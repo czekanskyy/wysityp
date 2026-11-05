@@ -91,7 +91,9 @@ Let students switch the whole note between the rendered page and its Typst sourc
 ### 10. Search, recent notes and templates
 Help students find and start notes fast: search across the text of every note in the folder, a list of notes opened recently, and ready made templates for lectures, problem sets and lab notes that create a new Typst file in the folder.
 **Done when:** a student can find an old proof by a word inside it during exam week, jump back to yesterday's lecture in two clicks, and start today's lecture from a template that already has the right shape.
-- [ ] Build it: `/develop search, recent notes and templates`
+**Spec:** [0002. Recent notes and templates](../specs/0002-recent-notes-and-templates.md) (assumed decision, spec 0002)
+**Code:** `src/App.svelte`, `src/lib/api.ts`, `src-tauri/src/commands.rs`, `src-tauri/src/files.rs`, `src-tauri/src/settings.rs`, `src-tauri/src/templates.rs`
+- [x] Build it: `/develop search, recent notes and templates`
 
 ### 11. Spell checking in Polish and English · needs a decision
 Check spelling as students type, in Polish and in English, underline mistakes on the rendered page, offer corrections, respect math and Typst commands, and let students teach the checker words from their own subjects.

@@ -12,7 +12,9 @@ export const commands = {
 	deleteEntry: (path: string) => typedError<null, string>(__TAURI_INVOKE("delete_entry", { path })),
 	listNotes: () => typedError<string[], string>(__TAURI_INVOKE("list_notes")),
 	searchNotes: (query: string) => typedError<SearchHit[], string>(__TAURI_INVOKE("search_notes", { query })),
+	listRecentNotes: () => typedError<string[], string>(__TAURI_INVOKE("list_recent_notes")),
 	openNote: (path: string) => typedError<Note, string>(__TAURI_INVOKE("open_note", { path })),
+	createFromTemplate: (parent: string, template: string) => typedError<Note, string>(__TAURI_INVOKE("create_from_template", { parent, template })),
 	createSampleNote: () => typedError<Note, string>(__TAURI_INVOKE("create_sample_note")),
 	saveNote: (path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("save_note", { path, text })),
 	renderNote: (path: string, source: string, revision: number) => typedError<RenderResult, string>(__TAURI_INVOKE("render_note", { path, source, revision })),
@@ -49,6 +51,11 @@ export type SearchHit = {
 	snippet: string,
 };
 
+/**
+ *  What the page is allowed to see. Language lives only in `locale`.
+ *  Recent notes are a separate command so the workspace identity never
+ *  travels to the page.
+ */
 export type Settings = {
 	locale: string,
 };

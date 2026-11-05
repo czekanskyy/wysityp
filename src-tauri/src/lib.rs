@@ -2,6 +2,7 @@ mod commands;
 mod error;
 mod files;
 mod settings;
+mod templates;
 mod typst_engine;
 
 use std::path::PathBuf;
@@ -36,7 +37,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::delete_entry,
         commands::list_notes,
         commands::search_notes,
+        commands::list_recent_notes,
         commands::open_note,
+        commands::create_from_template,
         commands::create_sample_note,
         commands::save_note,
         commands::render_note,

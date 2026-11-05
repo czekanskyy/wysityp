@@ -254,21 +254,30 @@ fn read_tree(root: &Path, dir: &Path) -> AppResult<Vec<TreeNode>> {
 }
 
 pub fn create_note(root: &Path, parent: &str, name: &str) -> AppResult<Note> {
+    let file_name = note_file_name(name)?;
+    let text = starter_heading(&file_name);
+    create_new_note(root, parent, &file_name, &text)
+}
+
+/// Write a new `.typ` file that does not exist yet.
+///
+/// The parent is a path counted from the root. An existing file is
+/// refused, and a path that leaves the root is refused.
+pub fn create_new_note(root: &Path, parent: &str, file_name: &str, text: &str) -> AppResult<Note> {
     let parent_path = resolve_place(root, parent)?;
     if !parent_path.is_dir() {
         return Err(AppError::InvalidName(parent.to_string()));
     }
-    let file_name = note_file_name(name)?;
+    let file_name = note_file_name(file_name)?;
     let relative = join_relative(parent, &file_name);
     let path = resolve_inside_root(root, &relative)?;
     if path.exists() {
         return Err(AppError::AlreadyExists(relative));
     }
-    let text = starter_heading(&file_name);
-    write_new_file(&path, &relative, &text)?;
+    write_new_file(&path, &relative, text)?;
     Ok(Note {
         path: relative,
-        text,
+        text: text.to_string(),
     })
 }
 

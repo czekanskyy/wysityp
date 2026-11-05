@@ -50,5 +50,15 @@
   "search_empty": "No note contains that.",
   "search_failed": "Search failed",
   "search_result": "Open this match",
-  "search_searching": "Searching..."
+  "search_searching": "Searching...",
+  "recent_notes": "Recent notes",
+  "recent_empty": "Notes you open show up here.",
+  "recent_loading": "Loading recent notes...",
+  "recent_failed": "Recent notes could not be read",
+  "templates_label": "Templates",
+  "template_lecture": "Lecture",
+  "template_problem_set": "Problem set",
+  "template_lab": "Lab note",
+  "template_created": "Created",
+  "template_failed": "The template did not create a note"
 }
