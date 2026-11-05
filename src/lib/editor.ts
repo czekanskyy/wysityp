@@ -57,7 +57,9 @@ export function createEditor(
     setSelection: (position: number) => {
       const clamped = Math.max(0, Math.min(position, view.state.doc.length));
       view.dispatch({ selection: { anchor: clamped } });
-      view.dispatch({ effects: EditorView.scrollIntoView(clamped, { y: "center" }) });
+      view.dispatch({
+        effects: EditorView.scrollIntoView(clamped, { y: "center" }),
+      });
     },
     focus: () => view.focus(),
     destroy: () => view.destroy(),

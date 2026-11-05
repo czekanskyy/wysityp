@@ -1,8 +1,7 @@
 import { commands } from "../bindings";
 
 type SpectaResult<T> =
-  | { status: "ok"; data: T }
-  | { status: "error"; error: string };
+  { status: "ok"; data: T } | { status: "error"; error: string };
 
 function unwrap<T>(value: T | SpectaResult<T>): T {
   if (

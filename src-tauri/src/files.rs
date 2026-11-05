@@ -422,10 +422,10 @@ fn collect_notes(root: &Path, dir: &Path, notes: &mut Vec<String>) -> AppResult<
         }
         if file_type.is_dir() {
             collect_notes(root, &path, notes)?;
-        } else if path.extension().is_some_and(|ext| ext == "typ") {
-            if let Ok(rel) = path.strip_prefix(root) {
-                notes.push(rel.to_string_lossy().replace('\\', "/"));
-            }
+        } else if path.extension().is_some_and(|ext| ext == "typ")
+            && let Ok(rel) = path.strip_prefix(root)
+        {
+            notes.push(rel.to_string_lossy().replace('\\', "/"));
         }
     }
     Ok(())

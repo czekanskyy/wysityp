@@ -12,7 +12,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | # | Feature | Phase | Status |
 |---|---------|-------|--------|
 | 1 | Stack and architecture | Foundation | in-progress |
-| 2 | Coding standards and tooling | Foundation | planned |
+| 2 | Coding standards and tooling | Foundation | in-progress |
 | 3 | Data model | Foundation | planned |
 | 4 | Design system and UI foundation | Foundation | planned |
 | 5 | Workspace and note files | Release 1 | in-progress |
@@ -43,8 +43,9 @@ Decide how the native Windows app is built, including the Rust and Tauri questio
 ### 2. Coding standards and tooling
 Capture how code in this project is written and checked, then set up the tools that enforce it, so later work stays consistent for one person building in spare time.
 **Done when:** the root `AGENTS.md` reflects the real scaffolded project, and lint, format and checks run clean.
-- [ ] Capture conventions and tooling choices: `/audit`
-- [ ] Install the tooling: `/develop tooling`
+**Code:** `AGENTS.md`, `package.json`, `.github/workflows/ci.yml`
+- [x] Capture conventions and tooling choices: `/audit`
+- [x] Install the tooling: `/develop tooling`
 - [ ] Check it runs clean: `/test tooling`
 
 ### 3. Data model · needs a decision
