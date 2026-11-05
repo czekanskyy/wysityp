@@ -631,15 +631,42 @@ pub fn write_note(root: &Path, relative: &str, text: &str) -> AppResult<()> {
 /// Write beside the target first, then swap it in, so a crash or a
 /// failed write leaves the previous file whole instead of torn.
 pub fn write_atomically(path: &Path, bytes: &[u8]) -> AppResult<()> {
+    use std::io::Write;
+    // The temp name carries the process id, so it never lands on a file
+    // the student made, and two app instances never share one temp.
     let mut temp_name = path.as_os_str().to_owned();
-    temp_name.push(".tmp");
+    temp_name.push(format!(".wysityp-{}.tmp", std::process::id()));
     let temp = PathBuf::from(temp_name);
-    std::fs::write(&temp, bytes).map_err(|err| AppError::io(&temp, err))?;
-    if let Err(err) = std::fs::rename(&temp, path) {
+    let written = (|| -> AppResult<()> {
+        let mut file = std::fs::File::create(&temp).map_err(|err| AppError::io(&temp, err))?;
+        file.write_all(bytes)
+            .map_err(|err| AppError::io(&temp, err))?;
+        // Flush before the swap, so a power cut cannot leave the renamed
+        // file empty.
+        file.sync_all().map_err(|err| AppError::io(&temp, err))?;
+        Ok(())
+    })();
+    if let Err(err) = written {
         let _ = std::fs::remove_file(&temp);
-        return Err(AppError::io(path, err));
+        return Err(err);
     }
-    Ok(())
+    // A sync tool or scanner can hold the target for a moment on
+    // Windows. A few short retries ride that out.
+    let mut attempt = 0;
+    loop {
+        match std::fs::rename(&temp, path) {
+            Ok(()) => return Ok(()),
+            Err(err) => {
+                attempt += 1;
+                let locked = err.kind() == std::io::ErrorKind::PermissionDenied;
+                if !locked || attempt >= 5 {
+                    let _ = std::fs::remove_file(&temp);
+                    return Err(AppError::io(path, err));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+        }
+    }
 }
 
 fn fingerprint_bytes(bytes: &[u8]) -> NoteFingerprint {

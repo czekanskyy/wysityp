@@ -143,6 +143,35 @@ pub fn list_recent(settings_path: &Path, root: &Path) -> AppResult<Vec<String>> 
     Ok(kept)
 }
 
+/// Follow a rename or move, the same retarget the save baseline does.
+/// Entries for a different open folder are left alone.
+pub fn retarget_recent(
+    settings_path: &Path,
+    root: &Path,
+    from: &str,
+    to: &str,
+) -> AppResult<()> {
+    let from = normalize_note(from)?;
+    let to = normalize_note(to)?;
+    let mut file = load_file(settings_path)?;
+    if file.recent_notes.workspace != workspace_key(root)? {
+        return Ok(());
+    }
+    let prefix = format!("{from}/");
+    for path in &mut file.recent_notes.paths {
+        if same_note(path, &from) {
+            *path = to.clone();
+        } else if let Some(rest) = path
+            .get(..prefix.len())
+            .filter(|head| head.eq_ignore_ascii_case(&prefix))
+            .map(|_| &path[prefix.len()..])
+        {
+            *path = format!("{to}/{rest}");
+        }
+    }
+    save_file(settings_path, &file)
+}
+
 fn load_file(path: &Path) -> AppResult<SettingsFile> {
     match std::fs::read_to_string(path) {
         Ok(text) => {
@@ -381,6 +410,32 @@ mod tests {
         record_recent(&path, root.path(), "a.typ").unwrap();
         assert!(!settings_dir.path().join("settings.json.tmp").exists());
         assert_eq!(load_settings(&path).unwrap().locale, "pl");
+    }
+
+    // covers: feature 10, a renamed note stays in the recent list at its new path
+    #[test]
+    fn recent_notes_follow_a_rename() {
+        let root = tempfile::tempdir().unwrap();
+        let other = tempfile::tempdir().unwrap();
+        let settings_dir = tempfile::tempdir().unwrap();
+        let path = settings_dir.path().join("settings.json");
+        write_note(root.path(), "old.typ");
+        write_note(root.path(), "keep.typ");
+        record_recent(&path, root.path(), "old.typ").unwrap();
+        record_recent(&path, root.path(), "keep.typ").unwrap();
+
+        retarget_recent(&path, other.path(), "keep.typ", "moved.typ").unwrap();
+        assert_eq!(
+            list_recent(&path, root.path()).unwrap(),
+            vec!["keep.typ".to_string(), "old.typ".to_string()]
+        );
+
+        retarget_recent(&path, root.path(), "old.typ", "nested/new.typ").unwrap();
+        write_note(root.path(), "nested/new.typ");
+        assert_eq!(
+            list_recent(&path, root.path()).unwrap(),
+            vec!["keep.typ".to_string(), "nested/new.typ".to_string()]
+        );
     }
 
     #[test]

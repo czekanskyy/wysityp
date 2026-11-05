@@ -95,6 +95,7 @@ Grow the page beyond prose and math with tables you can edit on the page, code b
 Let students switch the whole note between the rendered page and its Typst source with both views always in step, save work as they type, recover gracefully after a crash, and stay safe when another tool changes the same file.
 **Done when:** switching views never loses a character or a cursor place, killing the app mid sentence loses nothing already typed, and a change made in another tool is surfaced to the student rather than silently overwritten.
 **Code:** `src/App.svelte`, `src/lib/editor.ts`, `src/lib/noteSafety.ts`, `src/lib/api.ts`, `src-tauri/src/files.rs`, `src-tauri/src/commands.rs`
+Closing the window writes typing still inside the autosave pause first. Killing the process can still lose typing from that pause (under a second). That window is accepted for now and stays visible here until a recovery copy exists.
 - [x] Build it: `/develop source view and file safety`
 
 ### 10. Search, recent notes and templates

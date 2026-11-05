@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { api } from "./lib/api";
   import {
     createEditor,
@@ -53,6 +54,8 @@
   let savePhase = $state<SavePhase>("saved");
   let conflict = $state(false);
   let reloadArmed = $state(false);
+  let saveFailed = $state(false);
+  let leaveApproved = $state(false);
 
   let editor: EditorHandle | undefined;
   let nameInput: HTMLInputElement | undefined = $state();
@@ -139,6 +142,9 @@
       reloadWarning: m.reload_warning(),
       reloadConfirm: m.reload_confirm(),
       overwriteDisk: m.overwrite_disk(),
+      saveFailedBody: m.save_failed_body(),
+      retrySave: m.retry_save(),
+      leaveWithoutSaving: m.leave_without_saving(),
       recentNotes: m.recent_notes(),
       recentEmpty: m.recent_empty(),
       recentLoading: m.recent_loading(),
@@ -223,6 +229,7 @@
         return;
       conflict = false;
       reloadArmed = false;
+      saveFailed = false;
       if (
         savedTextIsCurrent(openNow, ticket, editor?.getText() ?? sourceText)
       ) {
@@ -248,12 +255,18 @@
         return;
       }
       savePhase = "unsaved";
+      saveFailed = true;
       status = `${labels.saveFailed}: ${String(error)}`;
     }
   }
 
   async function settleBeforeLeave(): Promise<boolean> {
     if (!currentPath) return true;
+    if (leaveApproved) {
+      leaveApproved = false;
+      autosave.cancel();
+      return true;
+    }
     autosave.cancel();
     await saveChain;
     if (conflict) return false;
@@ -263,11 +276,20 @@
     return !conflict && phaseNow() === "saved";
   }
 
+  function leaveWithoutSaving() {
+    // The next settleBeforeLeave lets one switch or close through.
+    leaveApproved = true;
+    saveFailed = false;
+    status = "";
+  }
+
   function applyLoadedNote(note: { path: string; text: string }) {
     noteEpoch += 1;
     noteRevision = 0;
     conflict = false;
     reloadArmed = false;
+    saveFailed = false;
+    leaveApproved = false;
     autosave.cancel();
     savePhase = "saved";
     currentPath = note.path;
@@ -333,6 +355,8 @@
     noteRevision = 0;
     conflict = false;
     reloadArmed = false;
+    saveFailed = false;
+    leaveApproved = false;
     autosave.cancel();
     savePhase = "saved";
     currentPath = "";
@@ -438,6 +462,8 @@
     if (!left) return;
     try {
       const note = await api.openNote(path);
+      // Typing that landed while Rust read the note is saved first.
+      if (!(await settleBeforeLeave())) return;
       setPages([]);
       diagnostics = [];
       applyLoadedNote(note);
@@ -450,14 +476,16 @@
 
   async function createFromTemplate(template: string) {
     if (!rootName || templatePending) return;
+    const left = await settleBeforeLeave();
+    if (!left) return;
     templatePending = true;
     try {
       const note = await api.createFromTemplate(selectedFolder, template);
+      if (!(await settleBeforeLeave())) return;
       await refreshTree();
-      currentPath = note.path;
-      editor?.setText(note.text);
       setPages([]);
       diagnostics = [];
+      applyLoadedNote(note);
       await runRender();
       status = `${labels.templateCreated}: ${note.path}`;
     } catch (error) {
@@ -472,6 +500,7 @@
     if (!left) return;
     try {
       const note = await api.createSampleNote();
+      if (!(await settleBeforeLeave())) return;
       await refreshTree();
       applyLoadedNote(note);
       await runRender();
@@ -490,6 +519,7 @@
     try {
       if (kind === "note") {
         const note = await api.createNote(selectedFolder, name);
+        if (!(await settleBeforeLeave())) return;
         entryName = "";
         await refreshTree();
         if (selectedFolder && !openFolders.includes(selectedFolder)) {
@@ -597,6 +627,8 @@
       await refreshTree();
     } catch (error) {
       status = `${labels.actionFailed}: ${String(error)}`;
+      if (currentPath && savePhase === "unsaved" && !conflict)
+        scheduleAutosave();
     }
   }
 
@@ -674,6 +706,34 @@
       status = `${labels.actionFailed}: ${String(error)}`;
     }
   }
+
+  // Closing the window first writes typing still inside the autosave
+  // pause. A conflict or a failed save keeps the window open, where the
+  // banners above the editor offer the way out.
+  $effect(() => {
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
+    try {
+      void getCurrentWindow()
+        .onCloseRequested(async (event) => {
+          event.preventDefault();
+          if (await settleBeforeLeave()) {
+            await getCurrentWindow().destroy();
+          }
+        })
+        .then((fn) => {
+          if (disposed) fn();
+          else unlisten = fn;
+        })
+        .catch(() => undefined);
+    } catch {
+      // Outside Tauri (a plain browser preview) there is no window to guard.
+    }
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  });
 
   async function exportPdf() {
     if (!currentPath || exporting) return;
@@ -1110,6 +1170,21 @@
                 {labels.overwriteDisk}
               </button>
             {/if}
+          </div>
+        </section>
+      {/if}
+
+      {#if saveFailed && !conflict}
+        <section class="conflict-banner" role="alert">
+          <h2>{labels.saveFailed}</h2>
+          <p>{labels.saveFailedBody}</p>
+          <div class="row-actions">
+            <button type="button" class="primary" onclick={saveNote}>
+              {labels.retrySave}
+            </button>
+            <button type="button" class="danger" onclick={leaveWithoutSaving}>
+              {labels.leaveWithoutSaving}
+            </button>
           </div>
         </section>
       {/if}

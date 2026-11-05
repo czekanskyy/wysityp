@@ -41,10 +41,13 @@ fn settings_file(state: &AppState) -> Result<PathBuf, String> {
         .ok_or_else(|| AppError::SettingsNotReady.to_string())
 }
 
-fn remember_opened(state: &AppState, root: &Path, relative: &str) -> Result<(), String> {
-    let path = settings_file(state)?;
-    settings::record_recent(&path, root, relative).map_err(String::from)?;
-    Ok(())
+/// Recording a recent note is best effort. A broken or locked settings
+/// file must never fail opening or creating the note itself.
+fn remember_opened(state: &AppState, root: &Path, relative: &str) {
+    let Ok(path) = settings_file(state) else {
+        return;
+    };
+    let _ = settings::record_recent(&path, root, relative);
 }
 
 #[tauri::command]
@@ -94,7 +97,7 @@ pub fn create_note(
     let root = root_or_err(&state)?;
     let note = files::create_note(&root, &parent, &name).map_err(String::from)?;
     remember_note(&state, &note)?;
-    remember_opened(&state, &root, &note.path)?;
+    remember_opened(&state, &root, &note.path);
     Ok(note)
 }
 
@@ -119,6 +122,10 @@ pub fn rename_entry(
     let root = root_or_err(&state)?;
     let next = files::rename_entry(&root, &from, &to).map_err(String::from)?;
     baselines(&state)?.retarget(&from, &next);
+    // Recent notes follow the rename too, best effort like recording.
+    if let Ok(path) = settings_file(&state) {
+        let _ = settings::retarget_recent(&path, &root, &from, &next);
+    }
     Ok(next)
 }
 
@@ -167,7 +174,7 @@ pub fn open_note(state: State<'_, AppState>, path: String) -> Result<Note, Strin
     let root = root_or_err(&state)?;
     let note = files::read_note(&root, &path).map_err(String::from)?;
     remember_note(&state, &note)?;
-    remember_opened(&state, &root, &note.path)?;
+    remember_opened(&state, &root, &note.path);
     Ok(note)
 }
 
@@ -186,7 +193,7 @@ pub fn create_from_template(
     let note = templates::create_from_template(&root, &parent, &template, &locale)
         .map_err(String::from)?;
     remember_note(&state, &note)?;
-    remember_opened(&state, &root, &note.path)?;
+    remember_opened(&state, &root, &note.path);
     Ok(note)
 }
 
@@ -200,7 +207,7 @@ pub fn create_sample_note(state: State<'_, AppState>) -> Result<Note, String> {
     }
     let note = files::read_note(&root, SAMPLE_PATH).map_err(String::from)?;
     remember_note(&state, &note)?;
-    remember_opened(&state, &root, &note.path)?;
+    remember_opened(&state, &root, &note.path);
     Ok(note)
 }
 
@@ -295,7 +302,23 @@ pub fn set_locale(state: State<'_, AppState>, locale: String) -> Result<Settings
 
 #[cfg(test)]
 mod tests {
-    use super::export_open_note;
+    use super::{export_open_note, remember_opened};
+    use crate::AppState;
+
+    // covers: features 9 and 10 together, a broken settings file cannot block a note
+    #[test]
+    fn recording_a_recent_note_is_best_effort() {
+        let root = tempfile::tempdir().unwrap();
+        let settings_dir = tempfile::tempdir().unwrap();
+        let settings_path = settings_dir.path().join("settings.json");
+        std::fs::write(&settings_path, "{ broken").unwrap();
+        crate::files::write_note(root.path(), "a.typ", "= Hi\n").unwrap();
+
+        let state = AppState::new();
+        *state.settings_file.lock().unwrap() = Some(settings_path);
+        // Must not panic or fail the caller: it returns nothing.
+        remember_opened(&state, root.path(), "a.typ");
+    }
     use crate::files::SAMPLE_TEXT;
     use crate::typst_engine::Engine;
 
