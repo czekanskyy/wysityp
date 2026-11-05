@@ -16,7 +16,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 3 | Data model | Foundation | planned |
 | 4 | Design system and UI foundation | Foundation | planned |
 | 5 | Workspace and note files | Release 1 | in-progress |
-| 6 | Rendered page editor | Release 1 | planned |
+| 6 | Rendered page editor | Release 1 | in-progress |
 | 7 | Math editing | Release 1 | planned |
 | 8 | Tables, code, images and links | Release 1 | planned |
 | 9 | Source view and file safety | Release 1 | planned |
@@ -68,10 +68,18 @@ Open a folder on disk, show its folders and notes as a tree, and let students cr
 **Code:** `src/App.svelte`, `src/lib/api.ts`, `src-tauri/src/files.rs`, `src-tauri/src/commands.rs`
 - [x] Build it: `/develop workspace and note files`
 
-### 6. Rendered page editor · needs a decision
+### 6. Rendered page editor
 The heart of WYSITyp: you type on a page that renders in place for text, headings, lists and quotes, typing shortcuts turn marks into structure as you go, and clicking any rendered part lets you edit its Typst source right there without the page losing your place or your cursor.
 **Done when:** a student can write a full lecture note by typing on the rendered page, every edit lands correctly in the Typst file on disk, opening that file again shows the same page, and long notes stay responsive while typing.
-- [ ] Design it (spec): `/architect rendered page editor`
+**Spec:** [0002. Rendered page editor](../specs/0002-rendered-page-editor/index.md)
+- [x] Design it (spec): `/architect rendered page editor`
+- [ ] Build it: `/develop rendered page editor`
+  - [ ] Rendered prose page (headings, lists, quotes, body, click, arrows, selection, undo), covers AC-1, AC-2, AC-3, AC-6, AC-7
+  - [ ] Errors, a steady caret, and a print preview that does not take focus, covers AC-4, AC-8, AC-10, AC-11
+  - [ ] Math placeholders you can click through, covers AC-5, AC-6
+  - [ ] Structure keys and the long note check, covers AC-9, AC-8
+- [ ] Verify it: `/check verify rendered page editor`
+- [ ] Test it: `/test rendered page editor`
 
 ### 7. Math editing · needs a decision
 Full math support that feels quick in a lecture: insert math inline or as its own block, type it with helpful symbol entry, see it render as you go, and click rendered math to change its source.
