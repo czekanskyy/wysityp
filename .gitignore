@@ -1,0 +1,17 @@
+.DS_Store
+node_modules
+/dist
+/target
+src-tauri/target/
+project.inlang/cache/
+.env
+.env.*
+!.env.example
+vite.config.ts.timestamp-*
+*.log
+
+# Local AI-agent tooling (installed per machine, see skills-lock.json)
+.agents/
+.grok/
+skills-lock.json
+test-preferences.json
