@@ -1,0 +1,401 @@
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+
+use serde::{Deserialize, Serialize};
+use specta::Type;
+use typst::{LibraryExt, World};
+use typst_kit::datetime::Time;
+use typst_kit::downloader::SystemDownloader;
+use typst_kit::files::{FileLoader, FileStore, FsRoot, SystemFiles};
+use typst_kit::fonts::FontStore;
+use typst_kit::packages::SystemPackages;
+use typst_layout::PagedDocument;
+use typst_library::diag::{FileResult, Severity, SourceDiagnostic};
+use typst_library::foundations::{Bytes, Datetime, Duration};
+use typst_library::text::{Font, FontBook};
+use typst_library::{Library, WorldExt};
+use typst_syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
+use typst_utils::LazyHash;
+
+use crate::error::{AppError, AppResult};
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct RenderDiagnostic {
+    pub severity: String,
+    pub file: String,
+    pub start: u32,
+    pub end: u32,
+    pub message: String,
+    pub hints: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct RenderResult {
+    pub revision: u32,
+    pub pages: Vec<String>,
+    pub diagnostics: Vec<RenderDiagnostic>,
+}
+
+/// The bundled font families come first, so they win over a system
+/// family with the same name. They are the families Typst itself
+/// ships: Libertinus Serif and New Computer Modern for text,
+/// New Computer Modern Math for math, and Deja Vu Sans Mono for code.
+/// Each ships under an open licence that allows bundling it in an app.
+/// System fonts found on the machine come after the bundled set.
+pub fn build_fonts() -> FontStore {
+    let mut store = FontStore::new();
+    store.extend(typst_kit::fonts::embedded());
+    store.extend(typst_kit::fonts::system());
+    store
+}
+
+struct BufferLoader {
+    main_id: FileId,
+    buffer: String,
+    system: SystemFiles,
+}
+
+impl FileLoader for BufferLoader {
+    fn load(&self, id: FileId) -> FileResult<Bytes> {
+        if id == self.main_id {
+            Ok(Bytes::from_string(self.buffer.clone()))
+        } else {
+            self.system.load(id)
+        }
+    }
+}
+
+struct NoteWorld {
+    library: LazyHash<Library>,
+    fonts: Arc<FontStore>,
+    files: FileStore<BufferLoader>,
+    main_id: FileId,
+    time: Time,
+    root: PathBuf,
+    note_path: String,
+    last_document: Option<PagedDocument>,
+}
+
+impl NoteWorld {
+    fn new(fonts: Arc<FontStore>, root: &Path, note_path: &str, source: &str) -> AppResult<Self> {
+        let vpath = VirtualPath::new(format!("/{note_path}"))
+            .map_err(|err| AppError::Message(format!("bad note path: {err}")))?;
+        let main_id = FileId::new(RootedPath::new(VirtualRoot::Project, vpath));
+        let packages = SystemPackages::new(SystemDownloader::new("WYSITyp"));
+        let system = SystemFiles::new(FsRoot::new(root.to_path_buf()), packages);
+        Ok(Self {
+            library: LazyHash::new(Library::builder().build()),
+            fonts,
+            files: FileStore::new(BufferLoader {
+                main_id,
+                buffer: source.to_string(),
+                system,
+            }),
+            main_id,
+            time: Time::system(),
+            root: root.to_path_buf(),
+            note_path: note_path.to_string(),
+            last_document: None,
+        })
+    }
+
+    fn update(&mut self, source: &str) {
+        self.files.loader_mut().buffer = source.to_string();
+        self.files.reset();
+        self.time.reset();
+    }
+}
+
+impl World for NoteWorld {
+    fn library(&self) -> &LazyHash<Library> {
+        &self.library
+    }
+
+    fn book(&self) -> &LazyHash<FontBook> {
+        self.fonts.book()
+    }
+
+    fn main(&self) -> FileId {
+        self.main_id
+    }
+
+    fn source(&self, id: FileId) -> FileResult<Source> {
+        self.files.source(id)
+    }
+
+    fn file(&self, id: FileId) -> FileResult<Bytes> {
+        self.files.file(id)
+    }
+
+    fn font(&self, index: usize) -> Option<Font> {
+        self.fonts.font(index)
+    }
+
+    fn today(&self, offset: Option<Duration>) -> Option<Datetime> {
+        self.time.today(offset)
+    }
+}
+
+fn map_diagnostic(world: &NoteWorld, diagnostic: &SourceDiagnostic) -> RenderDiagnostic {
+    let range = world.range(diagnostic.span);
+    RenderDiagnostic {
+        severity: match diagnostic.severity {
+            Severity::Error => "error".to_string(),
+            Severity::Warning => "warning".to_string(),
+        },
+        file: diagnostic
+            .span
+            .id()
+            .map(|id| id.vpath().get_without_slash().to_string())
+            .unwrap_or_default(),
+        start: range.as_ref().map(|range| range.start as u32).unwrap_or(0),
+        end: range.map(|range| range.end as u32).unwrap_or(0),
+        message: diagnostic.message.to_string(),
+        hints: diagnostic
+            .hints
+            .iter()
+            .map(|hint| hint.v.to_string())
+            .collect(),
+    }
+}
+
+/// One engine for the app. It holds the font set and the world for the
+/// open note, so work from one compile can help the next one.
+pub struct Engine {
+    fonts: Arc<FontStore>,
+    world: Mutex<Option<NoteWorld>>,
+    gate: Mutex<()>,
+}
+
+impl Engine {
+    pub fn new() -> Self {
+        Self {
+            fonts: Arc::new(build_fonts()),
+            world: Mutex::new(None),
+            gate: Mutex::new(()),
+        }
+    }
+
+    pub fn render(
+        &self,
+        root: &Path,
+        note_path: &str,
+        source: &str,
+        revision: u32,
+    ) -> AppResult<RenderResult> {
+        let _gate = self
+            .gate
+            .lock()
+            .map_err(|_| AppError::Message("render gate was poisoned".to_string()))?;
+        let mut world = {
+            let mut slot = self
+                .world
+                .lock()
+                .map_err(|_| AppError::Message("world lock was poisoned".to_string()))?;
+            match slot.take() {
+                Some(existing) if existing.root == root && existing.note_path == note_path => {
+                    existing
+                }
+                _ => NoteWorld::new(self.fonts.clone(), root, note_path, source)?,
+            }
+        };
+        world.update(source);
+
+        let warned = typst::compile::<PagedDocument>(&world as &dyn World);
+        let mut diagnostics: Vec<RenderDiagnostic> = warned
+            .warnings
+            .iter()
+            .map(|diag| map_diagnostic(&world, diag))
+            .collect();
+        let pages = match warned.output {
+            Ok(document) => {
+                let pages: Vec<String> = document
+                    .pages()
+                    .iter()
+                    .map(|page| typst_svg::svg(page, &typst_svg::SvgOptions::default()))
+                    .collect();
+                world.last_document = Some(document);
+                pages
+            }
+            Err(errors) => {
+                diagnostics.extend(errors.iter().map(|diag| map_diagnostic(&world, diag)));
+                Vec::new()
+            }
+        };
+        comemo::evict(30);
+
+        let mut slot = self
+            .world
+            .lock()
+            .map_err(|_| AppError::Message("world lock was poisoned".to_string()))?;
+        *slot = Some(world);
+        Ok(RenderResult {
+            revision,
+            pages,
+            diagnostics,
+        })
+    }
+}
+
+impl Default for Engine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::files::SAMPLE_TEXT;
+
+    #[test]
+    fn renders_polish_and_math_to_svg() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        let result = engine
+            .render(dir.path(), "note.typ", SAMPLE_TEXT, 1)
+            .unwrap();
+        assert_eq!(
+            result.pages.len(),
+            1,
+            "diagnostics: {:?}",
+            result.diagnostics
+        );
+        let svg = &result.pages[0];
+        assert!(svg.contains("<svg"), "svg should be a page image");
+        assert!(
+            svg.contains("<path"),
+            "glyphs and the figure should be drawn as paths"
+        );
+        assert!(
+            !svg.contains("file://"),
+            "the page must not read files by itself"
+        );
+    }
+
+    #[test]
+    fn error_after_polish_letters_marks_the_right_place() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        let source = "= Łódź ąę\n\n#brak()\n";
+        let expected = source.find("brak").unwrap() as u32;
+        let result = engine.render(dir.path(), "note.typ", source, 1).unwrap();
+        assert!(result.pages.is_empty());
+        assert!(
+            result.diagnostics.iter().any(|diag| diag.start == expected),
+            "expected a diagnostic at byte {expected}, got {:?}",
+            result.diagnostics
+        );
+    }
+
+    // covers: proof 4, the revision comes back untouched
+    #[test]
+    fn returns_the_revision_untouched_with_one_image_per_page() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        let result = engine
+            .render(
+                dir.path(),
+                "note.typ",
+                "= One\n\n#pagebreak()\n\n= Two\n",
+                42,
+            )
+            .unwrap();
+        assert_eq!(result.revision, 42);
+        assert_eq!(result.pages.len(), 2);
+    }
+
+    // covers: proof 7, an error carries its file, range and own words
+    #[test]
+    fn a_diagnostic_carries_file_range_and_words() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        let source = "= Łódź ąę\n\n#brak()\n";
+        let expected = source.find("brak").unwrap() as u32;
+        let result = engine.render(dir.path(), "note.typ", source, 1).unwrap();
+        let diag = result
+            .diagnostics
+            .iter()
+            .find(|diag| diag.start == expected)
+            .expect("a diagnostic at the bad word");
+        assert_eq!(diag.severity, "error");
+        assert_eq!(diag.file, "note.typ");
+        assert!(diag.end > diag.start);
+        assert!(
+            diag.message.contains("brak"),
+            "message was: {}",
+            diag.message
+        );
+    }
+
+    // covers: proof 4, included files come from disk inside the folder
+    #[test]
+    fn reads_an_included_file_from_inside_the_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("included.typ"),
+            "= From the included file\n",
+        )
+        .unwrap();
+        let engine = Engine::new();
+        let result = engine
+            .render(dir.path(), "note.typ", "#include \"included.typ\"\n", 1)
+            .unwrap();
+        assert_eq!(
+            result.pages.len(),
+            1,
+            "diagnostics: {:?}",
+            result.diagnostics
+        );
+        assert!(
+            result
+                .diagnostics
+                .iter()
+                .all(|diag| diag.severity != "error"),
+            "diagnostics: {:?}",
+            result.diagnostics
+        );
+    }
+
+    // covers: the root rule, Typst reads cannot climb out of the folder
+    #[test]
+    fn an_included_file_outside_the_folder_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("root");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(dir.path().join("outside.typ"), "= Outside\n").unwrap();
+        let engine = Engine::new();
+        let result = engine
+            .render(&root, "note.typ", "#include \"../outside.typ\"\n", 1)
+            .unwrap();
+        assert!(result.pages.is_empty(), "pages: {:?}", result.pages);
+        assert!(
+            result
+                .diagnostics
+                .iter()
+                .any(|diag| diag.severity == "error"),
+            "diagnostics: {:?}",
+            result.diagnostics
+        );
+    }
+
+    // covers: proof 4, a world that stays alive still uses the new buffer
+    #[test]
+    fn a_second_render_uses_the_new_buffer() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        let first = engine.render(dir.path(), "note.typ", "= One\n", 1).unwrap();
+        assert_eq!(first.pages.len(), 1);
+        let second = engine
+            .render(dir.path(), "note.typ", "= One\n\n#brak()\n", 2)
+            .unwrap();
+        assert_eq!(second.revision, 2);
+        assert!(second.pages.is_empty());
+        assert!(
+            second
+                .diagnostics
+                .iter()
+                .any(|diag| diag.severity == "error")
+        );
+    }
+}
