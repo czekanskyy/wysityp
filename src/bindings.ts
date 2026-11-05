@@ -16,6 +16,7 @@ export const commands = {
 	createSampleNote: () => typedError<Note, string>(__TAURI_INVOKE("create_sample_note")),
 	saveNote: (path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("save_note", { path, text })),
 	renderNote: (path: string, source: string, revision: number) => typedError<RenderResult, string>(__TAURI_INVOKE("render_note", { path, source, revision })),
+	exportPdf: (path: string, source: string) => typedError<string, string>(__TAURI_INVOKE("export_pdf", { path, source })),
 	getSettings: () => typedError<Settings, string>(__TAURI_INVOKE("get_settings")),
 	setLocale: (locale: string) => typedError<Settings, string>(__TAURI_INVOKE("set_locale", { locale })),
 };

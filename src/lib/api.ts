@@ -55,6 +55,9 @@ export const api = {
   async renderNote(path: string, source: string, revision: number) {
     return unwrap(await commands.renderNote(path, source, revision));
   },
+  async exportPdf(path: string, source: string) {
+    return unwrap(await commands.exportPdf(path, source));
+  },
   async getSettings() {
     return unwrap(await commands.getSettings());
   },

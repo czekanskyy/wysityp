@@ -74,6 +74,10 @@ struct NoteWorld {
     root: PathBuf,
     note_path: String,
     last_document: Option<PagedDocument>,
+    /// Source that `last_document` was compiled from.
+    /// Export reuses that document when the editor still has this source,
+    /// so the PDF keeps the date pinned for that compile.
+    compiled_source: Option<String>,
 }
 
 impl NoteWorld {
@@ -96,6 +100,7 @@ impl NoteWorld {
             root: root.to_path_buf(),
             note_path: note_path.to_string(),
             last_document: None,
+            compiled_source: None,
         })
     }
 
@@ -214,11 +219,14 @@ impl Engine {
                     .iter()
                     .map(|page| typst_svg::svg(page, &typst_svg::SvgOptions::default()))
                     .collect();
+                world.compiled_source = Some(source.to_string());
                 world.last_document = Some(document);
                 pages
             }
             Err(errors) => {
                 diagnostics.extend(errors.iter().map(|diag| map_diagnostic(&world, diag)));
+                world.compiled_source = None;
+                world.last_document = None;
                 Vec::new()
             }
         };
@@ -235,6 +243,96 @@ impl Engine {
             diagnostics,
         })
     }
+
+    /// Compile the editor source and return PDF bytes.
+    ///
+    /// When this engine already compiled that exact source, the kept document
+    /// is exported and the pinned date stays. Otherwise one fresh compile runs
+    /// first and its date is pinned for this export. This function does not
+    /// write a file.
+    pub fn export_pdf(&self, root: &Path, note_path: &str, source: &str) -> AppResult<Vec<u8>> {
+        let _gate = self
+            .gate
+            .lock()
+            .map_err(|_| AppError::Message("compile gate was poisoned".to_string()))?;
+        let mut world = {
+            let mut slot = self
+                .world
+                .lock()
+                .map_err(|_| AppError::Message("world lock was poisoned".to_string()))?;
+            match slot.take() {
+                Some(existing) if existing.root == root && existing.note_path == note_path => {
+                    existing
+                }
+                _ => NoteWorld::new(self.fonts.clone(), root, note_path, source)?,
+            }
+        };
+
+        let result = export_from_world(&mut world, source);
+        comemo::evict(30);
+        let mut slot = self
+            .world
+            .lock()
+            .map_err(|_| AppError::Message("world lock was poisoned".to_string()))?;
+        *slot = Some(world);
+        result
+    }
+}
+
+fn export_from_world(world: &mut NoteWorld, source: &str) -> AppResult<Vec<u8>> {
+    if world.compiled_source.as_deref() == Some(source)
+        && let Some(document) = world.last_document.as_ref()
+    {
+        return pdf_bytes(world, document);
+    }
+
+    world.update(source);
+    let warned = typst::compile::<PagedDocument>(world as &dyn World);
+    match warned.output {
+        Ok(document) => {
+            let bytes = pdf_bytes(world, &document)?;
+            world.compiled_source = Some(source.to_string());
+            world.last_document = Some(document);
+            Ok(bytes)
+        }
+        Err(errors) => {
+            world.compiled_source = None;
+            world.last_document = None;
+            Err(AppError::Message(format_diagnostics(world, &errors)))
+        }
+    }
+}
+
+fn pdf_bytes(world: &NoteWorld, document: &PagedDocument) -> AppResult<Vec<u8>> {
+    match typst_pdf::pdf(document, &typst_pdf::PdfOptions::default()) {
+        Ok(bytes) if !bytes.is_empty() && bytes.starts_with(b"%PDF") => Ok(bytes),
+        Ok(_) => Err(AppError::Message("Typst did not produce a PDF".to_string())),
+        Err(errors) => Err(AppError::Message(format_diagnostics(world, &errors))),
+    }
+}
+
+fn format_diagnostics(world: &NoteWorld, errors: &[SourceDiagnostic]) -> String {
+    if errors.is_empty() {
+        return format!("{}: Typst could not compile this note", world.note_path);
+    }
+    errors
+        .iter()
+        .map(|diagnostic| {
+            let mapped = map_diagnostic(world, diagnostic);
+            let file = if mapped.file.is_empty() {
+                world.note_path.clone()
+            } else {
+                mapped.file
+            };
+            let mut line = format!("{file}:{}-{}: {}", mapped.start, mapped.end, mapped.message);
+            if !mapped.hints.is_empty() {
+                line.push(' ');
+                line.push_str(&mapped.hints.join(" "));
+            }
+            line
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 impl Default for Engine {
@@ -396,6 +494,40 @@ mod tests {
                 .diagnostics
                 .iter()
                 .any(|diag| diag.severity == "error")
+        );
+    }
+
+    #[test]
+    fn exports_pdf_bytes_for_a_valid_note() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        let bytes = engine
+            .export_pdf(dir.path(), "notes/lecture.typ", SAMPLE_TEXT)
+            .unwrap();
+        assert!(!bytes.is_empty());
+        assert!(bytes.starts_with(b"%PDF"));
+        assert!(
+            std::fs::read_dir(dir.path()).unwrap().next().is_none(),
+            "exporting bytes must not touch the folder"
+        );
+    }
+
+    #[test]
+    fn a_broken_note_fails_with_the_place_in_the_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        let source = "= Łódź ąę\n\n#brak()\n";
+        let expected = source.find("brak").unwrap().to_string();
+        let message = engine
+            .export_pdf(dir.path(), "notes/lecture.typ", source)
+            .unwrap_err()
+            .to_string();
+        assert!(message.contains(&expected), "{message}");
+        assert!(message.contains("brak"), "{message}");
+        assert!(message.contains("notes/lecture.typ"), "{message}");
+        assert!(
+            std::fs::read_dir(dir.path()).unwrap().next().is_none(),
+            "a failed export must not touch the folder"
         );
     }
 }

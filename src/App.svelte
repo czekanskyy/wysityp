@@ -24,6 +24,7 @@
   let searchTouched = $state(false);
   let searchPending = $state(false);
   let rendering = $state(false);
+  let exporting = $state(false);
 
   let editor: EditorHandle | undefined;
   let nameInput: HTMLInputElement | undefined = $state();
@@ -56,6 +57,10 @@
       rendering: m.rendering(),
       saved: m.saved(),
       saveFailed: m.save_failed(),
+      exportPdf: m.export_pdf(),
+      exportingPdf: m.exporting_pdf(),
+      exportedPdf: m.exported_pdf(),
+      exportFailed: m.export_failed(),
       openFailed: m.open_failed(),
       renderFailed: m.render_failed(),
       workspaceReady: m.workspace_ready(),
@@ -351,6 +356,22 @@
     }
   }
 
+  async function exportPdf() {
+    if (!editor || !currentPath || exporting) return;
+    const path = currentPath;
+    const source = editor.getText();
+    exporting = true;
+    status = labels.exportingPdf;
+    try {
+      const written = await api.exportPdf(path, source);
+      status = `${labels.exportedPdf}: ${written}`;
+    } catch (error) {
+      status = `${labels.exportFailed}: ${String(error)}`;
+    } finally {
+      exporting = false;
+    }
+  }
+
   async function changeLocale(next: AppLocale) {
     try {
       const saved = await api.setLocale(next);
@@ -495,6 +516,13 @@
         disabled={!currentPath}
       >
         {labels.saveNote}
+      </button>
+      <button
+        type="button"
+        onclick={exportPdf}
+        disabled={!currentPath || exporting}
+      >
+        {labels.exportPdf}
       </button>
       <label class="locale-picker">
         <span>{labels.language}</span>

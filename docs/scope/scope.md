@@ -22,7 +22,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 9 | Source view and file safety | Release 1 | planned |
 | 10 | Search, recent notes and templates | Release 1 | in-progress |
 | 11 | Spell checking in Polish and English | Release 1 | planned |
-| 12 | PDF export | Release 1 | planned |
+| 12 | PDF export | Release 1 | in-progress |
 | 13 | Smart suggestions for Typst and math | Release 2 | planned |
 | 14 | Visual geometry and diagrams | Release 3 | planned |
 | 15 | Markdown import | Release 4 | planned |
@@ -101,7 +101,8 @@ Check spelling as students type, in Polish and in English, underline mistakes on
 ### 12. PDF export
 Turn the open note into a PDF through Typst itself, with page settings a student can choose, and when Typst reports an error, point back to the place in the note that caused it.
 **Done when:** a finished note exports to a PDF that matches the rendered page, export settings are remembered per note or per student, and a Typst error tells the student where to look instead of failing in silence.
-- [ ] Build it: `/develop PDF export`
+**Code:** `src/App.svelte`, `src/lib/api.ts`, `src-tauri/src/commands.rs`, `src-tauri/src/files.rs`, `src-tauri/src/typst_engine.rs`
+- [x] Build it: `/develop PDF export`
 
 ## Release 2: Faster typing
 

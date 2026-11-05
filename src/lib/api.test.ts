@@ -14,6 +14,7 @@ vi.mock("../bindings", () => ({
     createSampleNote: vi.fn(),
     saveNote: vi.fn(),
     renderNote: vi.fn(),
+    exportPdf: vi.fn(),
     getSettings: vi.fn(),
     setLocale: vi.fn(),
   },
@@ -98,6 +99,18 @@ describe("workspace api", () => {
 
     await expect(api.createNote("", "one.typ")).rejects.toThrow(
       "that name is already taken",
+    );
+  });
+
+  it("exports the open note and returns the PDF path from the root", async () => {
+    mocked.exportPdf.mockResolvedValue("notes/lecture.pdf" as never);
+
+    await expect(
+      api.exportPdf("notes/lecture.typ", "= Wykład\n"),
+    ).resolves.toBe("notes/lecture.pdf");
+    expect(mocked.exportPdf).toHaveBeenCalledWith(
+      "notes/lecture.typ",
+      "= Wykład\n",
     );
   });
 

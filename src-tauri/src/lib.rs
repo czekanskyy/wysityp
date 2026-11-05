@@ -40,6 +40,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::create_sample_note,
         commands::save_note,
         commands::render_note,
+        commands::export_pdf,
         commands::get_settings,
         commands::set_locale
     ])

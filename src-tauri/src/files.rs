@@ -525,6 +525,56 @@ pub fn read_note(root: &Path, relative: &str) -> AppResult<Note> {
     })
 }
 
+/// The PDF sits beside the note, with the note file stem and a `.pdf` extension.
+///
+/// `notes/lecture.typ` becomes `notes/lecture.pdf`. The page never chooses this path.
+pub fn pdf_export_path(note_path: &str) -> AppResult<String> {
+    let relative = note_path.trim().replace('\\', "/");
+    if relative.is_empty() || relative.ends_with('/') {
+        return Err(AppError::InvalidName(note_path.to_string()));
+    }
+    let path = Path::new(&relative);
+    if path.is_absolute() {
+        return Err(AppError::OutsideRoot(note_path.to_string()));
+    }
+    for part in path.components() {
+        match part {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => return Err(AppError::OutsideRoot(note_path.to_string())),
+        }
+    }
+    let stem = path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .filter(|stem| !stem.is_empty())
+        .ok_or_else(|| AppError::InvalidName(note_path.to_string()))?;
+    let file_name = format!("{stem}.pdf");
+    match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => {
+            let parent = parent.to_string_lossy().replace('\\', "/");
+            Ok(format!("{parent}/{file_name}"))
+        }
+        _ => Ok(file_name),
+    }
+}
+
+/// Write PDF bytes beside the note. An existing export is replaced.
+/// Bytes that are not a PDF are refused, so a failed compile cannot leave a bogus file.
+pub fn write_pdf_export(root: &Path, note_path: &str, bytes: &[u8]) -> AppResult<String> {
+    if bytes.is_empty() || !bytes.starts_with(b"%PDF") {
+        return Err(AppError::Message(
+            "refusing to write a file that is not a PDF".to_string(),
+        ));
+    }
+    let relative = pdf_export_path(note_path)?;
+    let path = resolve_inside_root(root, &relative)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|err| AppError::io(parent, err))?;
+    }
+    std::fs::write(&path, bytes).map_err(|err| AppError::io(&path, err))?;
+    Ok(relative)
+}
+
 pub fn write_note(root: &Path, relative: &str, text: &str) -> AppResult<()> {
     let path = resolve_inside_root(root, relative)?;
     if let Some(parent) = path.parent() {
@@ -810,5 +860,38 @@ mod tests {
         let tree = list_tree(dir.path()).unwrap();
         assert!(tree.iter().all(|node| !node.name.starts_with('.')));
         assert_eq!(tree.len(), 2);
+    }
+
+    #[test]
+    fn pdf_export_path_sits_beside_the_note() {
+        assert_eq!(
+            pdf_export_path("notes/lecture.typ").unwrap(),
+            "notes/lecture.pdf"
+        );
+        assert_eq!(pdf_export_path("lecture.typ").unwrap(), "lecture.pdf");
+        assert_eq!(
+            pdf_export_path("notes/my.lecture.typ").unwrap(),
+            "notes/my.lecture.pdf"
+        );
+        assert!(pdf_export_path("../lecture.typ").is_err());
+        assert!(pdf_export_path("C:/lecture.typ").is_err());
+    }
+
+    #[test]
+    fn writes_the_pdf_beside_the_note_and_overwrites_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let first = write_pdf_export(dir.path(), "notes/lecture.typ", b"%PDF-1.7\nfirst").unwrap();
+        assert_eq!(first, "notes/lecture.pdf");
+        write_pdf_export(dir.path(), "notes/lecture.typ", b"%PDF-1.7\nsecond").unwrap();
+        let bytes = std::fs::read(dir.path().join("notes").join("lecture.pdf")).unwrap();
+        assert_eq!(bytes, b"%PDF-1.7\nsecond");
+    }
+
+    #[test]
+    fn refuses_to_write_bytes_that_are_not_a_pdf() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(write_pdf_export(dir.path(), "notes/lecture.typ", b"not a pdf").is_err());
+        assert!(write_pdf_export(dir.path(), "notes/lecture.typ", b"").is_err());
+        assert!(!dir.path().join("notes").join("lecture.pdf").exists());
     }
 }
