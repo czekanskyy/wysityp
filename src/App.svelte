@@ -194,7 +194,8 @@
         const created = await api.createFolder(selectedFolder, name);
         entryName = "";
         selectedFolder = created;
-        if (!openFolders.includes(created)) openFolders = [...openFolders, created];
+        if (!openFolders.includes(created))
+          openFolders = [...openFolders, created];
         await refreshTree();
       }
     } catch (error) {
@@ -219,11 +220,14 @@
       retargetOpenNote(from, next);
       if (selectedFolder === from || selectedFolder.startsWith(`${from}/`)) {
         selectedFolder =
-          selectedFolder === from ? next : next + selectedFolder.slice(from.length);
+          selectedFolder === from
+            ? next
+            : next + selectedFolder.slice(from.length);
       }
       openFolders = openFolders.map((folder) => {
         if (folder === from) return next;
-        if (folder.startsWith(`${from}/`)) return next + folder.slice(from.length);
+        if (folder.startsWith(`${from}/`))
+          return next + folder.slice(from.length);
         return folder;
       });
       await refreshTree();
@@ -344,7 +348,9 @@
     <p class="muted">{labels.moveHint}</p>
     <div class="row-actions">
       <button type="submit">{labels.applyPath}</button>
-      <button type="button" onclick={() => (renamingPath = "")}>{labels.cancel}</button>
+      <button type="button" onclick={() => (renamingPath = "")}
+        >{labels.cancel}</button
+      >
     </div>
   </form>
 {/snippet}
@@ -383,7 +389,9 @@
             <button type="button" onclick={() => startRename(node.path)}>
               {labels.renameOrMove}
             </button>
-            <button type="button" onclick={() => askDelete(node.path)}>{labels.delete}</button>
+            <button type="button" onclick={() => askDelete(node.path)}
+              >{labels.delete}</button
+            >
           </div>
           {#if renamingPath === node.path}
             {@render renameForm()}
@@ -410,7 +418,9 @@
             <button type="button" onclick={() => startRename(node.path)}>
               {labels.renameOrMove}
             </button>
-            <button type="button" onclick={() => askDelete(node.path)}>{labels.delete}</button>
+            <button type="button" onclick={() => askDelete(node.path)}
+              >{labels.delete}</button
+            >
           </div>
           {#if renamingPath === node.path}
             {@render renameForm()}
@@ -487,10 +497,18 @@
             {/if}
           </p>
           <div class="row-actions">
-            <button type="button" onclick={() => createEntry("note")} disabled={!entryName.trim()}>
+            <button
+              type="button"
+              onclick={() => createEntry("note")}
+              disabled={!entryName.trim()}
+            >
               {labels.newNote}
             </button>
-            <button type="button" onclick={() => createEntry("folder")} disabled={!entryName.trim()}>
+            <button
+              type="button"
+              onclick={() => createEntry("folder")}
+              disabled={!entryName.trim()}
+            >
               {labels.newFolder}
             </button>
           </div>
@@ -510,10 +528,17 @@
             <p id="confirm-title">{labels.confirmDelete}</p>
             <p class="path-line">{pendingDelete}</p>
             <div class="row-actions">
-              <button type="button" class="danger" {@attach focusOnMount} onclick={confirmDelete}>
+              <button
+                type="button"
+                class="danger"
+                {@attach focusOnMount}
+                onclick={confirmDelete}
+              >
                 {labels.delete}
               </button>
-              <button type="button" onclick={closeDelete}>{labels.cancel}</button>
+              <button type="button" onclick={closeDelete}
+                >{labels.cancel}</button
+              >
             </div>
           </section>
         {/if}
@@ -555,7 +580,10 @@
                 <li>
                   <button
                     type="button"
-                    class={["diagnostic", { error: diagnostic.severity === "error" }]}
+                    class={[
+                      "diagnostic",
+                      { error: diagnostic.severity === "error" },
+                    ]}
                     onclick={() => jumpToDiagnostic(diagnostic)}
                   >
                     <strong>{diagnostic.severity}</strong>

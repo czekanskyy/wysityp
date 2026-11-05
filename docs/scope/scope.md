@@ -46,7 +46,7 @@ Capture how code in this project is written and checked, then set up the tools t
 **Code:** `AGENTS.md`, `package.json`, `.github/workflows/ci.yml`
 - [x] Capture conventions and tooling choices: `/audit`
 - [x] Install the tooling: `/develop tooling`
-- [ ] Check it runs clean: `/test tooling`
+- [x] Check it runs clean: `/test tooling`
 
 ### 3. Data model · needs a decision
 Decide where things live on disk: the folder a student picks, notes as plain Typst files inside it, images that belong to a note, templates, app settings, and any index the app keeps to search fast, all in a shape other tools can still read.

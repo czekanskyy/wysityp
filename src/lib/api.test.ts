@@ -34,7 +34,9 @@ describe("workspace api", () => {
         name: "lab",
         path: "lab",
         kind: "folder",
-        children: [{ name: "one.typ", path: "lab/one.typ", kind: "note", children: [] }],
+        children: [
+          { name: "one.typ", path: "lab/one.typ", kind: "note", children: [] },
+        ],
       },
     ];
     mocked.listTree.mockResolvedValue(tree as never);
@@ -44,7 +46,10 @@ describe("workspace api", () => {
   });
 
   it("creates a note in the chosen folder and hands back its words", async () => {
-    mocked.createNote.mockResolvedValue({ path: "lab/one.typ", text: "= one\n" } as never);
+    mocked.createNote.mockResolvedValue({
+      path: "lab/one.typ",
+      text: "= one\n",
+    } as never);
 
     await expect(api.createNote("lab", "one")).resolves.toEqual({
       path: "lab/one.typ",
@@ -63,7 +68,9 @@ describe("workspace api", () => {
   it("renames or moves an entry and returns the new path", async () => {
     mocked.renameEntry.mockResolvedValue("dest/new.typ" as never);
 
-    await expect(api.renameEntry("old.typ", "dest/new.typ")).resolves.toBe("dest/new.typ");
+    await expect(api.renameEntry("old.typ", "dest/new.typ")).resolves.toBe(
+      "dest/new.typ",
+    );
     expect(mocked.renameEntry).toHaveBeenCalledWith("old.typ", "dest/new.typ");
   });
 
@@ -91,6 +98,8 @@ describe("workspace api", () => {
       data: "new.typ",
     } as never);
 
-    await expect(api.renameEntry("old.typ", "new.typ")).resolves.toBe("new.typ");
+    await expect(api.renameEntry("old.typ", "new.typ")).resolves.toBe(
+      "new.typ",
+    );
   });
 });

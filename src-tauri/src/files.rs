@@ -97,7 +97,10 @@ pub fn resolve_inside_root(root: &Path, relative: &str) -> AppResult<PathBuf> {
 }
 
 fn display_relative(path: &str) -> String {
-    path.trim().replace('\\', "/").trim_end_matches('/').to_string()
+    path.trim()
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_string()
 }
 
 fn is_same_or_inside(parent: &str, child: &str) -> bool {
@@ -110,9 +113,28 @@ fn is_reserved_device_name(name: &str) -> bool {
     let stem = name.split('.').next().unwrap_or(name);
     matches!(
         stem.to_ascii_uppercase().as_str(),
-        "CON" | "PRN" | "AUX" | "NUL"
-            | "COM1" | "COM2" | "COM3" | "COM4" | "COM5" | "COM6" | "COM7" | "COM8" | "COM9"
-            | "LPT1" | "LPT2" | "LPT3" | "LPT4" | "LPT5" | "LPT6" | "LPT7" | "LPT8" | "LPT9"
+        "CON"
+            | "PRN"
+            | "AUX"
+            | "NUL"
+            | "COM1"
+            | "COM2"
+            | "COM3"
+            | "COM4"
+            | "COM5"
+            | "COM6"
+            | "COM7"
+            | "COM8"
+            | "COM9"
+            | "LPT1"
+            | "LPT2"
+            | "LPT3"
+            | "LPT4"
+            | "LPT5"
+            | "LPT6"
+            | "LPT7"
+            | "LPT8"
+            | "LPT9"
     )
 }
 
@@ -299,7 +321,10 @@ pub fn rename_entry(root: &Path, from: &str, to: &str) -> AppResult<String> {
             std::io::Error::new(std::io::ErrorKind::NotFound, "missing"),
         ));
     }
-    if source.symlink_metadata().is_ok_and(|meta| meta.file_type().is_symlink()) {
+    if source
+        .symlink_metadata()
+        .is_ok_and(|meta| meta.file_type().is_symlink())
+    {
         return Err(AppError::OutsideRoot(from_display));
     }
     let source_is_dir = source.is_dir();
@@ -562,7 +587,12 @@ mod tests {
         assert!(rename_entry(dir.path(), "dest/new.typ", "dest/kept.typ").is_err());
         assert!(rename_entry(dir.path(), "dest/new.typ", "dest/new").is_err());
         assert!(rename_entry(dir.path(), "dest/new.typ", "missing/new.typ").is_err());
-        assert!(read_note(dir.path(), "dest/kept.typ").unwrap().text.starts_with("= kept"));
+        assert!(
+            read_note(dir.path(), "dest/kept.typ")
+                .unwrap()
+                .text
+                .starts_with("= kept")
+        );
     }
 
     #[test]
