@@ -40,6 +40,9 @@ export const api = {
   async listNotes() {
     return unwrap(await commands.listNotes());
   },
+  async searchNotes(query: string) {
+    return unwrap(await commands.searchNotes(query));
+  },
   async openNote(path: string) {
     return unwrap(await commands.openNote(path));
   },
@@ -51,6 +54,9 @@ export const api = {
   },
   async renderNote(path: string, source: string, revision: number) {
     return unwrap(await commands.renderNote(path, source, revision));
+  },
+  async exportPdf(path: string, source: string) {
+    return unwrap(await commands.exportPdf(path, source));
   },
   async getSettings() {
     return unwrap(await commands.getSettings());

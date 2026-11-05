@@ -74,6 +74,10 @@ struct NoteWorld {
     root: PathBuf,
     note_path: String,
     last_document: Option<PagedDocument>,
+    /// Source that `last_document` was compiled from.
+    /// Export reuses that document when the editor still has this source,
+    /// so the PDF keeps the date pinned for that compile.
+    compiled_source: Option<String>,
 }
 
 impl NoteWorld {
@@ -96,6 +100,7 @@ impl NoteWorld {
             root: root.to_path_buf(),
             note_path: note_path.to_string(),
             last_document: None,
+            compiled_source: None,
         })
     }
 
@@ -183,10 +188,9 @@ impl Engine {
         source: &str,
         revision: u32,
     ) -> AppResult<RenderResult> {
-        let _gate = self
-            .gate
-            .lock()
-            .map_err(|_| AppError::Message("render gate was poisoned".to_string()))?;
+        // The gate guards nothing but turn taking, so a panicked
+        // compile must not disable every later render: take it back.
+        let _gate = self.gate.lock().unwrap_or_else(|err| err.into_inner());
         let mut world = {
             let mut slot = self
                 .world
@@ -214,11 +218,14 @@ impl Engine {
                     .iter()
                     .map(|page| typst_svg::svg(page, &typst_svg::SvgOptions::default()))
                     .collect();
+                world.compiled_source = Some(source.to_string());
                 world.last_document = Some(document);
                 pages
             }
             Err(errors) => {
                 diagnostics.extend(errors.iter().map(|diag| map_diagnostic(&world, diag)));
+                world.compiled_source = None;
+                world.last_document = None;
                 Vec::new()
             }
         };
@@ -235,6 +242,93 @@ impl Engine {
             diagnostics,
         })
     }
+
+    /// Compile the editor source and return PDF bytes.
+    ///
+    /// When this engine already compiled that exact source, the kept document
+    /// is exported and the pinned date stays. Otherwise one fresh compile runs
+    /// first and its date is pinned for this export. This function does not
+    /// write a file.
+    pub fn export_pdf(&self, root: &Path, note_path: &str, source: &str) -> AppResult<Vec<u8>> {
+        let _gate = self.gate.lock().unwrap_or_else(|err| err.into_inner());
+        let mut world = {
+            let mut slot = self
+                .world
+                .lock()
+                .map_err(|_| AppError::Message("world lock was poisoned".to_string()))?;
+            match slot.take() {
+                Some(existing) if existing.root == root && existing.note_path == note_path => {
+                    existing
+                }
+                _ => NoteWorld::new(self.fonts.clone(), root, note_path, source)?,
+            }
+        };
+
+        let result = export_from_world(&mut world, source);
+        comemo::evict(30);
+        let mut slot = self
+            .world
+            .lock()
+            .map_err(|_| AppError::Message("world lock was poisoned".to_string()))?;
+        *slot = Some(world);
+        result
+    }
+}
+
+fn export_from_world(world: &mut NoteWorld, source: &str) -> AppResult<Vec<u8>> {
+    if world.compiled_source.as_deref() == Some(source)
+        && let Some(document) = world.last_document.as_ref()
+    {
+        return pdf_bytes(world, document);
+    }
+
+    world.update(source);
+    let warned = typst::compile::<PagedDocument>(world as &dyn World);
+    match warned.output {
+        Ok(document) => {
+            let bytes = pdf_bytes(world, &document)?;
+            world.compiled_source = Some(source.to_string());
+            world.last_document = Some(document);
+            Ok(bytes)
+        }
+        Err(errors) => {
+            world.compiled_source = None;
+            world.last_document = None;
+            Err(AppError::Message(format_diagnostics(world, &errors)))
+        }
+    }
+}
+
+fn pdf_bytes(world: &NoteWorld, document: &PagedDocument) -> AppResult<Vec<u8>> {
+    match typst_pdf::pdf(document, &typst_pdf::PdfOptions::default()) {
+        Ok(bytes) if !bytes.is_empty() && bytes.starts_with(b"%PDF") => Ok(bytes),
+        Ok(_) => Err(AppError::Message("Typst did not produce a PDF".to_string())),
+        Err(errors) => Err(AppError::Message(format_diagnostics(world, &errors))),
+    }
+}
+
+fn format_diagnostics(world: &NoteWorld, errors: &[SourceDiagnostic]) -> String {
+    if errors.is_empty() {
+        return format!("{}: Typst could not compile this note", world.note_path);
+    }
+    errors
+        .iter()
+        .map(|diagnostic| {
+            let mapped = map_diagnostic(world, diagnostic);
+            let file = if mapped.file.is_empty() {
+                world.note_path.clone()
+            } else {
+                mapped.file
+            };
+            let mut line = format!("{file}:{}-{}: {}", mapped.start, mapped.end, mapped.message);
+            if !mapped.hints.is_empty() {
+                line.push(' ');
+                line.push_str(&mapped.hints.join(" "));
+            }
+            line
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 impl Default for Engine {
@@ -396,6 +490,102 @@ mod tests {
                 .diagnostics
                 .iter()
                 .any(|diag| diag.severity == "error")
+        );
+    }
+
+    #[test]
+    fn exports_pdf_bytes_for_a_valid_note() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        let bytes = engine
+            .export_pdf(dir.path(), "notes/lecture.typ", SAMPLE_TEXT)
+            .unwrap();
+        assert!(!bytes.is_empty());
+        assert!(bytes.starts_with(b"%PDF"));
+        assert!(
+            std::fs::read_dir(dir.path()).unwrap().next().is_none(),
+            "exporting bytes must not touch the folder"
+        );
+    }
+
+    // covers: feature 12, export reuses the kept document for the same source
+    #[test]
+    fn export_reuses_the_rendered_document_when_the_source_is_unchanged() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("inc.typ"), "= Included\n").unwrap();
+        let engine = Engine::new();
+        let source = "#include \"inc.typ\"\n";
+        let rendered = engine.render(dir.path(), "note.typ", source, 1).unwrap();
+        assert_eq!(rendered.pages.len(), 1);
+        // Break the included file on disk. A recompile would now fail,
+        // so a good export proves the kept document was reused.
+        std::fs::write(dir.path().join("inc.typ"), "#brak()\n").unwrap();
+        let bytes = engine.export_pdf(dir.path(), "note.typ", source).unwrap();
+        assert!(bytes.starts_with(b"%PDF"));
+    }
+
+    // covers: feature 12, a changed source is compiled again on export
+    #[test]
+    fn export_recompiles_when_the_source_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        engine.render(dir.path(), "note.typ", "= One\n", 1).unwrap();
+        let message = engine
+            .export_pdf(dir.path(), "note.typ", "= One\n\n#brak()\n")
+            .unwrap_err()
+            .to_string();
+        assert!(message.contains("brak"), "{message}");
+        let bytes = engine
+            .export_pdf(dir.path(), "note.typ", "= Two\n")
+            .unwrap();
+        assert!(bytes.starts_with(b"%PDF"));
+    }
+
+    // covers: feature 12, a failed render clears the kept document
+    #[test]
+    fn export_after_a_failed_render_recompiles_instead_of_reusing() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("inc.typ"), "= Included\n").unwrap();
+        let engine = Engine::new();
+        let source = "#include \"inc.typ\"\n";
+        engine.render(dir.path(), "note.typ", source, 1).unwrap();
+        let failed = engine
+            .render(dir.path(), "note.typ", "#brak()\n", 2)
+            .unwrap();
+        assert!(failed.pages.is_empty());
+        // With the cache cleared, exporting the good source compiles
+        // again and meets the now broken included file.
+        std::fs::write(dir.path().join("inc.typ"), "#brak()\n").unwrap();
+        assert!(engine.export_pdf(dir.path(), "note.typ", source).is_err());
+    }
+
+    // covers: feature 12, export never reuses a document from another note
+    #[test]
+    fn export_for_another_note_does_not_reuse_the_first_document() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        engine.render(dir.path(), "a.typ", "= One\n", 1).unwrap();
+        assert!(engine.export_pdf(dir.path(), "b.typ", "#brak()\n").is_err());
+        let bytes = engine.export_pdf(dir.path(), "b.typ", "= Two\n").unwrap();
+        assert!(bytes.starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn a_broken_note_fails_with_the_place_in_the_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        let source = "= Łódź ąę\n\n#brak()\n";
+        let expected = source.find("brak").unwrap().to_string();
+        let message = engine
+            .export_pdf(dir.path(), "notes/lecture.typ", source)
+            .unwrap_err()
+            .to_string();
+        assert!(message.contains(&expected), "{message}");
+        assert!(message.contains("brak"), "{message}");
+        assert!(message.contains("notes/lecture.typ"), "{message}");
+        assert!(
+            std::fs::read_dir(dir.path()).unwrap().next().is_none(),
+            "a failed export must not touch the folder"
         );
     }
 }

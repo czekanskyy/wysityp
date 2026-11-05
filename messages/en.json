@@ -16,6 +16,10 @@
   "rendering": "Drawing the page...",
   "saved": "Saved.",
   "save_failed": "Saving failed",
+  "export_pdf": "Export PDF",
+  "exporting_pdf": "Exporting the PDF...",
+  "exported_pdf": "Exported the PDF",
+  "export_failed": "Exporting the PDF failed",
   "open_failed": "Opening failed",
   "render_failed": "Drawing failed",
   "sample_name": "Sample note",
@@ -40,5 +44,11 @@
   "move_hint": "Type a new name, or a path such as folder/name.typ, to move it.",
   "action_failed": "That change did not land",
   "empty_tree": "This folder has no notes yet.",
-  "clear_place": "Put new notes in the open folder"
+  "clear_place": "Put new notes in the open folder",
+  "search_label": "Search notes",
+  "search_placeholder": "A word from a note",
+  "search_empty": "No note contains that.",
+  "search_failed": "Search failed",
+  "search_result": "Open this match",
+  "search_searching": "Searching..."
 }

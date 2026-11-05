@@ -16,6 +16,10 @@
   "rendering": "Rysowanie strony...",
   "saved": "Zapisano.",
   "save_failed": "Zapis się nie powiódł",
+  "export_pdf": "Eksportuj PDF",
+  "exporting_pdf": "Eksportowanie PDF...",
+  "exported_pdf": "Wyeksportowano PDF",
+  "export_failed": "Eksport PDF się nie powiódł",
   "open_failed": "Otwarcie się nie powiódł",
   "render_failed": "Rysowanie się nie powiodło",
   "sample_name": "Przykładowa notatka",
@@ -40,5 +44,11 @@
   "move_hint": "Wpisz nową nazwę albo ścieżkę, na przykład folder/nazwa.typ, aby przenieść.",
   "action_failed": "Ta zmiana się nie udała",
   "empty_tree": "W tym folderze nie ma jeszcze notatek.",
-  "clear_place": "Nowe notatki do otwartego folderu"
+  "clear_place": "Nowe notatki do otwartego folderu",
+  "search_label": "Szukaj w notatkach",
+  "search_placeholder": "Słowo z notatki",
+  "search_empty": "Żadna notatka tego nie zawiera.",
+  "search_failed": "Szukanie się nie udało",
+  "search_result": "Otwórz to trafienie",
+  "search_searching": "Szukanie..."
 }

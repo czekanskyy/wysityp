@@ -162,6 +162,7 @@ input:focus-visible {
 }
 
 .entry-form,
+.search-form,
 .rename-form,
 .confirm {
   display: grid;
@@ -170,6 +171,7 @@ input:focus-visible {
 }
 
 .entry-form label,
+.search-form label,
 .rename-form label {
   display: grid;
   gap: 0.25rem;
@@ -288,6 +290,7 @@ button.danger {
 }
 
 .status {
+  white-space: pre-line;
   margin-top: 1rem;
   padding: 0.6rem;
   border: 1px solid var(--line);
@@ -357,6 +360,25 @@ button.danger {
 .diagnostics h3 {
   margin: 0 0 0.5rem;
   font-size: 0.9rem;
+}
+
+.search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.search-hit {
+  width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.search-snippet {
+  overflow-wrap: anywhere;
 }
 
 .diagnostics ul {

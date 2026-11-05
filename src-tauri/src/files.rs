@@ -71,29 +71,28 @@ pub fn resolve_inside_root(root: &Path, relative: &str) -> AppResult<PathBuf> {
         }
     }
     let candidate = root.join(rel_path);
-    // If the file or its parent exists for real, check the true shape.
-    let existing = if candidate.exists() {
-        Some(candidate.as_path())
-    } else {
-        candidate.parent().filter(|parent| parent.exists())
-    };
-    if let Some(existing_path) = existing {
-        let true_existing = canonical_root(existing_path)?;
-        let true_root = canonical_root(root)?;
-        if !true_existing.starts_with(&true_root) {
-            return Err(AppError::OutsideRoot(relative.to_string()));
+    // Check the deepest part that exists for real, then rebuild the
+    // tail below it. Checking only the file or its parent would let a
+    // link higher up carry a new path outside the root unseen.
+    let mut existing = candidate.as_path();
+    while !existing.exists() {
+        match existing.parent() {
+            Some(parent) => existing = parent,
+            None => break,
         }
-        // Rebuild the tail below the existing part inside the true root.
-        if candidate.exists() {
-            return Ok(true_existing);
-        }
-        let parent = candidate.parent().unwrap_or(root);
-        let tail = candidate
-            .strip_prefix(parent)
-            .map_err(|_| AppError::OutsideRoot(relative.to_string()))?;
-        return Ok(true_existing.join(tail));
     }
-    Ok(candidate)
+    let true_existing = canonical_root(existing)?;
+    let true_root = canonical_root(root)?;
+    if !true_existing.starts_with(&true_root) {
+        return Err(AppError::OutsideRoot(relative.to_string()));
+    }
+    let tail = candidate
+        .strip_prefix(existing)
+        .map_err(|_| AppError::OutsideRoot(relative.to_string()))?;
+    if tail.as_os_str().is_empty() {
+        return Ok(true_existing);
+    }
+    Ok(true_existing.join(tail))
 }
 
 fn display_relative(path: &str) -> String {
@@ -430,6 +429,72 @@ pub fn list_notes(root: &Path) -> AppResult<Vec<String>> {
     Ok(notes)
 }
 
+/// One matching line inside a note. `line` is 1 based.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
+pub struct SearchHit {
+    pub path: String,
+    pub line: u32,
+    pub snippet: String,
+}
+
+/// Stop after this many hits so a broad query cannot flood the sidebar.
+pub const SEARCH_RESULT_CAP: usize = 100;
+
+/// Trimmed matching line, cut to this many characters.
+const SNIPPET_CHARS: usize = 120;
+
+pub fn search_notes(root: &Path, query: &str) -> AppResult<Vec<SearchHit>> {
+    let needle = query.trim().to_lowercase();
+    if needle.is_empty() {
+        return Ok(Vec::new());
+    }
+    let notes = list_notes(root)?;
+    let mut hits = Vec::new();
+    for relative in notes {
+        if hits.len() >= SEARCH_RESULT_CAP {
+            break;
+        }
+        let path = match resolve_inside_root(root, &relative) {
+            Ok(path) => path,
+            Err(_) => continue,
+        };
+        let bytes = match std::fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(_) => continue,
+        };
+        let Ok(text) = String::from_utf8(bytes) else {
+            continue;
+        };
+        for (index, line) in text.lines().enumerate() {
+            if hits.len() >= SEARCH_RESULT_CAP {
+                break;
+            }
+            if !line.to_lowercase().contains(&needle) {
+                continue;
+            }
+            hits.push(SearchHit {
+                path: relative.clone(),
+                line: (index + 1) as u32,
+                snippet: snippet_of(line, &needle),
+            });
+        }
+    }
+    Ok(hits)
+}
+
+fn snippet_of(line: &str, needle: &str) -> String {
+    let trimmed = line.trim();
+    // Keep the match inside the window: start a little before it
+    // instead of always cutting the head of a long line.
+    let lowered = trimmed.to_lowercase();
+    let match_start = lowered
+        .find(needle)
+        .map(|byte| lowered[..byte].chars().count())
+        .unwrap_or(0);
+    let start = match_start.saturating_sub(40);
+    trimmed.chars().skip(start).take(SNIPPET_CHARS).collect()
+}
+
 fn collect_notes(root: &Path, dir: &Path, notes: &mut Vec<String>) -> AppResult<()> {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
@@ -465,6 +530,70 @@ pub fn read_note(root: &Path, relative: &str) -> AppResult<Note> {
     })
 }
 
+/// The PDF sits beside the note, with the note file stem and a `.pdf` extension.
+///
+/// `notes/lecture.typ` becomes `notes/lecture.pdf`. The page never chooses this path.
+pub fn pdf_export_path(note_path: &str) -> AppResult<String> {
+    let relative = note_path.trim().replace('\\', "/");
+    if relative.is_empty() || relative.ends_with('/') {
+        return Err(AppError::InvalidName(note_path.to_string()));
+    }
+    let path = Path::new(&relative);
+    if path.is_absolute() {
+        return Err(AppError::OutsideRoot(note_path.to_string()));
+    }
+    for part in path.components() {
+        match part {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => return Err(AppError::OutsideRoot(note_path.to_string())),
+        }
+    }
+    let stem = path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .filter(|stem| !stem.is_empty())
+        .ok_or_else(|| AppError::InvalidName(note_path.to_string()))?;
+    let file_name = format!("{stem}.pdf");
+    match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => {
+            let parent = parent.to_string_lossy().replace('\\', "/");
+            Ok(format!("{parent}/{file_name}"))
+        }
+        _ => Ok(file_name),
+    }
+}
+
+/// Write PDF bytes beside the note. An existing export is replaced.
+/// Bytes that are not a PDF are refused, so a failed compile cannot leave a bogus file.
+pub fn write_pdf_export(root: &Path, note_path: &str, bytes: &[u8]) -> AppResult<String> {
+    if bytes.is_empty() || !bytes.starts_with(b"%PDF") {
+        return Err(AppError::Message(
+            "refusing to write a file that is not a PDF".to_string(),
+        ));
+    }
+    let relative = pdf_export_path(note_path)?;
+    let path = resolve_inside_root(root, &relative)?;
+    // Never write through a link: a dangling link would carry the
+    // bytes to its target outside the root check above.
+    if let Ok(meta) = std::fs::symlink_metadata(&path)
+        && meta.file_type().is_symlink()
+    {
+        return Err(AppError::OutsideRoot(relative));
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|err| AppError::io(parent, err))?;
+    }
+    // Write beside the target first, then swap it in, so a failed
+    // write leaves the previous export whole.
+    let temp = path.with_extension("pdf.tmp");
+    std::fs::write(&temp, bytes).map_err(|err| AppError::io(&temp, err))?;
+    if let Err(err) = std::fs::rename(&temp, &path) {
+        let _ = std::fs::remove_file(&temp);
+        return Err(AppError::io(&path, err));
+    }
+    Ok(relative)
+}
+
 pub fn write_note(root: &Path, relative: &str, text: &str) -> AppResult<()> {
     let path = resolve_inside_root(root, relative)?;
     if let Some(parent) = path.parent() {
@@ -497,6 +626,129 @@ mod tests {
         let note = read_note(dir.path(), "notes/one.typ").unwrap();
         assert_eq!(note.text, "= Cześć\n");
         assert_eq!(list_notes(dir.path()).unwrap(), vec!["notes/one.typ"]);
+    }
+
+    #[test]
+    fn search_finds_a_line_with_path_number_and_snippet() {
+        let dir = tempfile::tempdir().unwrap();
+        write_note(
+            dir.path(),
+            "notes/proof.typ",
+            "intro\n  The Proof sits here and also Proof again\n",
+        )
+        .unwrap();
+        let hits = search_notes(dir.path(), "proof").unwrap();
+        assert_eq!(
+            hits,
+            vec![SearchHit {
+                path: "notes/proof.typ".to_string(),
+                line: 2,
+                snippet: "The Proof sits here and also Proof again".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn search_is_case_insensitive_and_empty_query_is_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        write_note(dir.path(), "a.typ", "Całka\n").unwrap();
+        let hits = search_notes(dir.path(), "całka").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].snippet, "Całka");
+        assert!(search_notes(dir.path(), "").unwrap().is_empty());
+        assert!(search_notes(dir.path(), "   ").unwrap().is_empty());
+    }
+
+    #[test]
+    fn search_skips_unreadable_text_and_non_typst_files() {
+        let dir = tempfile::tempdir().unwrap();
+        write_note(dir.path(), "good.typ", "needle\n").unwrap();
+        std::fs::write(dir.path().join("skip.txt"), "needle").unwrap();
+        std::fs::write(dir.path().join("bad.typ"), [0xff, 0xfe, b'n']).unwrap();
+        let hits = search_notes(dir.path(), "needle").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].path, "good.typ");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn search_skips_a_note_that_cannot_be_read() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let locked = dir.path().join("locked.typ");
+        std::fs::write(&locked, "needle\n").unwrap();
+        write_note(dir.path(), "open.typ", "needle\n").unwrap();
+        let _hold = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&locked)
+            .unwrap();
+        let hits = search_notes(dir.path(), "needle").unwrap();
+        assert_eq!(
+            hits,
+            vec![SearchHit {
+                path: "open.typ".to_string(),
+                line: 1,
+                snippet: "needle".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn search_truncates_a_long_matching_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let long = "x".repeat(SNIPPET_CHARS + 40);
+        write_note(dir.path(), "long.typ", &format!("  {long}\n")).unwrap();
+        let hits = search_notes(dir.path(), "x").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].snippet.chars().count(), SNIPPET_CHARS);
+        assert!(hits[0].snippet.chars().all(|ch| ch == 'x'));
+    }
+
+    // covers: feature 10, the snippet window keeps the match in view
+    #[test]
+    fn search_snippet_keeps_a_late_match_and_cuts_by_characters() {
+        let dir = tempfile::tempdir().unwrap();
+        let line = format!("{} igła", "ą".repeat(200));
+        write_note(dir.path(), "late.typ", &format!("{line}\n")).unwrap();
+        let hits = search_notes(dir.path(), "igła").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert!(hits[0].snippet.contains("igła"), "{}", hits[0].snippet);
+        assert!(hits[0].snippet.chars().count() <= SNIPPET_CHARS);
+    }
+
+    // covers: feature 10, CRLF notes keep editor line numbers
+    #[test]
+    fn search_counts_lines_in_a_crlf_note() {
+        let dir = tempfile::tempdir().unwrap();
+        write_note(dir.path(), "crlf.typ", "one\r\nneedle\r\nthree\r\n").unwrap();
+        let hits = search_notes(dir.path(), "needle").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].line, 2);
+    }
+
+    #[test]
+    fn search_orders_by_path_then_line_and_stops_at_the_cap() {
+        let dir = tempfile::tempdir().unwrap();
+        write_note(dir.path(), "b.typ", "hit\nhit\n").unwrap();
+        write_note(dir.path(), "a/z.typ", "no\nhit\n").unwrap();
+        let hits = search_notes(dir.path(), "hit").unwrap();
+        assert_eq!(
+            hits.iter()
+                .map(|hit| (hit.path.as_str(), hit.line))
+                .collect::<Vec<_>>(),
+            vec![("a/z.typ", 2), ("b.typ", 1), ("b.typ", 2)]
+        );
+
+        let mut many = String::new();
+        for _ in 0..(SEARCH_RESULT_CAP + 5) {
+            many.push_str("hit\n");
+        }
+        write_note(dir.path(), "many.typ", &many).unwrap();
+        assert_eq!(
+            search_notes(dir.path(), "hit").unwrap().len(),
+            SEARCH_RESULT_CAP
+        );
     }
 
     // covers: proof 2, a folder with subfolders lists every note once
@@ -649,5 +901,38 @@ mod tests {
         let tree = list_tree(dir.path()).unwrap();
         assert!(tree.iter().all(|node| !node.name.starts_with('.')));
         assert_eq!(tree.len(), 2);
+    }
+
+    #[test]
+    fn pdf_export_path_sits_beside_the_note() {
+        assert_eq!(
+            pdf_export_path("notes/lecture.typ").unwrap(),
+            "notes/lecture.pdf"
+        );
+        assert_eq!(pdf_export_path("lecture.typ").unwrap(), "lecture.pdf");
+        assert_eq!(
+            pdf_export_path("notes/my.lecture.typ").unwrap(),
+            "notes/my.lecture.pdf"
+        );
+        assert!(pdf_export_path("../lecture.typ").is_err());
+        assert!(pdf_export_path("C:/lecture.typ").is_err());
+    }
+
+    #[test]
+    fn writes_the_pdf_beside_the_note_and_overwrites_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let first = write_pdf_export(dir.path(), "notes/lecture.typ", b"%PDF-1.7\nfirst").unwrap();
+        assert_eq!(first, "notes/lecture.pdf");
+        write_pdf_export(dir.path(), "notes/lecture.typ", b"%PDF-1.7\nsecond").unwrap();
+        let bytes = std::fs::read(dir.path().join("notes").join("lecture.pdf")).unwrap();
+        assert_eq!(bytes, b"%PDF-1.7\nsecond");
+    }
+
+    #[test]
+    fn refuses_to_write_bytes_that_are_not_a_pdf() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(write_pdf_export(dir.path(), "notes/lecture.typ", b"not a pdf").is_err());
+        assert!(write_pdf_export(dir.path(), "notes/lecture.typ", b"").is_err());
+        assert!(!dir.path().join("notes").join("lecture.pdf").exists());
     }
 }

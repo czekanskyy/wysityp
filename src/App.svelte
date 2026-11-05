@@ -4,7 +4,7 @@
   import { applyLocale, currentLocale, type AppLocale } from "./lib/locale";
   import { byteOffsetToUtf16, debounce, RenderGuard } from "./lib/render";
   import { m } from "./paraglide/messages.js";
-  import type { RenderDiagnostic, TreeNode } from "./bindings";
+  import type { RenderDiagnostic, SearchHit, TreeNode } from "./bindings";
 
   let locale = $state<AppLocale>(currentLocale());
   let rootName = $state("");
@@ -19,7 +19,12 @@
   let pageUrls = $state<string[]>([]);
   let diagnostics = $state<RenderDiagnostic[]>([]);
   let status = $state("");
+  let searchQuery = $state("");
+  let searchHits = $state<SearchHit[]>([]);
+  let searchTouched = $state(false);
+  let searchPending = $state(false);
   let rendering = $state(false);
+  let exporting = $state(false);
 
   let editor: EditorHandle | undefined;
   let nameInput: HTMLInputElement | undefined = $state();
@@ -52,6 +57,10 @@
       rendering: m.rendering(),
       saved: m.saved(),
       saveFailed: m.save_failed(),
+      exportPdf: m.export_pdf(),
+      exportingPdf: m.exporting_pdf(),
+      exportedPdf: m.exported_pdf(),
+      exportFailed: m.export_failed(),
       openFailed: m.open_failed(),
       renderFailed: m.render_failed(),
       workspaceReady: m.workspace_ready(),
@@ -76,6 +85,11 @@
       actionFailed: m.action_failed(),
       emptyTree: m.empty_tree(),
       clearPlace: m.clear_place(),
+      searchLabel: m.search_label(),
+      searchPlaceholder: m.search_placeholder(),
+      searchEmpty: m.search_empty(),
+      searchFailed: m.search_failed(),
+      searchSearching: m.search_searching(),
     };
   });
 
@@ -130,6 +144,9 @@
 
   async function refreshTree() {
     tree = await api.listTree();
+    // Tree changes can remove or rename a note a hit points at.
+    searchHits = [];
+    searchTouched = false;
   }
 
   async function openFolder() {
@@ -137,6 +154,10 @@
       const picked = await api.openWorkspace();
       if (!picked) return;
       rootName = picked.root_name;
+      searchQuery = "";
+      searchHits = [];
+      searchTouched = false;
+      searchPending = false;
       selectedFolder = "";
       openFolders = [];
       renamingPath = "";
@@ -147,6 +168,39 @@
     } catch (error) {
       status = `${labels.openFailed}: ${String(error)}`;
     }
+  }
+
+  const runSearch = debounce(() => {
+    const query = searchQuery;
+    if (!query.trim()) {
+      searchPending = false;
+      return;
+    }
+    searchPending = true;
+    void (async () => {
+      try {
+        const hits = await api.searchNotes(query);
+        if (searchQuery !== query) return;
+        searchHits = hits;
+        searchTouched = true;
+      } catch (error) {
+        if (searchQuery !== query) return;
+        searchHits = [];
+        status = `${labels.searchFailed}: ${String(error)}`;
+      } finally {
+        if (searchQuery === query) searchPending = false;
+      }
+    })();
+  }, 200);
+
+  function onSearchInput(value: string) {
+    searchQuery = value;
+    if (!value.trim()) {
+      searchHits = [];
+      searchTouched = false;
+      searchPending = false;
+    }
+    runSearch();
   }
 
   async function openNote(path: string) {
@@ -305,6 +359,22 @@
     }
   }
 
+  async function exportPdf() {
+    if (!editor || !currentPath || exporting) return;
+    const path = currentPath;
+    const source = editor.getText();
+    exporting = true;
+    status = labels.exportingPdf;
+    try {
+      const written = await api.exportPdf(path, source);
+      status = `${labels.exportedPdf}: ${written}`;
+    } catch (error) {
+      status = `${labels.exportFailed}: ${String(error)}`;
+    } finally {
+      exporting = false;
+    }
+  }
+
   async function changeLocale(next: AppLocale) {
     try {
       const saved = await api.setLocale(next);
@@ -450,6 +520,13 @@
       >
         {labels.saveNote}
       </button>
+      <button
+        type="button"
+        onclick={exportPdf}
+        disabled={!currentPath || exporting}
+      >
+        {labels.exportPdf}
+      </button>
       <label class="locale-picker">
         <span>{labels.language}</span>
         <select
@@ -472,6 +549,47 @@
         <p class="muted">{labels.noFolder}</p>
       {:else}
         <p class="root-name">{rootName}</p>
+        <form
+          class="search-form"
+          role="search"
+          aria-busy={searchPending}
+          onsubmit={(event) => event.preventDefault()}
+        >
+          <label>
+            <span>{labels.searchLabel}</span>
+            <input
+              type="search"
+              value={searchQuery}
+              placeholder={labels.searchPlaceholder}
+              autocomplete="off"
+              spellcheck="false"
+              oninput={(event) => onSearchInput(event.currentTarget.value)}
+            />
+          </label>
+          <div aria-live="polite">
+            {#if searchPending}
+              <p class="muted">{labels.searchSearching}</p>
+            {:else if searchTouched && searchHits.length === 0}
+              <p class="muted">{labels.searchEmpty}</p>
+            {/if}
+          </div>
+          {#if searchTouched && searchHits.length > 0}
+            <ul class="search-results">
+              {#each searchHits as hit (`${hit.path}:${hit.line}`)}
+                <li>
+                  <button
+                    type="button"
+                    class="search-hit"
+                    onclick={() => openNote(hit.path)}
+                  >
+                    <span class="path-line">{hit.path}:{hit.line}</span>
+                    <span class="search-snippet">{hit.snippet}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </form>
         <form
           class="entry-form"
           onsubmit={(event) => {

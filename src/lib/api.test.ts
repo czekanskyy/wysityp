@@ -9,10 +9,12 @@ vi.mock("../bindings", () => ({
     renameEntry: vi.fn(),
     deleteEntry: vi.fn(),
     listNotes: vi.fn(),
+    searchNotes: vi.fn(),
     openNote: vi.fn(),
     createSampleNote: vi.fn(),
     saveNote: vi.fn(),
     renderNote: vi.fn(),
+    exportPdf: vi.fn(),
     getSettings: vi.fn(),
     setLocale: vi.fn(),
   },
@@ -74,6 +76,14 @@ describe("workspace api", () => {
     expect(mocked.renameEntry).toHaveBeenCalledWith("old.typ", "dest/new.typ");
   });
 
+  it("searches notes with the query string only", async () => {
+    const hits = [{ path: "lab/one.typ", line: 3, snippet: "a proof" }];
+    mocked.searchNotes.mockResolvedValue(hits as never);
+
+    await expect(api.searchNotes("proof")).resolves.toEqual(hits);
+    expect(mocked.searchNotes).toHaveBeenCalledWith("proof");
+  });
+
   it("deletes the entry at the given path", async () => {
     mocked.deleteEntry.mockResolvedValue(null as never);
 
@@ -89,6 +99,18 @@ describe("workspace api", () => {
 
     await expect(api.createNote("", "one.typ")).rejects.toThrow(
       "that name is already taken",
+    );
+  });
+
+  it("exports the open note and returns the PDF path from the root", async () => {
+    mocked.exportPdf.mockResolvedValue("notes/lecture.pdf" as never);
+
+    await expect(
+      api.exportPdf("notes/lecture.typ", "= Wykład\n"),
+    ).resolves.toBe("notes/lecture.pdf");
+    expect(mocked.exportPdf).toHaveBeenCalledWith(
+      "notes/lecture.typ",
+      "= Wykład\n",
     );
   });
 
