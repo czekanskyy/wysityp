@@ -10,7 +10,8 @@ function byteIndexOf(source: string, needle: string): number {
 describe("byteOffsetToUtf16", () => {
   it("marks the right place after Polish letters", () => {
     const source = "= Łódź ąę\n\n#brak()\n";
-    const byteIndex = new TextEncoder().encode(source).length -
+    const byteIndex =
+      new TextEncoder().encode(source).length -
       new TextEncoder().encode(source.slice(source.indexOf("brak"))).length;
     expect(byteOffsetToUtf16(source, byteIndex)).toBe(source.indexOf("brak"));
   });
@@ -24,9 +25,9 @@ describe("byteOffsetToUtf16", () => {
   it("keeps the start and the end of a source in place", () => {
     const source = "= Cześć\n";
     expect(byteOffsetToUtf16(source, 0)).toBe(0);
-    expect(byteOffsetToUtf16(source, new TextEncoder().encode(source).length)).toBe(
-      source.length,
-    );
+    expect(
+      byteOffsetToUtf16(source, new TextEncoder().encode(source).length),
+    ).toBe(source.length);
   });
 
   // covers: proof 7, letters that take more than one unit in either count

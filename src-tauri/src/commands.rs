@@ -6,7 +6,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::AppState;
 use crate::error::AppError;
-use crate::files::{self, Note, SAMPLE_PATH, SAMPLE_TEXT, WorkspaceInfo};
+use crate::files::{self, Note, SAMPLE_PATH, SAMPLE_TEXT, TreeNode, WorkspaceInfo};
 use crate::settings::{self, Settings};
 use crate::typst_engine::RenderResult;
 
@@ -53,6 +53,53 @@ pub fn open_workspace(
         .map_err(|_| "workspace lock was poisoned".to_string())?;
     *slot = Some(root);
     Ok(Some(WorkspaceInfo { root_name, notes }))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn list_tree(state: State<'_, AppState>) -> Result<Vec<TreeNode>, String> {
+    let root = root_or_err(&state)?;
+    files::list_tree(&root).map_err(String::from)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn create_note(
+    state: State<'_, AppState>,
+    parent: String,
+    name: String,
+) -> Result<Note, String> {
+    let root = root_or_err(&state)?;
+    files::create_note(&root, &parent, &name).map_err(String::from)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn create_folder(
+    state: State<'_, AppState>,
+    parent: String,
+    name: String,
+) -> Result<String, String> {
+    let root = root_or_err(&state)?;
+    files::create_folder(&root, &parent, &name).map_err(String::from)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn rename_entry(
+    state: State<'_, AppState>,
+    from: String,
+    to: String,
+) -> Result<String, String> {
+    let root = root_or_err(&state)?;
+    files::rename_entry(&root, &from, &to).map_err(String::from)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn delete_entry(state: State<'_, AppState>, path: String) -> Result<(), String> {
+    let root = root_or_err(&state)?;
+    files::delete_entry(&root, &path).map_err(String::from)
 }
 
 #[tauri::command]

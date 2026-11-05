@@ -29,6 +29,11 @@ impl AppState {
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::new().commands(tauri_specta::collect_commands![
         commands::open_workspace,
+        commands::list_tree,
+        commands::create_note,
+        commands::create_folder,
+        commands::rename_entry,
+        commands::delete_entry,
         commands::list_notes,
         commands::open_note,
         commands::create_sample_note,
@@ -37,19 +42,6 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::get_settings,
         commands::set_locale
     ])
-}
-
-#[cfg(test)]
-mod bindings_export {
-    #[test]
-    fn export_bindings() {
-        super::specta_builder()
-            .export(
-                specta_typescript::Typescript::default(),
-                "../src/bindings.ts",
-            )
-            .expect("failed to export typescript bindings");
-    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -97,4 +89,17 @@ pub fn run() {
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod bindings_export {
+    #[test]
+    fn export_bindings() {
+        super::specta_builder()
+            .export(
+                specta_typescript::Typescript::default(),
+                "../src/bindings.ts",
+            )
+            .expect("failed to export typescript bindings");
+    }
 }
