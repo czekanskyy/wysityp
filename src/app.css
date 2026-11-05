@@ -6,6 +6,7 @@
   --ink-soft: #5a6875;
   --line: #d8d2c4;
   --accent: #2456a6;
+  --accent-soft: #e8effc;
   --accent-ink: #ffffff;
   --danger: #a61e2e;
   --danger-bg: #fbeaec;
@@ -53,8 +54,19 @@ button.primary {
   border-color: var(--accent);
 }
 
+input {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  width: 100%;
+}
+
 button:focus-visible,
-select:focus-visible {
+select:focus-visible,
+input:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
@@ -114,7 +126,7 @@ select:focus-visible {
 .workarea {
   flex: 1;
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 19rem 1fr;
   min-height: 0;
 }
 
@@ -143,23 +155,136 @@ select:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.note-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.3rem;
+.folder-name.chosen,
+.note-name.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
-.note-list button {
-  width: 100%;
-  text-align: left;
+.entry-form,
+.rename-form,
+.confirm {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.8rem 0;
+}
+
+.entry-form label,
+.rename-form label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.form-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.place-line,
+.path-line {
+  margin: 0;
   overflow-wrap: anywhere;
 }
 
-.note-list button.active {
-  border-color: var(--accent);
-  background: #e8effc;
+.row-actions,
+.tree-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.tree {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.tree .tree {
+  margin: 0.45rem 0 0 0.35rem;
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--line);
+}
+
+.tree-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
+.folder-name,
+.note-name {
+  flex: 1;
+  text-align: left;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.note-name {
+  font-weight: 400;
+}
+
+.folder-name::before,
+.note-name::before {
+  content: "";
+  display: inline-block;
+  margin-right: 0.45rem;
+  vertical-align: -0.05rem;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+}
+
+.folder-name::before {
+  width: 0.95rem;
+  height: 0.7rem;
+}
+
+.note-name::before {
+  width: 0.7rem;
+  height: 0.9rem;
+}
+
+.twist {
+  width: 2.4rem;
+  min-height: 2.4rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chevron {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  margin-top: -0.15rem;
+}
+
+.chevron.open {
+  transform: rotate(45deg);
+  margin-top: 0.1rem;
+}
+
+.nested-empty {
+  margin: 0.35rem 0 0.2rem;
+}
+
+.confirm {
+  padding: 0.7rem;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: var(--danger-bg);
+}
+
+button.danger {
+  background: var(--danger);
+  color: var(--accent-ink);
+  border-color: var(--danger);
 }
 
 .status {

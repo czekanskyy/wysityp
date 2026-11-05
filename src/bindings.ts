@@ -5,6 +5,11 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 /** Commands */
 export const commands = {
 	openWorkspace: () => typedError<WorkspaceInfo | null, string>(__TAURI_INVOKE("open_workspace")),
+	listTree: () => typedError<TreeNode[], string>(__TAURI_INVOKE("list_tree")),
+	createNote: (parent: string, name: string) => typedError<Note, string>(__TAURI_INVOKE("create_note", { parent, name })),
+	createFolder: (parent: string, name: string) => typedError<string, string>(__TAURI_INVOKE("create_folder", { parent, name })),
+	renameEntry: (from: string, to: string) => typedError<string, string>(__TAURI_INVOKE("rename_entry", { from, to })),
+	deleteEntry: (path: string) => typedError<null, string>(__TAURI_INVOKE("delete_entry", { path })),
 	listNotes: () => typedError<string[], string>(__TAURI_INVOKE("list_notes")),
 	openNote: (path: string) => typedError<Note, string>(__TAURI_INVOKE("open_note", { path })),
 	createSampleNote: () => typedError<Note, string>(__TAURI_INVOKE("create_sample_note")),
@@ -37,6 +42,15 @@ export type RenderResult = {
 
 export type Settings = {
 	locale: string,
+};
+
+/**  One folder or note in the open workspace, as it sits on disk. */
+export type TreeNode = {
+	name: string,
+	path: string,
+	/**  `folder` or `note`. */
+	kind: string,
+	children: TreeNode[],
 };
 
 export type WorkspaceInfo = {

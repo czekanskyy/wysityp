@@ -23,6 +23,21 @@ export const api = {
   async openWorkspace() {
     return unwrap(await commands.openWorkspace());
   },
+  async listTree() {
+    return unwrap(await commands.listTree());
+  },
+  async createNote(parent: string, name: string) {
+    return unwrap(await commands.createNote(parent, name));
+  },
+  async createFolder(parent: string, name: string) {
+    return unwrap(await commands.createFolder(parent, name));
+  },
+  async renameEntry(from: string, to: string) {
+    return unwrap(await commands.renameEntry(from, to));
+  },
+  async deleteEntry(path: string) {
+    return unwrap(await commands.deleteEntry(path));
+  },
   async listNotes() {
     return unwrap(await commands.listNotes());
   },

@@ -15,7 +15,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 2 | Coding standards and tooling | Foundation | planned |
 | 3 | Data model | Foundation | planned |
 | 4 | Design system and UI foundation | Foundation | planned |
-| 5 | Workspace and note files | Release 1 | planned |
+| 5 | Workspace and note files | Release 1 | in-progress |
 | 6 | Rendered page editor | Release 1 | planned |
 | 7 | Math editing | Release 1 | planned |
 | 8 | Tables, code, images and links | Release 1 | planned |
@@ -64,7 +64,8 @@ One folder of notes, a page you type on that renders in place, full math, spell 
 ### 5. Workspace and note files
 Open a folder on disk, show its folders and notes as a tree, and let students create, rename, move and delete notes and folders, open notes they already have, and switch the app language between Polish and English in settings.
 **Done when:** a student can open an existing folder of Typst files, organise it from inside the app, and see the same truth in any file tool afterwards, because the app only ever changed the files themselves.
-- [ ] Build it: `/develop workspace and note files`
+**Code:** `src/App.svelte`, `src/lib/api.ts`, `src-tauri/src/files.rs`, `src-tauri/src/commands.rs`
+- [x] Build it: `/develop workspace and note files`
 
 ### 6. Rendered page editor · needs a decision
 The heart of WYSITyp: you type on a page that renders in place for text, headings, lists and quotes, typing shortcuts turn marks into structure as you go, and clicking any rendered part lets you edit its Typst source right there without the page losing your place or your cursor.

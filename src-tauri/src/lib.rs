@@ -29,6 +29,11 @@ impl AppState {
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::new().commands(tauri_specta::collect_commands![
         commands::open_workspace,
+        commands::list_tree,
+        commands::create_note,
+        commands::create_folder,
+        commands::rename_entry,
+        commands::delete_entry,
         commands::list_notes,
         commands::open_note,
         commands::create_sample_note,
