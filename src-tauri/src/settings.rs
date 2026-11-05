@@ -168,7 +168,7 @@ fn save_file(path: &Path, file: &SettingsFile) -> AppResult<()> {
     }
     let text =
         serde_json::to_string_pretty(file).map_err(|err| AppError::Message(err.to_string()))?;
-    std::fs::write(path, format!("{text}\n")).map_err(|err| AppError::io(path, err))
+    files::write_atomically(path, format!("{text}\n").as_bytes())
 }
 
 fn workspace_key(root: &Path) -> AppResult<String> {
