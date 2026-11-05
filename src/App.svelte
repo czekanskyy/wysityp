@@ -89,7 +89,6 @@
       searchPlaceholder: m.search_placeholder(),
       searchEmpty: m.search_empty(),
       searchFailed: m.search_failed(),
-      searchResult: m.search_result(),
       searchSearching: m.search_searching(),
     };
   });
@@ -145,6 +144,9 @@
 
   async function refreshTree() {
     tree = await api.listTree();
+    // Tree changes can remove or rename a note a hit points at.
+    searchHits = [];
+    searchTouched = false;
   }
 
   async function openFolder() {
@@ -183,6 +185,7 @@
         searchTouched = true;
       } catch (error) {
         if (searchQuery !== query) return;
+        searchHits = [];
         status = `${labels.searchFailed}: ${String(error)}`;
       } finally {
         if (searchQuery === query) searchPending = false;
@@ -577,7 +580,6 @@
                   <button
                     type="button"
                     class="search-hit"
-                    aria-label={`${labels.searchResult}: ${hit.path}, ${hit.line}`}
                     onclick={() => openNote(hit.path)}
                   >
                     <span class="path-line">{hit.path}:{hit.line}</span>

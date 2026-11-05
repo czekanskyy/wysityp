@@ -290,6 +290,7 @@ button.danger {
 }
 
 .status {
+  white-space: pre-line;
   margin-top: 1rem;
   padding: 0.6rem;
   border: 1px solid var(--line);

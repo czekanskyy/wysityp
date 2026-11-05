@@ -104,9 +104,17 @@ pub fn delete_entry(state: State<'_, AppState>, path: String) -> Result<(), Stri
 
 #[tauri::command]
 #[specta::specta]
-pub fn search_notes(state: State<'_, AppState>, query: String) -> Result<Vec<SearchHit>, String> {
+pub async fn search_notes(
+    state: State<'_, AppState>,
+    query: String,
+) -> Result<Vec<SearchHit>, String> {
     let root = root_or_err(&state)?;
-    files::search_notes(&root, &query).map_err(String::from)
+    // The scan reads every note, so it runs off the page thread.
+    tauri::async_runtime::spawn_blocking(move || {
+        files::search_notes(&root, &query).map_err(String::from)
+    })
+    .await
+    .map_err(|err| AppError::Message(err.to_string()).to_string())?
 }
 
 #[tauri::command]
@@ -166,7 +174,12 @@ pub async fn render_note(
 /// Rust writes the PDF beside that note, inside the stored root, and returns
 /// the path counted from the root.
 fn export_open_note(engine: &Engine, root: &Path, path: &str, source: &str) -> AppResult<String> {
-    files::resolve_inside_root(root, path)?;
+    // Only a real note may be exported: anything else could make the
+    // derived PDF path overwrite an unrelated file beside it.
+    let resolved = files::resolve_inside_root(root, path)?;
+    if resolved.extension().is_none_or(|ext| ext != "typ") || !resolved.is_file() {
+        return Err(crate::error::AppError::InvalidName(path.to_string()));
+    }
     let bytes = engine.export_pdf(root, path, source)?;
     files::write_pdf_export(root, path, &bytes)
 }
@@ -211,6 +224,7 @@ mod tests {
     fn writes_a_pdf_beside_the_note() {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::new();
+        crate::files::write_note(dir.path(), "notes/lecture.typ", SAMPLE_TEXT).unwrap();
         let relative =
             export_open_note(&engine, dir.path(), "notes/lecture.typ", SAMPLE_TEXT).unwrap();
         assert_eq!(relative, "notes/lecture.pdf");
@@ -218,13 +232,27 @@ mod tests {
         let bytes = std::fs::read(&pdf).unwrap();
         assert!(!bytes.is_empty());
         assert!(bytes.starts_with(b"%PDF"));
-        assert!(!dir.path().join("notes").join("lecture.typ").exists());
+        // Export must not change the note on disk.
+        let note = crate::files::read_note(dir.path(), "notes/lecture.typ").unwrap();
+        assert_eq!(note.text, SAMPLE_TEXT);
+    }
+
+    // covers: feature 12, only a real Typst note may be exported
+    #[test]
+    fn refuses_to_export_a_missing_or_non_note_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        assert!(export_open_note(&engine, dir.path(), "notes/missing.typ", "= Hi\n").is_err());
+        std::fs::write(dir.path().join("data.json"), "{}").unwrap();
+        assert!(export_open_note(&engine, dir.path(), "data.json", "= Hi\n").is_err());
+        assert!(!dir.path().join("data.pdf").exists());
     }
 
     #[test]
     fn a_broken_note_does_not_write_a_pdf() {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::new();
+        crate::files::write_note(dir.path(), "notes/lecture.typ", "= Dobrze\n").unwrap();
         let source = "= Łódź ąę\n\n#brak()\n";
         let expected = source.find("brak").unwrap().to_string();
         let message = export_open_note(&engine, dir.path(), "notes/lecture.typ", source)
@@ -239,6 +267,7 @@ mod tests {
     fn a_failed_export_leaves_an_existing_pdf_in_place() {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::new();
+        crate::files::write_note(dir.path(), "notes/lecture.typ", "= Dobrze\n").unwrap();
         export_open_note(&engine, dir.path(), "notes/lecture.typ", "= Dobrze\n").unwrap();
         let pdf = dir.path().join("notes").join("lecture.pdf");
         let before = std::fs::read(&pdf).unwrap();

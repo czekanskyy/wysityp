@@ -71,29 +71,28 @@ pub fn resolve_inside_root(root: &Path, relative: &str) -> AppResult<PathBuf> {
         }
     }
     let candidate = root.join(rel_path);
-    // If the file or its parent exists for real, check the true shape.
-    let existing = if candidate.exists() {
-        Some(candidate.as_path())
-    } else {
-        candidate.parent().filter(|parent| parent.exists())
-    };
-    if let Some(existing_path) = existing {
-        let true_existing = canonical_root(existing_path)?;
-        let true_root = canonical_root(root)?;
-        if !true_existing.starts_with(&true_root) {
-            return Err(AppError::OutsideRoot(relative.to_string()));
+    // Check the deepest part that exists for real, then rebuild the
+    // tail below it. Checking only the file or its parent would let a
+    // link higher up carry a new path outside the root unseen.
+    let mut existing = candidate.as_path();
+    while !existing.exists() {
+        match existing.parent() {
+            Some(parent) => existing = parent,
+            None => break,
         }
-        // Rebuild the tail below the existing part inside the true root.
-        if candidate.exists() {
-            return Ok(true_existing);
-        }
-        let parent = candidate.parent().unwrap_or(root);
-        let tail = candidate
-            .strip_prefix(parent)
-            .map_err(|_| AppError::OutsideRoot(relative.to_string()))?;
-        return Ok(true_existing.join(tail));
     }
-    Ok(candidate)
+    let true_existing = canonical_root(existing)?;
+    let true_root = canonical_root(root)?;
+    if !true_existing.starts_with(&true_root) {
+        return Err(AppError::OutsideRoot(relative.to_string()));
+    }
+    let tail = candidate
+        .strip_prefix(existing)
+        .map_err(|_| AppError::OutsideRoot(relative.to_string()))?;
+    if tail.as_os_str().is_empty() {
+        return Ok(true_existing);
+    }
+    Ok(true_existing.join(tail))
 }
 
 fn display_relative(path: &str) -> String {
@@ -476,18 +475,24 @@ pub fn search_notes(root: &Path, query: &str) -> AppResult<Vec<SearchHit>> {
             hits.push(SearchHit {
                 path: relative.clone(),
                 line: (index + 1) as u32,
-                snippet: snippet_of(line),
+                snippet: snippet_of(line, &needle),
             });
         }
     }
     Ok(hits)
 }
 
-fn snippet_of(line: &str) -> String {
+fn snippet_of(line: &str, needle: &str) -> String {
     let trimmed = line.trim();
-    let mut chars = trimmed.chars();
-    let snippet: String = chars.by_ref().take(SNIPPET_CHARS).collect();
-    snippet
+    // Keep the match inside the window: start a little before it
+    // instead of always cutting the head of a long line.
+    let lowered = trimmed.to_lowercase();
+    let match_start = lowered
+        .find(needle)
+        .map(|byte| lowered[..byte].chars().count())
+        .unwrap_or(0);
+    let start = match_start.saturating_sub(40);
+    trimmed.chars().skip(start).take(SNIPPET_CHARS).collect()
 }
 
 fn collect_notes(root: &Path, dir: &Path, notes: &mut Vec<String>) -> AppResult<()> {
@@ -568,10 +573,24 @@ pub fn write_pdf_export(root: &Path, note_path: &str, bytes: &[u8]) -> AppResult
     }
     let relative = pdf_export_path(note_path)?;
     let path = resolve_inside_root(root, &relative)?;
+    // Never write through a link: a dangling link would carry the
+    // bytes to its target outside the root check above.
+    if let Ok(meta) = std::fs::symlink_metadata(&path)
+        && meta.file_type().is_symlink()
+    {
+        return Err(AppError::OutsideRoot(relative));
+    }
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|err| AppError::io(parent, err))?;
     }
-    std::fs::write(&path, bytes).map_err(|err| AppError::io(&path, err))?;
+    // Write beside the target first, then swap it in, so a failed
+    // write leaves the previous export whole.
+    let temp = path.with_extension("pdf.tmp");
+    std::fs::write(&temp, bytes).map_err(|err| AppError::io(&temp, err))?;
+    if let Err(err) = std::fs::rename(&temp, &path) {
+        let _ = std::fs::remove_file(&temp);
+        return Err(AppError::io(&path, err));
+    }
     Ok(relative)
 }
 
@@ -684,6 +703,28 @@ mod tests {
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].snippet.chars().count(), SNIPPET_CHARS);
         assert!(hits[0].snippet.chars().all(|ch| ch == 'x'));
+    }
+
+    // covers: feature 10, the snippet window keeps the match in view
+    #[test]
+    fn search_snippet_keeps_a_late_match_and_cuts_by_characters() {
+        let dir = tempfile::tempdir().unwrap();
+        let line = format!("{} igła", "ą".repeat(200));
+        write_note(dir.path(), "late.typ", &format!("{line}\n")).unwrap();
+        let hits = search_notes(dir.path(), "igła").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert!(hits[0].snippet.contains("igła"), "{}", hits[0].snippet);
+        assert!(hits[0].snippet.chars().count() <= SNIPPET_CHARS);
+    }
+
+    // covers: feature 10, CRLF notes keep editor line numbers
+    #[test]
+    fn search_counts_lines_in_a_crlf_note() {
+        let dir = tempfile::tempdir().unwrap();
+        write_note(dir.path(), "crlf.typ", "one\r\nneedle\r\nthree\r\n").unwrap();
+        let hits = search_notes(dir.path(), "needle").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].line, 2);
     }
 
     #[test]

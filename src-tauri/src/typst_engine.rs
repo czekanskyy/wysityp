@@ -188,10 +188,9 @@ impl Engine {
         source: &str,
         revision: u32,
     ) -> AppResult<RenderResult> {
-        let _gate = self
-            .gate
-            .lock()
-            .map_err(|_| AppError::Message("render gate was poisoned".to_string()))?;
+        // The gate guards nothing but turn taking, so a panicked
+        // compile must not disable every later render: take it back.
+        let _gate = self.gate.lock().unwrap_or_else(|err| err.into_inner());
         let mut world = {
             let mut slot = self
                 .world
@@ -251,10 +250,7 @@ impl Engine {
     /// first and its date is pinned for this export. This function does not
     /// write a file.
     pub fn export_pdf(&self, root: &Path, note_path: &str, source: &str) -> AppResult<Vec<u8>> {
-        let _gate = self
-            .gate
-            .lock()
-            .map_err(|_| AppError::Message("compile gate was poisoned".to_string()))?;
+        let _gate = self.gate.lock().unwrap_or_else(|err| err.into_inner());
         let mut world = {
             let mut slot = self
                 .world
@@ -510,6 +506,68 @@ mod tests {
             std::fs::read_dir(dir.path()).unwrap().next().is_none(),
             "exporting bytes must not touch the folder"
         );
+    }
+
+    // covers: feature 12, export reuses the kept document for the same source
+    #[test]
+    fn export_reuses_the_rendered_document_when_the_source_is_unchanged() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("inc.typ"), "= Included\n").unwrap();
+        let engine = Engine::new();
+        let source = "#include \"inc.typ\"\n";
+        let rendered = engine.render(dir.path(), "note.typ", source, 1).unwrap();
+        assert_eq!(rendered.pages.len(), 1);
+        // Break the included file on disk. A recompile would now fail,
+        // so a good export proves the kept document was reused.
+        std::fs::write(dir.path().join("inc.typ"), "#brak()\n").unwrap();
+        let bytes = engine.export_pdf(dir.path(), "note.typ", source).unwrap();
+        assert!(bytes.starts_with(b"%PDF"));
+    }
+
+    // covers: feature 12, a changed source is compiled again on export
+    #[test]
+    fn export_recompiles_when_the_source_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        engine.render(dir.path(), "note.typ", "= One\n", 1).unwrap();
+        let message = engine
+            .export_pdf(dir.path(), "note.typ", "= One\n\n#brak()\n")
+            .unwrap_err()
+            .to_string();
+        assert!(message.contains("brak"), "{message}");
+        let bytes = engine
+            .export_pdf(dir.path(), "note.typ", "= Two\n")
+            .unwrap();
+        assert!(bytes.starts_with(b"%PDF"));
+    }
+
+    // covers: feature 12, a failed render clears the kept document
+    #[test]
+    fn export_after_a_failed_render_recompiles_instead_of_reusing() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("inc.typ"), "= Included\n").unwrap();
+        let engine = Engine::new();
+        let source = "#include \"inc.typ\"\n";
+        engine.render(dir.path(), "note.typ", source, 1).unwrap();
+        let failed = engine
+            .render(dir.path(), "note.typ", "#brak()\n", 2)
+            .unwrap();
+        assert!(failed.pages.is_empty());
+        // With the cache cleared, exporting the good source compiles
+        // again and meets the now broken included file.
+        std::fs::write(dir.path().join("inc.typ"), "#brak()\n").unwrap();
+        assert!(engine.export_pdf(dir.path(), "note.typ", source).is_err());
+    }
+
+    // covers: feature 12, export never reuses a document from another note
+    #[test]
+    fn export_for_another_note_does_not_reuse_the_first_document() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        engine.render(dir.path(), "a.typ", "= One\n", 1).unwrap();
+        assert!(engine.export_pdf(dir.path(), "b.typ", "#brak()\n").is_err());
+        let bytes = engine.export_pdf(dir.path(), "b.typ", "= Two\n").unwrap();
+        assert!(bytes.starts_with(b"%PDF"));
     }
 
     #[test]
