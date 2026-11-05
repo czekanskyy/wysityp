@@ -145,12 +145,7 @@ pub fn list_recent(settings_path: &Path, root: &Path) -> AppResult<Vec<String>> 
 
 /// Follow a rename or move, the same retarget the save baseline does.
 /// Entries for a different open folder are left alone.
-pub fn retarget_recent(
-    settings_path: &Path,
-    root: &Path,
-    from: &str,
-    to: &str,
-) -> AppResult<()> {
+pub fn retarget_recent(settings_path: &Path, root: &Path, from: &str, to: &str) -> AppResult<()> {
     let from = normalize_note(from)?;
     let to = normalize_note(to)?;
     let mut file = load_file(settings_path)?;

@@ -950,7 +950,12 @@ mod tests {
         );
 
         baselines
-            .save(dir.path(), &created.path, "= Lecture\n\nTyped live.\n", false)
+            .save(
+                dir.path(),
+                &created.path,
+                "= Lecture\n\nTyped live.\n",
+                false,
+            )
             .unwrap();
 
         assert_eq!(

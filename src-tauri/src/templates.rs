@@ -132,7 +132,12 @@ mod tests {
         baselines.remember(&note.path, note.fingerprint.clone());
 
         let saved = baselines
-            .save(root.path(), &note.path, "= Lecture title\n\nTyped live.\n", false)
+            .save(
+                root.path(),
+                &note.path,
+                "= Lecture title\n\nTyped live.\n",
+                false,
+            )
             .unwrap();
 
         assert_eq!(
