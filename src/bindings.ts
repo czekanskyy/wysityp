@@ -11,6 +11,7 @@ export const commands = {
 	renameEntry: (from: string, to: string) => typedError<string, string>(__TAURI_INVOKE("rename_entry", { from, to })),
 	deleteEntry: (path: string) => typedError<null, string>(__TAURI_INVOKE("delete_entry", { path })),
 	listNotes: () => typedError<string[], string>(__TAURI_INVOKE("list_notes")),
+	searchNotes: (query: string) => typedError<SearchHit[], string>(__TAURI_INVOKE("search_notes", { query })),
 	openNote: (path: string) => typedError<Note, string>(__TAURI_INVOKE("open_note", { path })),
 	createSampleNote: () => typedError<Note, string>(__TAURI_INVOKE("create_sample_note")),
 	saveNote: (path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("save_note", { path, text })),
@@ -38,6 +39,13 @@ export type RenderResult = {
 	revision: number,
 	pages: string[],
 	diagnostics: RenderDiagnostic[],
+};
+
+/**  One matching line inside a note. `line` is 1 based. */
+export type SearchHit = {
+	path: string,
+	line: number,
+	snippet: string,
 };
 
 export type Settings = {

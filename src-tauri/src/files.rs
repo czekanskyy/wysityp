@@ -430,6 +430,66 @@ pub fn list_notes(root: &Path) -> AppResult<Vec<String>> {
     Ok(notes)
 }
 
+/// One matching line inside a note. `line` is 1 based.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
+pub struct SearchHit {
+    pub path: String,
+    pub line: u32,
+    pub snippet: String,
+}
+
+/// Stop after this many hits so a broad query cannot flood the sidebar.
+pub const SEARCH_RESULT_CAP: usize = 100;
+
+/// Trimmed matching line, cut to this many characters.
+const SNIPPET_CHARS: usize = 120;
+
+pub fn search_notes(root: &Path, query: &str) -> AppResult<Vec<SearchHit>> {
+    let needle = query.trim().to_lowercase();
+    if needle.is_empty() {
+        return Ok(Vec::new());
+    }
+    let notes = list_notes(root)?;
+    let mut hits = Vec::new();
+    for relative in notes {
+        if hits.len() >= SEARCH_RESULT_CAP {
+            break;
+        }
+        let path = match resolve_inside_root(root, &relative) {
+            Ok(path) => path,
+            Err(_) => continue,
+        };
+        let bytes = match std::fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(_) => continue,
+        };
+        let Ok(text) = String::from_utf8(bytes) else {
+            continue;
+        };
+        for (index, line) in text.lines().enumerate() {
+            if hits.len() >= SEARCH_RESULT_CAP {
+                break;
+            }
+            if !line.to_lowercase().contains(&needle) {
+                continue;
+            }
+            hits.push(SearchHit {
+                path: relative.clone(),
+                line: (index + 1) as u32,
+                snippet: snippet_of(line),
+            });
+        }
+    }
+    Ok(hits)
+}
+
+fn snippet_of(line: &str) -> String {
+    let trimmed = line.trim();
+    let mut chars = trimmed.chars();
+    let snippet: String = chars.by_ref().take(SNIPPET_CHARS).collect();
+    snippet
+}
+
 fn collect_notes(root: &Path, dir: &Path, notes: &mut Vec<String>) -> AppResult<()> {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
@@ -497,6 +557,107 @@ mod tests {
         let note = read_note(dir.path(), "notes/one.typ").unwrap();
         assert_eq!(note.text, "= Cześć\n");
         assert_eq!(list_notes(dir.path()).unwrap(), vec!["notes/one.typ"]);
+    }
+
+    #[test]
+    fn search_finds_a_line_with_path_number_and_snippet() {
+        let dir = tempfile::tempdir().unwrap();
+        write_note(
+            dir.path(),
+            "notes/proof.typ",
+            "intro\n  The Proof sits here and also Proof again\n",
+        )
+        .unwrap();
+        let hits = search_notes(dir.path(), "proof").unwrap();
+        assert_eq!(
+            hits,
+            vec![SearchHit {
+                path: "notes/proof.typ".to_string(),
+                line: 2,
+                snippet: "The Proof sits here and also Proof again".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn search_is_case_insensitive_and_empty_query_is_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        write_note(dir.path(), "a.typ", "Całka\n").unwrap();
+        let hits = search_notes(dir.path(), "całka").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].snippet, "Całka");
+        assert!(search_notes(dir.path(), "").unwrap().is_empty());
+        assert!(search_notes(dir.path(), "   ").unwrap().is_empty());
+    }
+
+    #[test]
+    fn search_skips_unreadable_text_and_non_typst_files() {
+        let dir = tempfile::tempdir().unwrap();
+        write_note(dir.path(), "good.typ", "needle\n").unwrap();
+        std::fs::write(dir.path().join("skip.txt"), "needle").unwrap();
+        std::fs::write(dir.path().join("bad.typ"), [0xff, 0xfe, b'n']).unwrap();
+        let hits = search_notes(dir.path(), "needle").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].path, "good.typ");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn search_skips_a_note_that_cannot_be_read() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let locked = dir.path().join("locked.typ");
+        std::fs::write(&locked, "needle\n").unwrap();
+        write_note(dir.path(), "open.typ", "needle\n").unwrap();
+        let _hold = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&locked)
+            .unwrap();
+        let hits = search_notes(dir.path(), "needle").unwrap();
+        assert_eq!(
+            hits,
+            vec![SearchHit {
+                path: "open.typ".to_string(),
+                line: 1,
+                snippet: "needle".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn search_truncates_a_long_matching_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let long = "x".repeat(SNIPPET_CHARS + 40);
+        write_note(dir.path(), "long.typ", &format!("  {long}\n")).unwrap();
+        let hits = search_notes(dir.path(), "x").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].snippet.chars().count(), SNIPPET_CHARS);
+        assert!(hits[0].snippet.chars().all(|ch| ch == 'x'));
+    }
+
+    #[test]
+    fn search_orders_by_path_then_line_and_stops_at_the_cap() {
+        let dir = tempfile::tempdir().unwrap();
+        write_note(dir.path(), "b.typ", "hit\nhit\n").unwrap();
+        write_note(dir.path(), "a/z.typ", "no\nhit\n").unwrap();
+        let hits = search_notes(dir.path(), "hit").unwrap();
+        assert_eq!(
+            hits.iter()
+                .map(|hit| (hit.path.as_str(), hit.line))
+                .collect::<Vec<_>>(),
+            vec![("a/z.typ", 2), ("b.typ", 1), ("b.typ", 2)]
+        );
+
+        let mut many = String::new();
+        for _ in 0..(SEARCH_RESULT_CAP + 5) {
+            many.push_str("hit\n");
+        }
+        write_note(dir.path(), "many.typ", &many).unwrap();
+        assert_eq!(
+            search_notes(dir.path(), "hit").unwrap().len(),
+            SEARCH_RESULT_CAP
+        );
     }
 
     // covers: proof 2, a folder with subfolders lists every note once

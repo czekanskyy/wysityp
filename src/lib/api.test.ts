@@ -9,6 +9,7 @@ vi.mock("../bindings", () => ({
     renameEntry: vi.fn(),
     deleteEntry: vi.fn(),
     listNotes: vi.fn(),
+    searchNotes: vi.fn(),
     openNote: vi.fn(),
     createSampleNote: vi.fn(),
     saveNote: vi.fn(),
@@ -72,6 +73,14 @@ describe("workspace api", () => {
       "dest/new.typ",
     );
     expect(mocked.renameEntry).toHaveBeenCalledWith("old.typ", "dest/new.typ");
+  });
+
+  it("searches notes with the query string only", async () => {
+    const hits = [{ path: "lab/one.typ", line: 3, snippet: "a proof" }];
+    mocked.searchNotes.mockResolvedValue(hits as never);
+
+    await expect(api.searchNotes("proof")).resolves.toEqual(hits);
+    expect(mocked.searchNotes).toHaveBeenCalledWith("proof");
   });
 
   it("deletes the entry at the given path", async () => {

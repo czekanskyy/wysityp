@@ -35,6 +35,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::rename_entry,
         commands::delete_entry,
         commands::list_notes,
+        commands::search_notes,
         commands::open_note,
         commands::create_sample_note,
         commands::save_note,

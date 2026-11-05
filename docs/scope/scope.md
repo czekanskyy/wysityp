@@ -20,7 +20,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 7 | Math editing | Release 1 | planned |
 | 8 | Tables, code, images and links | Release 1 | planned |
 | 9 | Source view and file safety | Release 1 | planned |
-| 10 | Search, recent notes and templates | Release 1 | planned |
+| 10 | Search, recent notes and templates | Release 1 | in-progress |
 | 11 | Spell checking in Polish and English | Release 1 | planned |
 | 12 | PDF export | Release 1 | planned |
 | 13 | Smart suggestions for Typst and math | Release 2 | planned |

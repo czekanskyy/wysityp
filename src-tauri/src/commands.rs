@@ -6,7 +6,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::AppState;
 use crate::error::AppError;
-use crate::files::{self, Note, SAMPLE_PATH, SAMPLE_TEXT, TreeNode, WorkspaceInfo};
+use crate::files::{self, Note, SAMPLE_PATH, SAMPLE_TEXT, SearchHit, TreeNode, WorkspaceInfo};
 use crate::settings::{self, Settings};
 use crate::typst_engine::RenderResult;
 
@@ -100,6 +100,13 @@ pub fn rename_entry(
 pub fn delete_entry(state: State<'_, AppState>, path: String) -> Result<(), String> {
     let root = root_or_err(&state)?;
     files::delete_entry(&root, &path).map_err(String::from)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn search_notes(state: State<'_, AppState>, query: String) -> Result<Vec<SearchHit>, String> {
+    let root = root_or_err(&state)?;
+    files::search_notes(&root, &query).map_err(String::from)
 }
 
 #[tauri::command]

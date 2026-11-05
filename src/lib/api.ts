@@ -40,6 +40,9 @@ export const api = {
   async listNotes() {
     return unwrap(await commands.listNotes());
   },
+  async searchNotes(query: string) {
+    return unwrap(await commands.searchNotes(query));
+  },
   async openNote(path: string) {
     return unwrap(await commands.openNote(path));
   },
