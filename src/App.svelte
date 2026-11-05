@@ -67,7 +67,10 @@
       diagnostics = result.diagnostics;
       // A failed draw keeps the last good page on screen.
       if (result.pages.length > 0) setPages(result.pages);
-      if (result.diagnostics.some((d) => d.severity === "error") && pageUrls.length > 0) {
+      if (
+        result.diagnostics.some((d) => d.severity === "error") &&
+        pageUrls.length > 0
+      ) {
         status = labels.lastGoodKept;
       }
     } catch (error) {
@@ -224,7 +227,10 @@
 
     <main class="panes">
       <section class="pane editor-pane" aria-label={labels.editor}>
-        <h2>{labels.editor}{#if currentPath}<span class="path">{currentPath}</span>{/if}</h2>
+        <h2>
+          {labels.editor}{#if currentPath}<span class="path">{currentPath}</span
+            >{/if}
+        </h2>
         {#if !currentPath}
           <p class="muted pad">{labels.noNote}</p>
         {/if}

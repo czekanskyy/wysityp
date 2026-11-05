@@ -39,19 +39,6 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     ])
 }
 
-#[cfg(test)]
-mod bindings_export {
-    #[test]
-    fn export_bindings() {
-        super::specta_builder()
-            .export(
-                specta_typescript::Typescript::default(),
-                "../src/bindings.ts",
-            )
-            .expect("failed to export typescript bindings");
-    }
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = specta_builder();
@@ -97,4 +84,17 @@ pub fn run() {
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod bindings_export {
+    #[test]
+    fn export_bindings() {
+        super::specta_builder()
+            .export(
+                specta_typescript::Typescript::default(),
+                "../src/bindings.ts",
+            )
+            .expect("failed to export typescript bindings");
+    }
 }

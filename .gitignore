@@ -4,6 +4,7 @@ node_modules
 /target
 src-tauri/target/
 project.inlang/cache/
+src/paraglide/
 .env
 .env.*
 !.env.example

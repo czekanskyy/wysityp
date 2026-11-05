@@ -1,0 +1,9 @@
+node_modules
+dist
+src/paraglide
+src/bindings.ts
+src-tauri
+bun.lock
+project.inlang/cache
+docs
+**/*.md
