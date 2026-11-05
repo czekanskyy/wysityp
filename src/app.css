@@ -1,0 +1,275 @@
+:root {
+  --bg: #f4f2ec;
+  --surface: #fffdf8;
+  --surface-strong: #ffffff;
+  --ink: #1d2733;
+  --ink-soft: #5a6875;
+  --line: #d8d2c4;
+  --accent: #2456a6;
+  --accent-ink: #ffffff;
+  --danger: #a61e2e;
+  --danger-bg: #fbeaec;
+  --warn-bg: #fff4d6;
+  --radius: 12px;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+select {
+  font: inherit;
+}
+
+button {
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+button:focus-visible,
+select:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.2rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand-name {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.brand-tag {
+  margin: 0.15rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.locale-picker {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  color: var(--ink-soft);
+}
+
+.locale-picker select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.4rem 0.55rem;
+  background: var(--surface-strong);
+  color: var(--ink);
+}
+
+.workarea {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 0;
+}
+
+.sidebar {
+  padding: 1rem;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  overflow: auto;
+}
+
+.sidebar h2,
+.pane h2 {
+  margin: 0 0 0.7rem;
+  font-size: 0.95rem;
+}
+
+.pane h2 .path {
+  margin-left: 0.6rem;
+  color: var(--ink-soft);
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
+.root-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.note-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.note-list button {
+  width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.note-list button.active {
+  border-color: var(--accent);
+  background: #e8effc;
+}
+
+.status {
+  margin-top: 1rem;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  color: var(--ink-soft);
+}
+
+.pad {
+  padding: 0 1rem;
+}
+
+.panes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pane {
+  padding: 1rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-pane {
+  border-right: 1px solid var(--line);
+}
+
+.editor-host {
+  flex: 1;
+  min-height: 320px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  overflow: hidden;
+}
+
+.pages {
+  display: grid;
+  gap: 1rem;
+  overflow: auto;
+}
+
+.page {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.8rem;
+}
+
+.page img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.diagnostics {
+  margin-top: 1rem;
+}
+
+.diagnostics h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.diagnostics ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.diagnostic {
+  width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 0.2rem;
+  background: var(--warn-bg);
+}
+
+.diagnostic.error {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+}
+
+.diagnostic .hint {
+  color: var(--ink-soft);
+}
+
+@media (max-width: 900px) {
+  .workarea {
+    grid-template-columns: 1fr;
+  }
+
+  .panes {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+}
