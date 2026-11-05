@@ -909,6 +909,29 @@ mod tests {
         );
     }
 
+    // covers: features 9 and 10 together, a created note saves without force once its fingerprint is remembered
+    #[test]
+    fn a_created_note_saves_without_force_once_remembered() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut baselines = NoteBaselines::default();
+        let created = create_note(dir.path(), "", "Lecture").unwrap();
+        baselines.remember(&created.path, created.fingerprint.clone());
+        assert!(
+            !baselines
+                .changed_on_disk(dir.path(), &created.path)
+                .unwrap()
+        );
+
+        baselines
+            .save(dir.path(), &created.path, "= Lecture\n\nTyped live.\n", false)
+            .unwrap();
+
+        assert_eq!(
+            read_note(dir.path(), &created.path).unwrap().text,
+            "= Lecture\n\nTyped live.\n"
+        );
+    }
+
     #[test]
     fn save_without_a_baseline_is_refused_and_a_missing_file_is_a_conflict() {
         let dir = tempfile::tempdir().unwrap();

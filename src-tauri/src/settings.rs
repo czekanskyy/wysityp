@@ -371,6 +371,18 @@ mod tests {
         assert!(list_recent(&path, folder_a.path()).unwrap().is_empty());
     }
 
+    // covers: feature 9, a settings write replaces the whole file and leaves no temp file
+    #[test]
+    fn a_settings_write_leaves_no_temp_file() {
+        let root = tempfile::tempdir().unwrap();
+        let settings_dir = tempfile::tempdir().unwrap();
+        let path = settings_dir.path().join("settings.json");
+        write_note(root.path(), "a.typ");
+        record_recent(&path, root.path(), "a.typ").unwrap();
+        assert!(!settings_dir.path().join("settings.json.tmp").exists());
+        assert_eq!(load_settings(&path).unwrap().locale, "pl");
+    }
+
     #[test]
     fn changing_the_language_keeps_recent_notes() {
         let root = tempfile::tempdir().unwrap();

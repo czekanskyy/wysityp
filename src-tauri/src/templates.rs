@@ -123,6 +123,30 @@ mod tests {
         assert!(std::fs::read_dir(&root).unwrap().next().is_none());
     }
 
+    // covers: features 9 and 10 together, a template note saves without force once its fingerprint is remembered
+    #[test]
+    fn a_template_note_saves_without_force_once_remembered() {
+        let root = tempfile::tempdir().unwrap();
+        let note = create_from_template(root.path(), "", "lecture", "en").unwrap();
+        let mut baselines = files::NoteBaselines::default();
+        baselines.remember(&note.path, note.fingerprint.clone());
+
+        let saved = baselines
+            .save(root.path(), &note.path, "= Lecture title\n\nTyped live.\n", false)
+            .unwrap();
+
+        assert_eq!(
+            files::read_note(root.path(), &note.path).unwrap().text,
+            "= Lecture title\n\nTyped live.\n"
+        );
+        assert_eq!(
+            files::read_note(root.path(), &note.path)
+                .unwrap()
+                .fingerprint,
+            saved
+        );
+    }
+
     #[test]
     fn a_template_can_land_in_a_folder_inside_the_workspace() {
         let root = tempfile::tempdir().unwrap();
