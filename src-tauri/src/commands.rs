@@ -19,6 +19,18 @@ fn root_or_err(state: &AppState) -> Result<PathBuf, String> {
         .ok_or_else(|| AppError::NoWorkspace.to_string())
 }
 
+fn baselines(state: &AppState) -> Result<std::sync::MutexGuard<'_, files::NoteBaselines>, String> {
+    state
+        .note_baselines
+        .lock()
+        .map_err(|_| "note baseline lock was poisoned".to_string())
+}
+
+fn remember_note(state: &AppState, note: &Note) -> Result<(), String> {
+    baselines(state)?.remember(&note.path, note.fingerprint.clone());
+    Ok(())
+}
+
 fn settings_file(state: &AppState) -> Result<PathBuf, String> {
     state
         .settings_file
@@ -47,11 +59,14 @@ pub fn open_workspace(
         .file_name()
         .map(|name| name.to_string_lossy().to_string())
         .unwrap_or_else(|| root.to_string_lossy().to_string());
-    let mut slot = state
-        .workspace_root
-        .lock()
-        .map_err(|_| "workspace lock was poisoned".to_string())?;
-    *slot = Some(root);
+    {
+        let mut slot = state
+            .workspace_root
+            .lock()
+            .map_err(|_| "workspace lock was poisoned".to_string())?;
+        *slot = Some(root);
+    }
+    baselines(&state)?.clear();
     Ok(Some(WorkspaceInfo { root_name, notes }))
 }
 
@@ -70,7 +85,9 @@ pub fn create_note(
     name: String,
 ) -> Result<Note, String> {
     let root = root_or_err(&state)?;
-    files::create_note(&root, &parent, &name).map_err(String::from)
+    let note = files::create_note(&root, &parent, &name).map_err(String::from)?;
+    remember_note(&state, &note)?;
+    Ok(note)
 }
 
 #[tauri::command]
@@ -92,14 +109,18 @@ pub fn rename_entry(
     to: String,
 ) -> Result<String, String> {
     let root = root_or_err(&state)?;
-    files::rename_entry(&root, &from, &to).map_err(String::from)
+    let next = files::rename_entry(&root, &from, &to).map_err(String::from)?;
+    baselines(&state)?.retarget(&from, &next);
+    Ok(next)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn delete_entry(state: State<'_, AppState>, path: String) -> Result<(), String> {
     let root = root_or_err(&state)?;
-    files::delete_entry(&root, &path).map_err(String::from)
+    files::delete_entry(&root, &path).map_err(String::from)?;
+    baselines(&state)?.forget(&path);
+    Ok(())
 }
 
 #[tauri::command]
@@ -128,7 +149,9 @@ pub fn list_notes(state: State<'_, AppState>) -> Result<Vec<String>, String> {
 #[specta::specta]
 pub fn open_note(state: State<'_, AppState>, path: String) -> Result<Note, String> {
     let root = root_or_err(&state)?;
-    files::read_note(&root, &path).map_err(String::from)
+    let note = files::read_note(&root, &path).map_err(String::from)?;
+    remember_note(&state, &note)?;
+    Ok(note)
 }
 
 #[tauri::command]
@@ -139,14 +162,33 @@ pub fn create_sample_note(state: State<'_, AppState>) -> Result<Note, String> {
     if !target.exists() {
         files::write_note(&root, SAMPLE_PATH, SAMPLE_TEXT).map_err(String::from)?;
     }
-    files::read_note(&root, SAMPLE_PATH).map_err(String::from)
+    let note = files::read_note(&root, SAMPLE_PATH).map_err(String::from)?;
+    remember_note(&state, &note)?;
+    Ok(note)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn save_note(state: State<'_, AppState>, path: String, text: String) -> Result<(), String> {
+pub fn save_note(
+    state: State<'_, AppState>,
+    path: String,
+    text: String,
+    force: bool,
+) -> Result<files::NoteFingerprint, String> {
     let root = root_or_err(&state)?;
-    files::write_note(&root, &path, &text).map_err(String::from)
+    baselines(&state)?
+        .save(&root, &path, &text, force)
+        .map_err(String::from)
+}
+
+/// Compare the open note with the bytes on disk. Does not change the baseline.
+#[tauri::command]
+#[specta::specta]
+pub fn note_changed_on_disk(state: State<'_, AppState>, path: String) -> Result<bool, String> {
+    let root = root_or_err(&state)?;
+    baselines(&state)?
+        .changed_on_disk(&root, &path)
+        .map_err(String::from)
 }
 
 #[tauri::command]

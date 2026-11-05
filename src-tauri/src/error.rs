@@ -26,6 +26,9 @@ pub enum AppError {
     BadLocale(String),
     #[error("settings are not ready yet")]
     SettingsNotReady,
+    /// The page matches this prefix. The words after it are for logs.
+    #[error("external-change: the note on disk was changed by another tool")]
+    ExternalChange,
     #[error("{0}")]
     Message(String),
 }

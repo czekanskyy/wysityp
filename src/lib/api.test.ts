@@ -13,6 +13,7 @@ vi.mock("../bindings", () => ({
     openNote: vi.fn(),
     createSampleNote: vi.fn(),
     saveNote: vi.fn(),
+    noteChangedOnDisk: vi.fn(),
     renderNote: vi.fn(),
     exportPdf: vi.fn(),
     getSettings: vi.fn(),
@@ -100,6 +101,34 @@ describe("workspace api", () => {
     await expect(api.createNote("", "one.typ")).rejects.toThrow(
       "that name is already taken",
     );
+  });
+
+  it("saves the note and can force the write", async () => {
+    const fingerprint = { hash: "abc", byte_len: 4 };
+    mocked.saveNote.mockResolvedValue(fingerprint as never);
+
+    await expect(
+      api.saveNote("notes/one.typ", "= A\n", false),
+    ).resolves.toEqual(fingerprint);
+    expect(mocked.saveNote).toHaveBeenCalledWith(
+      "notes/one.typ",
+      "= A\n",
+      false,
+    );
+
+    await api.saveNote("notes/one.typ", "= B\n", true);
+    expect(mocked.saveNote).toHaveBeenCalledWith(
+      "notes/one.typ",
+      "= B\n",
+      true,
+    );
+  });
+
+  it("asks Rust whether the open note changed on disk", async () => {
+    mocked.noteChangedOnDisk.mockResolvedValue(true as never);
+
+    await expect(api.noteChangedOnDisk("notes/one.typ")).resolves.toBe(true);
+    expect(mocked.noteChangedOnDisk).toHaveBeenCalledWith("notes/one.typ");
   });
 
   it("exports the open note and returns the PDF path from the root", async () => {

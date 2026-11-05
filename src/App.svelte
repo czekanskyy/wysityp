@@ -1,7 +1,27 @@
 <script lang="ts">
   import { api } from "./lib/api";
-  import { createEditor, type EditorHandle } from "./lib/editor";
+  import {
+    createEditor,
+    type EditorHandle,
+    type EditorPlace,
+  } from "./lib/editor";
   import { applyLocale, currentLocale, type AppLocale } from "./lib/locale";
+  import {
+    AUTOSAVE_WAIT_MS,
+    createAutosaveTimer,
+    EDITOR_PLACE_START,
+    isExternalChange,
+    savedTextIsCurrent,
+    shouldApplySaveResult,
+    shouldRunSave,
+    showsRendered,
+    showsSource,
+    type NoteView,
+    type OpenNote,
+    type SaveOrigin,
+    type SavePhase,
+    type SaveTicket,
+  } from "./lib/noteSafety";
   import { byteOffsetToUtf16, debounce, RenderGuard } from "./lib/render";
   import { m } from "./paraglide/messages.js";
   import type { RenderDiagnostic, SearchHit, TreeNode } from "./bindings";
@@ -25,10 +45,22 @@
   let searchPending = $state(false);
   let rendering = $state(false);
   let exporting = $state(false);
+  let viewMode = $state<NoteView>("split");
+  let savePhase = $state<SavePhase>("saved");
+  let conflict = $state(false);
+  let reloadArmed = $state(false);
 
   let editor: EditorHandle | undefined;
   let nameInput: HTMLInputElement | undefined = $state();
+  let sourceText = "";
+  let noteEpoch = 0;
+  let noteRevision = 0;
+  let saveSerial = 0;
+  let saveChain: Promise<void> = Promise.resolve();
+  let heldPlace: EditorPlace = { ...EDITOR_PLACE_START };
+  let pendingJump: number | null = null;
   const guard = new RenderGuard();
+  const autosave = createAutosaveTimer(AUTOSAVE_WAIT_MS);
 
   function setPages(svgs: string[]) {
     for (const url of pageUrls) URL.revokeObjectURL(url);
@@ -90,15 +122,167 @@
       searchEmpty: m.search_empty(),
       searchFailed: m.search_failed(),
       searchSearching: m.search_searching(),
+      viewSwitch: m.view_switch(),
+      viewSource: m.view_source(),
+      viewRendered: m.view_rendered(),
+      viewSplit: m.view_split(),
+      saveStateSaved: m.save_state_saved(),
+      saveStateSaving: m.save_state_saving(),
+      saveStateUnsaved: m.save_state_unsaved(),
+      saveStateConflict: m.save_state_conflict(),
+      conflictBody: m.conflict_body(),
+      reloadDisk: m.reload_disk(),
+      reloadWarning: m.reload_warning(),
+      reloadConfirm: m.reload_confirm(),
+      overwriteDisk: m.overwrite_disk(),
     };
   });
 
+  const saveStateLabel = $derived(
+    conflict
+      ? labels.saveStateConflict
+      : savePhase === "saving"
+        ? labels.saveStateSaving
+        : savePhase === "unsaved"
+          ? labels.saveStateUnsaved
+          : labels.saveStateSaved,
+  );
+
   const hasError = $derived(diagnostics.some((d) => d.severity === "error"));
 
+  function phaseNow(): SavePhase {
+    return savePhase;
+  }
+
+  function currentOpen(): OpenNote | null {
+    if (!currentPath) return null;
+    return { id: noteEpoch, path: currentPath, revision: noteRevision };
+  }
+
+  function currentTicket(): SaveTicket {
+    const text = editor?.getText() ?? sourceText;
+    sourceText = text;
+    return {
+      id: noteEpoch,
+      path: currentPath,
+      revision: noteRevision,
+      text,
+    };
+  }
+
+  function scheduleAutosave() {
+    if (conflict || !currentPath) return;
+    const ticket = currentTicket();
+    autosave.schedule(ticket, (pending) => {
+      void enqueueSave(pending, "auto");
+    });
+  }
+
+  function enqueueSave(ticket: SaveTicket, origin: SaveOrigin): Promise<void> {
+    const run = saveChain.then(() => runSave(ticket, origin));
+    saveChain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  async function runSave(ticket: SaveTicket, origin: SaveOrigin) {
+    if (!shouldRunSave(currentOpen(), ticket, conflict, savePhase, origin))
+      return;
+    const serial = ++saveSerial;
+    const phaseBefore = savePhase;
+    savePhase = "saving";
+    try {
+      await api.saveNote(ticket.path, ticket.text, origin === "force");
+      const openNow = currentOpen();
+      if (
+        !shouldApplySaveResult(openNow, ticket, serial, saveSerial) ||
+        !openNow
+      )
+        return;
+      conflict = false;
+      reloadArmed = false;
+      if (
+        savedTextIsCurrent(openNow, ticket, editor?.getText() ?? sourceText)
+      ) {
+        sourceText = ticket.text;
+        savePhase = "saved";
+        if (origin !== "auto") status = labels.saved;
+      } else {
+        savePhase = "unsaved";
+        scheduleAutosave();
+      }
+    } catch (error) {
+      const openNow = currentOpen();
+      if (!shouldApplySaveResult(openNow, ticket, serial, saveSerial)) return;
+      if (isExternalChange(error)) {
+        conflict = true;
+        reloadArmed = false;
+        autosave.cancel();
+        const textNow = editor?.getText() ?? sourceText;
+        const stillThatWrite =
+          openNow !== null && savedTextIsCurrent(openNow, ticket, textNow);
+        savePhase =
+          stillThatWrite && phaseBefore !== "unsaved" ? "saved" : "unsaved";
+        return;
+      }
+      savePhase = "unsaved";
+      status = `${labels.saveFailed}: ${String(error)}`;
+    }
+  }
+
+  async function settleBeforeLeave(): Promise<boolean> {
+    if (!currentPath) return true;
+    autosave.cancel();
+    await saveChain;
+    if (conflict) return false;
+    if (phaseNow() !== "saved") {
+      await enqueueSave(currentTicket(), "manual");
+    }
+    return !conflict && phaseNow() === "saved";
+  }
+
+  function applyLoadedNote(note: { path: string; text: string }) {
+    noteEpoch += 1;
+    noteRevision = 0;
+    conflict = false;
+    reloadArmed = false;
+    autosave.cancel();
+    savePhase = "saved";
+    currentPath = note.path;
+    sourceText = note.text;
+    heldPlace = { ...EDITOR_PLACE_START };
+    pendingJump = null;
+    editor?.setText(note.text);
+  }
+
+  function captureEditorPlace() {
+    if (!editor) return;
+    heldPlace = editor.getPlace();
+    sourceText = editor.getText();
+  }
+
+  function setView(next: NoteView) {
+    if (next === viewMode) return;
+    const enteringSource = !showsSource(viewMode) && showsSource(next);
+    if (showsSource(viewMode) && !showsSource(next)) captureEditorPlace();
+    viewMode = next;
+    if (!enteringSource) return;
+    queueMicrotask(() => {
+      editor?.restorePlace(heldPlace);
+      if (pendingJump !== null && editor) {
+        editor.setSelection(pendingJump);
+        editor.focus();
+        pendingJump = null;
+      }
+    });
+  }
+
   async function runRender() {
-    if (!editor || !currentPath) return;
+    if (!currentPath) return;
     const revision = guard.next();
-    const source = editor.getText();
+    const source = editor?.getText() ?? sourceText;
     const path = currentPath;
     rendering = true;
     try {
@@ -125,7 +309,16 @@
   const scheduleRender = debounce(() => void runRender(), 350);
 
   function clearOpenNote() {
+    noteEpoch += 1;
+    noteRevision = 0;
+    conflict = false;
+    reloadArmed = false;
+    autosave.cancel();
+    savePhase = "saved";
     currentPath = "";
+    sourceText = "";
+    heldPlace = { ...EDITOR_PLACE_START };
+    pendingJump = null;
     editor?.setText("");
     setPages([]);
     diagnostics = [];
@@ -150,6 +343,8 @@
   }
 
   async function openFolder() {
+    const left = await settleBeforeLeave();
+    if (!left) return;
     try {
       const picked = await api.openWorkspace();
       if (!picked) return;
@@ -204,12 +399,14 @@
   }
 
   async function openNote(path: string) {
+    if (path === currentPath) return;
+    const left = await settleBeforeLeave();
+    if (!left) return;
     try {
       const note = await api.openNote(path);
-      currentPath = note.path;
       setPages([]);
       diagnostics = [];
-      editor?.setText(note.text);
+      applyLoadedNote(note);
       await runRender();
     } catch (error) {
       status = `${labels.openFailed}: ${String(error)}`;
@@ -217,11 +414,12 @@
   }
 
   async function createSample() {
+    const left = await settleBeforeLeave();
+    if (!left) return;
     try {
       const note = await api.createSampleNote();
       await refreshTree();
-      currentPath = note.path;
-      editor?.setText(note.text);
+      applyLoadedNote(note);
       await runRender();
     } catch (error) {
       status = `${labels.openFailed}: ${String(error)}`;
@@ -231,6 +429,10 @@
   async function createEntry(kind: "note" | "folder") {
     const name = entryName.trim();
     if (!name || !rootName) return;
+    if (kind === "note") {
+      const left = await settleBeforeLeave();
+      if (!left) return;
+    }
     try {
       if (kind === "note") {
         const note = await api.createNote(selectedFolder, name);
@@ -239,10 +441,9 @@
         if (selectedFolder && !openFolders.includes(selectedFolder)) {
           openFolders = [...openFolders, selectedFolder];
         }
-        currentPath = note.path;
-        editor?.setText(note.text);
         setPages([]);
         diagnostics = [];
+        applyLoadedNote(note);
         await runRender();
       } else {
         const created = await api.createFolder(selectedFolder, name);
@@ -268,6 +469,10 @@
     const to = renameValue.trim();
     if (!from || !to) return;
     const wasOpen = currentPath === from || currentPath.startsWith(`${from}/`);
+    if (wasOpen) {
+      const left = await settleBeforeLeave();
+      if (!left) return;
+    }
     try {
       const next = await api.renameEntry(from, to);
       renamingPath = "";
@@ -322,7 +527,10 @@
   async function confirmDelete() {
     const path = pendingDelete;
     if (!path) return;
+    const removingOpen = noteWasRemoved(path);
+    if (removingOpen) autosave.cancel();
     try {
+      if (removingOpen) await saveChain;
       await api.deleteEntry(path);
       closeDelete();
       if (selectedFolder === path || selectedFolder.startsWith(`${path}/`)) {
@@ -350,19 +558,73 @@
   }
 
   async function saveNote() {
-    if (!editor || !currentPath) return;
+    if (!currentPath) return;
+    autosave.cancel();
+    await enqueueSave(currentTicket(), "manual");
+  }
+
+  function requestReload() {
+    if (savePhase === "unsaved") {
+      reloadArmed = true;
+      return;
+    }
+    void reloadFromDisk();
+  }
+
+  async function reloadFromDisk() {
+    if (!currentPath) return;
+    const path = currentPath;
+    const epoch = noteEpoch;
+    autosave.cancel();
+    await saveChain;
+    if (epoch !== noteEpoch || currentPath !== path) return;
     try {
-      await api.saveNote(currentPath, editor.getText());
-      status = labels.saved;
+      const note = await api.openNote(path);
+      if (epoch !== noteEpoch || currentPath !== path) return;
+      setPages([]);
+      diagnostics = [];
+      applyLoadedNote(note);
+      await runRender();
     } catch (error) {
-      status = `${labels.saveFailed}: ${String(error)}`;
+      status = `${labels.openFailed}: ${String(error)}`;
+    }
+  }
+
+  async function overwriteFromEditor() {
+    if (!currentPath) return;
+    autosave.cancel();
+    await enqueueSave(currentTicket(), "force");
+  }
+
+  async function onWindowFocus() {
+    if (!currentPath || conflict || phaseNow() === "saving") return;
+    const path = currentPath;
+    const epoch = noteEpoch;
+    try {
+      const changed = await api.noteChangedOnDisk(path);
+      if (
+        epoch !== noteEpoch ||
+        currentPath !== path ||
+        conflict ||
+        phaseNow() === "saving"
+      ) {
+        return;
+      }
+      if (changed) {
+        conflict = true;
+        reloadArmed = false;
+        autosave.cancel();
+      }
+    } catch (error) {
+      if (epoch !== noteEpoch || currentPath !== path) return;
+      status = `${labels.actionFailed}: ${String(error)}`;
     }
   }
 
   async function exportPdf() {
-    if (!editor || !currentPath || exporting) return;
+    if (!currentPath || exporting) return;
     const path = currentPath;
-    const source = editor.getText();
+    const source = editor?.getText() ?? sourceText;
     exporting = true;
     status = labels.exportingPdf;
     try {
@@ -386,22 +648,41 @@
   }
 
   function jumpToDiagnostic(diagnostic: RenderDiagnostic) {
-    if (!editor) return;
-    const source = editor.getText();
-    editor.setSelection(byteOffsetToUtf16(source, diagnostic.start));
-    editor.focus();
+    const source = editor?.getText() ?? sourceText;
+    const position = byteOffsetToUtf16(source, diagnostic.start);
+    if (!showsSource(viewMode)) {
+      pendingJump = position;
+      setView("split");
+      return;
+    }
+    editor?.setSelection(position);
+    editor?.focus();
+  }
+
+  function onEditorChange(text: string) {
+    sourceText = text;
+    if (!currentPath) return;
+    noteRevision += 1;
+    savePhase = "unsaved";
+    if (!conflict) scheduleAutosave();
+    scheduleRender();
   }
 
   function editorAttachment(node: HTMLDivElement) {
-    editor = createEditor(node, "", () => scheduleRender());
+    editor = createEditor(node, sourceText, onEditorChange);
+    editor.restorePlace(heldPlace);
     return () => {
+      if (editor) {
+        heldPlace = editor.getPlace();
+        sourceText = editor.getText();
+      }
       editor?.destroy();
       editor = undefined;
     };
   }
 </script>
 
-<svelte:window onkeydown={onConfirmKey} />
+<svelte:window onkeydown={onConfirmKey} onfocus={onWindowFocus} />
 
 {#snippet renameForm()}
   <form
@@ -669,57 +950,131 @@
       {/if}
     </aside>
 
-    <main class="panes">
-      <section class="pane editor-pane" aria-label={labels.editor}>
-        <h2>
-          {labels.editor}{#if currentPath}<span class="path">{currentPath}</span
-            >{/if}
-        </h2>
-        {#if !currentPath}
-          <p class="muted pad">{labels.noNote}</p>
-        {/if}
-        <div class="editor-host" {@attach editorAttachment}></div>
-      </section>
-
-      <section class="pane preview-pane" aria-label={labels.preview}>
-        <h2>{labels.preview}</h2>
-        <div class="pages">
-          {#each pageUrls as pageUrl, index (index)}
-            <div class="page"><img src={pageUrl} alt="" /></div>
-          {/each}
-        </div>
-        <div class="diagnostics" aria-label={labels.diagnostics}>
-          <h3>{labels.diagnostics}</h3>
-          {#if diagnostics.length === 0}
-            <p class="muted">{labels.noDiagnostics}</p>
-          {:else}
-            <ul>
-              {#each diagnostics as diagnostic, index (index)}
-                <li>
-                  <button
-                    type="button"
-                    class={[
-                      "diagnostic",
-                      { error: diagnostic.severity === "error" },
-                    ]}
-                    onclick={() => jumpToDiagnostic(diagnostic)}
-                  >
-                    <strong>{diagnostic.severity}</strong>
-                    <span>{diagnostic.file}:{diagnostic.start}</span>
-                    <span>{diagnostic.message}</span>
-                    {#each diagnostic.hints as hint (hint)}
-                      <span class="hint">{hint}</span>
-                    {/each}
-                  </button>
-                </li>
-              {/each}
-            </ul>
-            {#if hasError && pageUrls.length > 0}
-              <p class="muted">{labels.lastGoodKept}</p>
-            {/if}
+    <main class="stage">
+      <div class="stage-bar">
+        <div class="view-cluster">
+          <div class="view-switch" role="group" aria-label={labels.viewSwitch}>
+            <button
+              type="button"
+              aria-pressed={viewMode === "source"}
+              onclick={() => setView("source")}
+            >
+              {labels.viewSource}
+            </button>
+            <button
+              type="button"
+              aria-pressed={viewMode === "split"}
+              onclick={() => setView("split")}
+            >
+              {labels.viewSplit}
+            </button>
+            <button
+              type="button"
+              aria-pressed={viewMode === "rendered"}
+              onclick={() => setView("rendered")}
+            >
+              {labels.viewRendered}
+            </button>
+          </div>
+          {#if currentPath}
+            <p class="path-line">{currentPath}</p>
           {/if}
         </div>
-      </section>
+        {#if currentPath}
+          <p class={["save-state", savePhase, { conflict }]} role="status">
+            {saveStateLabel}
+          </p>
+        {/if}
+      </div>
+
+      {#if conflict}
+        <section class="conflict-banner" role="alert">
+          <h2>{labels.saveStateConflict}</h2>
+          <p>{labels.conflictBody}</p>
+          {#if reloadArmed}
+            <p>{labels.reloadWarning}</p>
+          {/if}
+          <div class="row-actions">
+            {#if reloadArmed}
+              <button type="button" class="danger" onclick={reloadFromDisk}>
+                {labels.reloadConfirm}
+              </button>
+              <button type="button" onclick={() => (reloadArmed = false)}>
+                {labels.cancel}
+              </button>
+            {:else}
+              <button type="button" onclick={requestReload}
+                >{labels.reloadDisk}</button
+              >
+              <button
+                type="button"
+                class="primary"
+                onclick={overwriteFromEditor}
+              >
+                {labels.overwriteDisk}
+              </button>
+            {/if}
+          </div>
+        </section>
+      {/if}
+
+      <div class={["panes", viewMode]}>
+        <section
+          class="pane editor-pane"
+          aria-label={labels.editor}
+          hidden={!showsSource(viewMode)}
+        >
+          <h2>{labels.editor}</h2>
+          {#if !currentPath}
+            <p class="muted pad">{labels.noNote}</p>
+          {/if}
+          <div class="editor-host" {@attach editorAttachment}></div>
+        </section>
+
+        <section
+          class="pane preview-pane"
+          aria-label={labels.preview}
+          hidden={!showsRendered(viewMode)}
+        >
+          <h2>{labels.preview}</h2>
+          <div class="pages">
+            {#each pageUrls as pageUrl, index (index)}
+              <div class="page"><img src={pageUrl} alt="" /></div>
+            {/each}
+          </div>
+          <div class="diagnostics" aria-label={labels.diagnostics}>
+            <h3>{labels.diagnostics}</h3>
+            {#if diagnostics.length === 0}
+              <p class="muted">{labels.noDiagnostics}</p>
+            {:else}
+              <ul>
+                {#each diagnostics as diagnostic, index (index)}
+                  <li>
+                    <button
+                      type="button"
+                      class={[
+                        "diagnostic",
+                        { error: diagnostic.severity === "error" },
+                      ]}
+                      onclick={() => jumpToDiagnostic(diagnostic)}
+                    >
+                      <strong>{diagnostic.severity}</strong>
+                      <span>{diagnostic.file}:{diagnostic.start}</span>
+                      <span>{diagnostic.message}</span>
+                      {#each diagnostic.hints as hint (hint)}
+                        <span class="hint">{hint}</span>
+                      {/each}
+                    </button>
+                  </li>
+                {/each}
+              </ul>
+              {#if hasError && pageUrls.length > 0}
+                <p class="muted">{labels.lastGoodKept}</p>
+              {/if}
+            {/if}
+          </div>
+        </section>
+      </div>
     </main>
   </div>
 </div>
