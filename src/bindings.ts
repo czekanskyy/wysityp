@@ -14,7 +14,9 @@ export const commands = {
 	searchNotes: (query: string) => typedError<SearchHit[], string>(__TAURI_INVOKE("search_notes", { query })),
 	openNote: (path: string) => typedError<Note, string>(__TAURI_INVOKE("open_note", { path })),
 	createSampleNote: () => typedError<Note, string>(__TAURI_INVOKE("create_sample_note")),
-	saveNote: (path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("save_note", { path, text })),
+	saveNote: (path: string, text: string, force: boolean) => typedError<NoteFingerprint, string>(__TAURI_INVOKE("save_note", { path, text, force })),
+	/**  Compare the open note with the bytes on disk. Does not change the baseline. */
+	noteChangedOnDisk: (path: string) => typedError<boolean, string>(__TAURI_INVOKE("note_changed_on_disk", { path })),
 	renderNote: (path: string, source: string, revision: number) => typedError<RenderResult, string>(__TAURI_INVOKE("render_note", { path, source, revision })),
 	exportPdf: (path: string, source: string) => typedError<string, string>(__TAURI_INVOKE("export_pdf", { path, source })),
 	getSettings: () => typedError<Settings, string>(__TAURI_INVOKE("get_settings")),
@@ -25,6 +27,17 @@ export const commands = {
 export type Note = {
 	path: string,
 	text: string,
+	fingerprint: NoteFingerprint,
+};
+
+/**
+ *  SHA-256 of the note bytes last read or written, plus how many bytes that was.
+ * 
+ *  A later save is refused when the file on disk no longer matches this record.
+ */
+export type NoteFingerprint = {
+	hash: string,
+	byte_len: number,
 };
 
 export type RenderDiagnostic = {

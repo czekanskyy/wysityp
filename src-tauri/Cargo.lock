@@ -6550,6 +6550,7 @@ dependencies = [
  "comemo",
  "serde",
  "serde_json",
+ "sha2",
  "specta",
  "specta-typescript",
  "tauri",

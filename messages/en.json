@@ -50,5 +50,18 @@
   "search_empty": "No note contains that.",
   "search_failed": "Search failed",
   "search_result": "Open this match",
-  "search_searching": "Searching..."
+  "search_searching": "Searching...",
+  "view_switch": "Note view",
+  "view_source": "Source",
+  "view_rendered": "Rendered",
+  "view_split": "Split",
+  "save_state_saved": "Saved",
+  "save_state_saving": "Saving...",
+  "save_state_unsaved": "Unsaved",
+  "save_state_conflict": "Changed on disk",
+  "conflict_body": "Another tool changed this note on disk. Autosave is paused so your typing is not written over that change.",
+  "reload_disk": "Reload from disk",
+  "reload_warning": "Reload replaces the edits that are still only in this window.",
+  "reload_confirm": "Reload and drop my edits",
+  "overwrite_disk": "Overwrite with my version"
 }

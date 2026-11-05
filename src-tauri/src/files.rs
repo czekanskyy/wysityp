@@ -1,6 +1,8 @@
+use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use specta::Type;
 
 use crate::error::{AppError, AppResult};
@@ -11,10 +13,20 @@ pub struct WorkspaceInfo {
     pub notes: Vec<String>,
 }
 
+/// SHA-256 of the note bytes last read or written, plus how many bytes that was.
+///
+/// A later save is refused when the file on disk no longer matches this record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct NoteFingerprint {
+    pub hash: String,
+    pub byte_len: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct Note {
     pub path: String,
     pub text: String,
+    pub fingerprint: NoteFingerprint,
 }
 
 /// One folder or note in the open workspace, as it sits on disk.
@@ -266,10 +278,7 @@ pub fn create_note(root: &Path, parent: &str, name: &str) -> AppResult<Note> {
     }
     let text = starter_heading(&file_name);
     write_new_file(&path, &relative, &text)?;
-    Ok(Note {
-        path: relative,
-        text,
-    })
+    Ok(note_from_text(relative, text))
 }
 
 fn write_new_file(path: &Path, relative: &str, text: &str) -> AppResult<()> {
@@ -523,10 +532,18 @@ fn collect_notes(root: &Path, dir: &Path, notes: &mut Vec<String>) -> AppResult<
 
 pub fn read_note(root: &Path, relative: &str) -> AppResult<Note> {
     let path = resolve_inside_root(root, relative)?;
-    let text = std::fs::read_to_string(&path).map_err(|err| AppError::io(&path, err))?;
+    let bytes = std::fs::read(&path).map_err(|err| AppError::io(&path, err))?;
+    let fingerprint = fingerprint_bytes(&bytes);
+    let text = String::from_utf8(bytes).map_err(|err| {
+        AppError::io(
+            &path,
+            std::io::Error::new(std::io::ErrorKind::InvalidData, err),
+        )
+    })?;
     Ok(Note {
         path: relative.replace('\\', "/"),
         text,
+        fingerprint,
     })
 }
 
@@ -602,6 +619,147 @@ pub fn write_note(root: &Path, relative: &str, text: &str) -> AppResult<()> {
     std::fs::write(&path, text).map_err(|err| AppError::io(&path, err))
 }
 
+fn fingerprint_bytes(bytes: &[u8]) -> NoteFingerprint {
+    let digest = Sha256::digest(bytes);
+    NoteFingerprint {
+        hash: hex_encode(&digest),
+        byte_len: u32::try_from(bytes.len()).unwrap_or(u32::MAX),
+    }
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        out.push(char::from(HEX[usize::from(byte >> 4)]));
+        out.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    out
+}
+
+fn note_from_text(path: String, text: String) -> Note {
+    let fingerprint = fingerprint_bytes(text.as_bytes());
+    Note {
+        path,
+        text,
+        fingerprint,
+    }
+}
+
+fn disk_fingerprint(root: &Path, relative: &str) -> AppResult<NoteFingerprint> {
+    let path = resolve_inside_root(root, relative)?;
+    let bytes = std::fs::read(&path).map_err(|err| AppError::io(&path, err))?;
+    Ok(fingerprint_bytes(&bytes))
+}
+
+/// The fingerprint this process last read or wrote for each note path.
+///
+/// Saves are checked against this record. The page never supplies the
+/// expected fingerprint, so a stale page cannot vouch for a file it did
+/// not last read.
+#[derive(Debug, Default)]
+pub struct NoteBaselines {
+    by_path: HashMap<String, NoteFingerprint>,
+}
+
+impl NoteBaselines {
+    pub fn remember(&mut self, path: &str, fingerprint: NoteFingerprint) {
+        self.by_path.insert(display_relative(path), fingerprint);
+    }
+
+    pub fn clear(&mut self) {
+        self.by_path.clear();
+    }
+
+    /// Drop the record for a note or for everything inside a folder.
+    pub fn forget(&mut self, path: &str) {
+        let path = display_relative(path);
+        let prefix = format!("{path}/");
+        self.by_path
+            .retain(|key, _| key != &path && !key.starts_with(&prefix));
+    }
+
+    /// Keep the record when a note or folder moves to a new path.
+    pub fn retarget(&mut self, from: &str, to: &str) {
+        let from = display_relative(from);
+        let to = display_relative(to);
+        if from.is_empty() || from == to {
+            return;
+        }
+        let prefix = format!("{from}/");
+        let keys: Vec<String> = self
+            .by_path
+            .keys()
+            .filter(|key| *key == &from || key.starts_with(&prefix))
+            .cloned()
+            .collect();
+        for key in keys {
+            let Some(fingerprint) = self.by_path.remove(&key) else {
+                continue;
+            };
+            let next = if key == from {
+                to.clone()
+            } else {
+                format!("{to}{}", &key[from.len()..])
+            };
+            self.by_path.insert(next, fingerprint);
+        }
+    }
+
+    /// True when the file on disk is not the bytes last read or written.
+    ///
+    /// A path this process has never read is treated as changed, so a save
+    /// cannot invent a baseline. This does not update the record.
+    pub fn changed_on_disk(&self, root: &Path, path: &str) -> AppResult<bool> {
+        let key = display_relative(path);
+        let Some(expected) = self.by_path.get(&key) else {
+            return Ok(true);
+        };
+        match disk_fingerprint(root, &key) {
+            Ok(current) => Ok(&current != expected),
+            Err(AppError::Io { source, .. }) if source.kind() == std::io::ErrorKind::NotFound => {
+                Ok(true)
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Write `text` to the note when the file still matches the baseline.
+    ///
+    /// `force` writes even when the file changed, then records the new bytes.
+    /// A refused save leaves the file untouched.
+    pub fn save(
+        &mut self,
+        root: &Path,
+        path: &str,
+        text: &str,
+        force: bool,
+    ) -> AppResult<NoteFingerprint> {
+        let key = display_relative(path);
+        if !force {
+            let Some(expected) = self.by_path.get(&key).cloned() else {
+                return Err(AppError::ExternalChange);
+            };
+            let current = match disk_fingerprint(root, &key) {
+                Ok(current) => current,
+                Err(AppError::Io { source, .. })
+                    if source.kind() == std::io::ErrorKind::NotFound =>
+                {
+                    return Err(AppError::ExternalChange);
+                }
+                Err(err) => return Err(err),
+            };
+            if current != expected {
+                return Err(AppError::ExternalChange);
+            }
+        }
+        write_note(root, &key, text)?;
+        let fingerprint = fingerprint_bytes(text.as_bytes());
+        self.by_path.insert(key, fingerprint.clone());
+        Ok(fingerprint)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -626,6 +784,176 @@ mod tests {
         let note = read_note(dir.path(), "notes/one.typ").unwrap();
         assert_eq!(note.text, "= Cześć\n");
         assert_eq!(list_notes(dir.path()).unwrap(), vec!["notes/one.typ"]);
+    }
+
+    #[test]
+    fn fingerprint_is_sha256_of_the_bytes() {
+        let empty = fingerprint_bytes(b"");
+        assert_eq!(empty.byte_len, 0);
+        assert_eq!(
+            empty.hash,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        let polish = fingerprint_bytes("Łódź".as_bytes());
+        assert_eq!(polish.byte_len, u32::try_from("Łódź".len()).unwrap());
+        assert_ne!(polish, empty);
+    }
+
+    // covers: feature 9, save when the file is unchanged, refuse an outside write, force, then the record moves
+    #[test]
+    fn save_refuses_an_outside_write_until_forced() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut baselines = NoteBaselines::default();
+        write_note(dir.path(), "notes/one.typ", "one\n").unwrap();
+        let opened = read_note(dir.path(), "notes/one.typ").unwrap();
+        baselines.remember(&opened.path, opened.fingerprint.clone());
+        assert_eq!(opened.fingerprint, fingerprint_bytes(b"one\n"));
+        assert!(
+            !baselines
+                .changed_on_disk(dir.path(), "notes/one.typ")
+                .unwrap()
+        );
+
+        let saved = baselines
+            .save(dir.path(), "notes/one.typ", "two\n", false)
+            .unwrap();
+        assert_eq!(
+            read_note(dir.path(), "notes/one.typ").unwrap().text,
+            "two\n"
+        );
+        assert_eq!(saved, fingerprint_bytes(b"two\n"));
+        assert_eq!(
+            read_note(dir.path(), "notes/one.typ").unwrap().fingerprint,
+            saved
+        );
+        assert_ne!(saved, opened.fingerprint);
+        assert!(
+            !baselines
+                .changed_on_disk(dir.path(), "notes/one.typ")
+                .unwrap()
+        );
+
+        std::fs::write(dir.path().join("notes").join("one.typ"), "other\n").unwrap();
+        assert!(
+            baselines
+                .changed_on_disk(dir.path(), "notes/one.typ")
+                .unwrap()
+        );
+        let refused = baselines
+            .save(dir.path(), "notes/one.typ", "mine\n", false)
+            .unwrap_err();
+        assert!(matches!(refused, AppError::ExternalChange));
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("notes").join("one.typ")).unwrap(),
+            "other\n"
+        );
+        // Looking again must not adopt the outside bytes as the baseline.
+        assert!(
+            baselines
+                .changed_on_disk(dir.path(), "notes/one.typ")
+                .unwrap()
+        );
+
+        let forced = baselines
+            .save(dir.path(), "notes/one.typ", "mine\n", true)
+            .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("notes").join("one.typ")).unwrap(),
+            "mine\n"
+        );
+        assert_eq!(forced, fingerprint_bytes(b"mine\n"));
+        let reopened = read_note(dir.path(), "notes/one.typ").unwrap();
+        baselines.remember(&reopened.path, reopened.fingerprint.clone());
+        assert_eq!(reopened.fingerprint, forced);
+        let again = baselines
+            .save(dir.path(), "notes/one.typ", "mine again\n", false)
+            .unwrap();
+        assert_eq!(again, fingerprint_bytes(b"mine again\n"));
+        assert_eq!(
+            read_note(dir.path(), "notes/one.typ").unwrap().text,
+            "mine again\n"
+        );
+    }
+
+    #[test]
+    fn save_without_a_baseline_is_refused_and_a_missing_file_is_a_conflict() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut baselines = NoteBaselines::default();
+        write_note(dir.path(), "a.typ", "keep\n").unwrap();
+        let err = baselines
+            .save(dir.path(), "a.typ", "nope\n", false)
+            .unwrap_err();
+        assert!(matches!(err, AppError::ExternalChange));
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("a.typ")).unwrap(),
+            "keep\n"
+        );
+
+        let opened = read_note(dir.path(), "a.typ").unwrap();
+        baselines.remember(&opened.path, opened.fingerprint.clone());
+        std::fs::remove_file(dir.path().join("a.typ")).unwrap();
+        assert!(baselines.changed_on_disk(dir.path(), "a.typ").unwrap());
+        let missing = baselines
+            .save(dir.path(), "a.typ", "back\n", false)
+            .unwrap_err();
+        assert!(matches!(missing, AppError::ExternalChange));
+        assert!(!dir.path().join("a.typ").exists());
+
+        let forced = baselines.save(dir.path(), "a.typ", "back\n", true).unwrap();
+        assert_eq!(forced, fingerprint_bytes(b"back\n"));
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("a.typ")).unwrap(),
+            "back\n"
+        );
+    }
+
+    #[test]
+    fn a_save_for_one_note_does_not_write_another_and_a_move_keeps_the_baseline() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut baselines = NoteBaselines::default();
+        write_note(dir.path(), "a.typ", "aaa\n").unwrap();
+        write_note(dir.path(), "b.typ", "bbb\n").unwrap();
+        let note_a = read_note(dir.path(), "a.typ").unwrap();
+        let note_b = read_note(dir.path(), "b.typ").unwrap();
+        baselines.remember(&note_a.path, note_a.fingerprint.clone());
+        baselines.remember(&note_b.path, note_b.fingerprint);
+        baselines
+            .save(dir.path(), "a.typ", "aaa changed\n", false)
+            .unwrap();
+        assert_eq!(read_note(dir.path(), "b.typ").unwrap().text, "bbb\n");
+
+        baselines.retarget("a.typ", "nested/a.typ");
+        // The file itself is moved by the caller. The record must follow the new path.
+        std::fs::create_dir(dir.path().join("nested")).unwrap();
+        std::fs::rename(
+            dir.path().join("a.typ"),
+            dir.path().join("nested").join("a.typ"),
+        )
+        .unwrap();
+        assert!(
+            !baselines
+                .changed_on_disk(dir.path(), "nested/a.typ")
+                .unwrap()
+        );
+        baselines
+            .save(dir.path(), "nested/a.typ", "moved\n", false)
+            .unwrap();
+        assert_eq!(
+            read_note(dir.path(), "nested/a.typ").unwrap().text,
+            "moved\n"
+        );
+
+        baselines.forget("nested");
+        let forgotten = baselines
+            .save(dir.path(), "nested/a.typ", "again\n", false)
+            .unwrap_err();
+        assert!(matches!(forgotten, AppError::ExternalChange));
+        assert!(
+            baselines
+                .save(dir.path(), "../outside.typ", "x\n", true)
+                .is_err()
+        );
+        assert!(!dir.path().parent().unwrap().join("outside.typ").exists());
     }
 
     #[test]

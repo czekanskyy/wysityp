@@ -49,8 +49,11 @@ export const api = {
   async createSampleNote() {
     return unwrap(await commands.createSampleNote());
   },
-  async saveNote(path: string, text: string) {
-    return unwrap(await commands.saveNote(path, text));
+  async saveNote(path: string, text: string, force: boolean) {
+    return unwrap(await commands.saveNote(path, text, force));
+  },
+  async noteChangedOnDisk(path: string) {
+    return unwrap(await commands.noteChangedOnDisk(path));
   },
   async renderNote(path: string, source: string, revision: number) {
     return unwrap(await commands.renderNote(path, source, revision));

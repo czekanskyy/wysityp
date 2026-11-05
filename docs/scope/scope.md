@@ -19,7 +19,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 6 | Rendered page editor | Release 1 | in-progress |
 | 7 | Math editing | Release 1 | planned |
 | 8 | Tables, code, images and links | Release 1 | planned |
-| 9 | Source view and file safety | Release 1 | planned |
+| 9 | Source view and file safety | Release 1 | in-progress |
 | 10 | Search, recent notes and templates | Release 1 | in-progress |
 | 11 | Spell checking in Polish and English | Release 1 | planned |
 | 12 | PDF export | Release 1 | in-progress |
@@ -94,7 +94,8 @@ Grow the page beyond prose and math with tables you can edit on the page, code b
 ### 9. Source view and file safety
 Let students switch the whole note between the rendered page and its Typst source with both views always in step, save work as they type, recover gracefully after a crash, and stay safe when another tool changes the same file.
 **Done when:** switching views never loses a character or a cursor place, killing the app mid sentence loses nothing already typed, and a change made in another tool is surfaced to the student rather than silently overwritten.
-- [ ] Build it: `/develop source view and file safety`
+**Code:** `src/App.svelte`, `src/lib/editor.ts`, `src/lib/noteSafety.ts`, `src/lib/api.ts`, `src-tauri/src/files.rs`, `src-tauri/src/commands.rs`
+- [x] Build it: `/develop source view and file safety`
 
 ### 10. Search, recent notes and templates
 Help students find and start notes fast: search across the text of every note in the folder, a list of notes opened recently, and ready made templates for lectures, problem sets and lab notes that create a new Typst file in the folder.
