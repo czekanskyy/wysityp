@@ -43,6 +43,12 @@ export const api = {
   async searchNotes(query: string) {
     return unwrap(await commands.searchNotes(query));
   },
+  async listRecentNotes() {
+    return unwrap(await commands.listRecentNotes());
+  },
+  async createFromTemplate(parent: string, template: string) {
+    return unwrap(await commands.createFromTemplate(parent, template));
+  },
   async openNote(path: string) {
     return unwrap(await commands.openNote(path));
   },

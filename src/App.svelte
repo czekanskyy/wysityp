@@ -43,6 +43,10 @@
   let searchHits = $state<SearchHit[]>([]);
   let searchTouched = $state(false);
   let searchPending = $state(false);
+  let recentNotes = $state<string[]>([]);
+  let recentPending = $state(false);
+  let recentError = $state("");
+  let templatePending = $state(false);
   let rendering = $state(false);
   let exporting = $state(false);
   let viewMode = $state<NoteView>("split");
@@ -135,8 +139,24 @@
       reloadWarning: m.reload_warning(),
       reloadConfirm: m.reload_confirm(),
       overwriteDisk: m.overwrite_disk(),
+      recentNotes: m.recent_notes(),
+      recentEmpty: m.recent_empty(),
+      recentLoading: m.recent_loading(),
+      recentFailed: m.recent_failed(),
+      templatesLabel: m.templates_label(),
+      templateLecture: m.template_lecture(),
+      templateProblemSet: m.template_problem_set(),
+      templateLab: m.template_lab(),
+      templateCreated: m.template_created(),
+      templateFailed: m.template_failed(),
     };
   });
+
+  const templateChoices = $derived([
+    { id: "lecture", label: labels.templateLecture },
+    { id: "problem-set", label: labels.templateProblemSet },
+    { id: "lab", label: labels.templateLab },
+  ]);
 
   const saveStateLabel = $derived(
     conflict
@@ -335,11 +355,25 @@
     }
   }
 
+  async function refreshRecent() {
+    recentPending = true;
+    recentError = "";
+    try {
+      recentNotes = await api.listRecentNotes();
+    } catch (error) {
+      recentNotes = [];
+      recentError = `${labels.recentFailed}: ${String(error)}`;
+    } finally {
+      recentPending = false;
+    }
+  }
+
   async function refreshTree() {
     tree = await api.listTree();
     // Tree changes can remove or rename a note a hit points at.
     searchHits = [];
     searchTouched = false;
+    await refreshRecent();
   }
 
   async function openFolder() {
@@ -408,8 +442,28 @@
       diagnostics = [];
       applyLoadedNote(note);
       await runRender();
+      await refreshRecent();
     } catch (error) {
       status = `${labels.openFailed}: ${String(error)}`;
+    }
+  }
+
+  async function createFromTemplate(template: string) {
+    if (!rootName || templatePending) return;
+    templatePending = true;
+    try {
+      const note = await api.createFromTemplate(selectedFolder, template);
+      await refreshTree();
+      currentPath = note.path;
+      editor?.setText(note.text);
+      setPages([]);
+      diagnostics = [];
+      await runRender();
+      status = `${labels.templateCreated}: ${note.path}`;
+    } catch (error) {
+      status = `${labels.templateFailed}: ${String(error)}`;
+    } finally {
+      templatePending = false;
     }
   }
 
@@ -871,6 +925,48 @@
             </ul>
           {/if}
         </form>
+        <section
+          class="recent-block"
+          aria-labelledby="recent-heading"
+          aria-busy={recentPending}
+        >
+          <h3 id="recent-heading">{labels.recentNotes}</h3>
+          {#if recentError}
+            <p class="muted">{recentError}</p>
+          {:else if recentPending}
+            <p class="muted">{labels.recentLoading}</p>
+          {:else if recentNotes.length === 0}
+            <p class="muted">{labels.recentEmpty}</p>
+          {:else}
+            <ul class="recent-list">
+              {#each recentNotes as path (path)}
+                <li>
+                  <button
+                    type="button"
+                    class="recent-hit"
+                    onclick={() => openNote(path)}
+                  >
+                    {path}
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </section>
+        <section class="template-block" aria-labelledby="templates-heading">
+          <h3 id="templates-heading">{labels.templatesLabel}</h3>
+          <div class="row-actions">
+            {#each templateChoices as template (template.id)}
+              <button
+                type="button"
+                disabled={templatePending}
+                onclick={() => createFromTemplate(template.id)}
+              >
+                {template.label}
+              </button>
+            {/each}
+          </div>
+        </section>
         <form
           class="entry-form"
           onsubmit={(event) => {

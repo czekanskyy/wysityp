@@ -10,7 +10,9 @@ vi.mock("../bindings", () => ({
     deleteEntry: vi.fn(),
     listNotes: vi.fn(),
     searchNotes: vi.fn(),
+    listRecentNotes: vi.fn(),
     openNote: vi.fn(),
+    createFromTemplate: vi.fn(),
     createSampleNote: vi.fn(),
     saveNote: vi.fn(),
     noteChangedOnDisk: vi.fn(),
@@ -83,6 +85,26 @@ describe("workspace api", () => {
 
     await expect(api.searchNotes("proof")).resolves.toEqual(hits);
     expect(mocked.searchNotes).toHaveBeenCalledWith("proof");
+  });
+
+  it("lists recent notes as paths counted from the root", async () => {
+    mocked.listRecentNotes.mockResolvedValue(["b.typ", "a.typ"] as never);
+
+    await expect(api.listRecentNotes()).resolves.toEqual(["b.typ", "a.typ"]);
+    expect(mocked.listRecentNotes).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates a note from a template in the chosen folder", async () => {
+    mocked.createFromTemplate.mockResolvedValue({
+      path: "lab/lecture-2.typ",
+      text: "= Lecture title\n",
+    } as never);
+
+    await expect(api.createFromTemplate("lab", "lecture")).resolves.toEqual({
+      path: "lab/lecture-2.typ",
+      text: "= Lecture title\n",
+    });
+    expect(mocked.createFromTemplate).toHaveBeenCalledWith("lab", "lecture");
   });
 
   it("deletes the entry at the given path", async () => {

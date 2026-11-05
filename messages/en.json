@@ -63,5 +63,15 @@
   "reload_disk": "Reload from disk",
   "reload_warning": "Reload replaces the edits that are still only in this window.",
   "reload_confirm": "Reload and drop my edits",
-  "overwrite_disk": "Overwrite with my version"
+  "overwrite_disk": "Overwrite with my version",
+  "recent_notes": "Recent notes",
+  "recent_empty": "Notes you open show up here.",
+  "recent_loading": "Loading recent notes...",
+  "recent_failed": "Recent notes could not be read",
+  "templates_label": "Templates",
+  "template_lecture": "Lecture",
+  "template_problem_set": "Problem set",
+  "template_lab": "Lab note",
+  "template_created": "Created",
+  "template_failed": "The template did not create a note"
 }

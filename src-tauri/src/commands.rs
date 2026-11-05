@@ -8,6 +8,7 @@ use crate::AppState;
 use crate::error::{AppError, AppResult};
 use crate::files::{self, Note, SAMPLE_PATH, SAMPLE_TEXT, SearchHit, TreeNode, WorkspaceInfo};
 use crate::settings::{self, Settings};
+use crate::templates;
 use crate::typst_engine::{Engine, RenderResult};
 
 fn root_or_err(state: &AppState) -> Result<PathBuf, String> {
@@ -38,6 +39,12 @@ fn settings_file(state: &AppState) -> Result<PathBuf, String> {
         .map_err(|_| "settings lock was poisoned".to_string())?
         .clone()
         .ok_or_else(|| AppError::SettingsNotReady.to_string())
+}
+
+fn remember_opened(state: &AppState, root: &Path, relative: &str) -> Result<(), String> {
+    let path = settings_file(state)?;
+    settings::record_recent(&path, root, relative).map_err(String::from)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -87,6 +94,7 @@ pub fn create_note(
     let root = root_or_err(&state)?;
     let note = files::create_note(&root, &parent, &name).map_err(String::from)?;
     remember_note(&state, &note)?;
+    remember_opened(&state, &root, &note.path)?;
     Ok(note)
 }
 
@@ -147,10 +155,38 @@ pub fn list_notes(state: State<'_, AppState>) -> Result<Vec<String>, String> {
 
 #[tauri::command]
 #[specta::specta]
+pub fn list_recent_notes(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let root = root_or_err(&state)?;
+    let path = settings_file(&state)?;
+    settings::list_recent(&path, &root).map_err(String::from)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn open_note(state: State<'_, AppState>, path: String) -> Result<Note, String> {
     let root = root_or_err(&state)?;
     let note = files::read_note(&root, &path).map_err(String::from)?;
     remember_note(&state, &note)?;
+    remember_opened(&state, &root, &note.path)?;
+    Ok(note)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn create_from_template(
+    state: State<'_, AppState>,
+    parent: String,
+    template: String,
+) -> Result<Note, String> {
+    let root = root_or_err(&state)?;
+    let settings_path = settings_file(&state)?;
+    let locale = settings::load_settings(&settings_path)
+        .map_err(String::from)?
+        .locale;
+    let note = templates::create_from_template(&root, &parent, &template, &locale)
+        .map_err(String::from)?;
+    remember_note(&state, &note)?;
+    remember_opened(&state, &root, &note.path)?;
     Ok(note)
 }
 
@@ -164,6 +200,7 @@ pub fn create_sample_note(state: State<'_, AppState>) -> Result<Note, String> {
     }
     let note = files::read_note(&root, SAMPLE_PATH).map_err(String::from)?;
     remember_note(&state, &note)?;
+    remember_opened(&state, &root, &note.path)?;
     Ok(note)
 }
 

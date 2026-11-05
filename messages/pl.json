@@ -63,5 +63,15 @@
   "reload_disk": "Wczytaj z dysku",
   "reload_warning": "Wczytanie zastąpi zmiany, które są tylko w tym oknie.",
   "reload_confirm": "Wczytaj i porzuć moje zmiany",
-  "overwrite_disk": "Nadpisz moją wersją"
+  "overwrite_disk": "Nadpisz moją wersją",
+  "recent_notes": "Ostatnie notatki",
+  "recent_empty": "Notatki, które otworzysz, pojawią się tutaj.",
+  "recent_loading": "Wczytywanie ostatnich notatek...",
+  "recent_failed": "Nie udało się odczytać ostatnich notatek",
+  "templates_label": "Szablony",
+  "template_lecture": "Wykład",
+  "template_problem_set": "Zestaw zadań",
+  "template_lab": "Notatka laboratoryjna",
+  "template_created": "Utworzono",
+  "template_failed": "Szablon nie utworzył notatki"
 }
