@@ -16,10 +16,10 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 3 | Data model | Foundation | planned |
 | 4 | Design system and UI foundation | Foundation | planned |
 | 5 | Workspace and note files | Release 1 | in-progress |
-| 6 | Rendered page editor | Release 1 | planned |
+| 6 | Rendered page editor | Release 1 | in-progress |
 | 7 | Math editing | Release 1 | planned |
 | 8 | Tables, code, images and links | Release 1 | planned |
-| 9 | Source view and file safety | Release 1 | planned |
+| 9 | Source view and file safety | Release 1 | in-progress |
 | 10 | Search, recent notes and templates | Release 1 | in-progress |
 | 11 | Spell checking in Polish and English | Release 1 | planned |
 | 12 | PDF export | Release 1 | in-progress |
@@ -68,10 +68,18 @@ Open a folder on disk, show its folders and notes as a tree, and let students cr
 **Code:** `src/App.svelte`, `src/lib/api.ts`, `src-tauri/src/files.rs`, `src-tauri/src/commands.rs`
 - [x] Build it: `/develop workspace and note files`
 
-### 6. Rendered page editor · needs a decision
+### 6. Rendered page editor
 The heart of WYSITyp: you type on a page that renders in place for text, headings, lists and quotes, typing shortcuts turn marks into structure as you go, and clicking any rendered part lets you edit its Typst source right there without the page losing your place or your cursor.
 **Done when:** a student can write a full lecture note by typing on the rendered page, every edit lands correctly in the Typst file on disk, opening that file again shows the same page, and long notes stay responsive while typing.
-- [ ] Design it (spec): `/architect rendered page editor`
+**Spec:** [0002. Rendered page editor](../specs/0002-rendered-page-editor/index.md)
+- [x] Design it (spec): `/architect rendered page editor`
+- [ ] Build it: `/develop rendered page editor`
+  - [ ] Rendered prose page (headings, lists, quotes, body, click, arrows, selection, undo), covers AC-1, AC-2, AC-3, AC-6, AC-7
+  - [ ] Errors, a steady caret, and a print preview that does not take focus, covers AC-4, AC-8, AC-10, AC-11
+  - [ ] Math placeholders you can click through, covers AC-5, AC-6
+  - [ ] Structure keys and the long note check, covers AC-9, AC-8
+- [ ] Verify it: `/check verify rendered page editor`
+- [ ] Test it: `/test rendered page editor`
 
 ### 7. Math editing · needs a decision
 Full math support that feels quick in a lecture: insert math inline or as its own block, type it with helpful symbol entry, see it render as you go, and click rendered math to change its source.
@@ -86,12 +94,16 @@ Grow the page beyond prose and math with tables you can edit on the page, code b
 ### 9. Source view and file safety
 Let students switch the whole note between the rendered page and its Typst source with both views always in step, save work as they type, recover gracefully after a crash, and stay safe when another tool changes the same file.
 **Done when:** switching views never loses a character or a cursor place, killing the app mid sentence loses nothing already typed, and a change made in another tool is surfaced to the student rather than silently overwritten.
-- [ ] Build it: `/develop source view and file safety`
+**Code:** `src/App.svelte`, `src/lib/editor.ts`, `src/lib/noteSafety.ts`, `src/lib/api.ts`, `src-tauri/src/files.rs`, `src-tauri/src/commands.rs`
+Closing the window writes typing still inside the autosave pause first. Killing the process can still lose typing from that pause (under a second). That window is accepted for now and stays visible here until a recovery copy exists.
+- [x] Build it: `/develop source view and file safety`
 
 ### 10. Search, recent notes and templates
 Help students find and start notes fast: search across the text of every note in the folder, a list of notes opened recently, and ready made templates for lectures, problem sets and lab notes that create a new Typst file in the folder.
 **Done when:** a student can find an old proof by a word inside it during exam week, jump back to yesterday's lecture in two clicks, and start today's lecture from a template that already has the right shape.
-- [ ] Build it: `/develop search, recent notes and templates`
+**Spec:** [0003. Recent notes and templates](../specs/0003-recent-notes-and-templates.md) (assumed decision, spec 0003)
+**Code:** `src/App.svelte`, `src/lib/api.ts`, `src-tauri/src/commands.rs`, `src-tauri/src/files.rs`, `src-tauri/src/settings.rs`, `src-tauri/src/templates.rs`
+- [x] Build it: `/develop search, recent notes and templates`
 
 ### 11. Spell checking in Polish and English · needs a decision
 Check spelling as students type, in Polish and in English, underline mistakes on the rendered page, offer corrections, respect math and Typst commands, and let students teach the checker words from their own subjects.

@@ -2,6 +2,7 @@ mod commands;
 mod error;
 mod files;
 mod settings;
+mod templates;
 mod typst_engine;
 
 use std::path::PathBuf;
@@ -14,6 +15,9 @@ pub struct AppState {
     pub workspace_root: Mutex<Option<PathBuf>>,
     pub settings_file: Mutex<Option<PathBuf>>,
     pub engine: Arc<Engine>,
+    /// What this process last read or wrote, per note path, so a save can
+    /// refuse a file another tool changed.
+    pub note_baselines: Mutex<files::NoteBaselines>,
 }
 
 impl AppState {
@@ -22,6 +26,7 @@ impl AppState {
             workspace_root: Mutex::new(None),
             settings_file: Mutex::new(None),
             engine: Arc::new(Engine::new()),
+            note_baselines: Mutex::new(files::NoteBaselines::default()),
         }
     }
 }
@@ -36,9 +41,12 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::delete_entry,
         commands::list_notes,
         commands::search_notes,
+        commands::list_recent_notes,
         commands::open_note,
+        commands::create_from_template,
         commands::create_sample_note,
         commands::save_note,
+        commands::note_changed_on_disk,
         commands::render_note,
         commands::export_pdf,
         commands::get_settings,

@@ -143,6 +143,11 @@ input:focus-visible {
   font-size: 0.95rem;
 }
 
+.sidebar h3 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
 .pane h2 .path {
   margin-left: 0.6rem;
   color: var(--ink-soft);
@@ -164,7 +169,9 @@ input:focus-visible {
 .entry-form,
 .search-form,
 .rename-form,
-.confirm {
+.confirm,
+.recent-block,
+.template-block {
   display: grid;
   gap: 0.45rem;
   margin: 0.8rem 0;
@@ -307,11 +314,82 @@ button.danger {
   padding: 0 1rem;
 }
 
+.stage {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.2rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem 0;
+}
+
+.view-cluster {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.view-switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.view-switch button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.save-state {
+  margin: 0;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.save-state.unsaved,
+.save-state.conflict {
+  color: var(--danger);
+}
+
+.conflict-banner {
+  margin: 0.75rem 1rem 0;
+  padding: 0.8rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.conflict-banner h2,
+.conflict-banner p {
+  margin: 0;
+}
+
 .panes {
   display: grid;
   grid-template-columns: 1fr 1fr;
   min-width: 0;
   min-height: 0;
+  flex: 1;
+}
+
+.panes.source,
+.panes.rendered {
+  grid-template-columns: 1fr;
+}
+
+.panes.source .editor-pane,
+.panes.rendered .preview-pane {
+  border-right: none;
 }
 
 .pane {
@@ -319,6 +397,10 @@ button.danger {
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+
+.pane[hidden] {
+  display: none;
 }
 
 .editor-pane {
@@ -362,7 +444,8 @@ button.danger {
   font-size: 0.9rem;
 }
 
-.search-results {
+.search-results,
+.recent-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -370,7 +453,8 @@ button.danger {
   gap: 0.35rem;
 }
 
-.search-hit {
+.search-hit,
+.recent-hit {
   width: 100%;
   text-align: left;
   display: grid;
@@ -411,7 +495,10 @@ button.danger {
     grid-template-columns: 1fr;
   }
 
-  .panes {
+  .panes,
+  .panes.split,
+  .panes.source,
+  .panes.rendered {
     grid-template-columns: 1fr;
   }
 

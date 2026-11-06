@@ -8,6 +8,7 @@ use crate::AppState;
 use crate::error::{AppError, AppResult};
 use crate::files::{self, Note, SAMPLE_PATH, SAMPLE_TEXT, SearchHit, TreeNode, WorkspaceInfo};
 use crate::settings::{self, Settings};
+use crate::templates;
 use crate::typst_engine::{Engine, RenderResult};
 
 fn root_or_err(state: &AppState) -> Result<PathBuf, String> {
@@ -19,6 +20,18 @@ fn root_or_err(state: &AppState) -> Result<PathBuf, String> {
         .ok_or_else(|| AppError::NoWorkspace.to_string())
 }
 
+fn baselines(state: &AppState) -> Result<std::sync::MutexGuard<'_, files::NoteBaselines>, String> {
+    state
+        .note_baselines
+        .lock()
+        .map_err(|_| "note baseline lock was poisoned".to_string())
+}
+
+fn remember_note(state: &AppState, note: &Note) -> Result<(), String> {
+    baselines(state)?.remember(&note.path, note.fingerprint.clone());
+    Ok(())
+}
+
 fn settings_file(state: &AppState) -> Result<PathBuf, String> {
     state
         .settings_file
@@ -26,6 +39,15 @@ fn settings_file(state: &AppState) -> Result<PathBuf, String> {
         .map_err(|_| "settings lock was poisoned".to_string())?
         .clone()
         .ok_or_else(|| AppError::SettingsNotReady.to_string())
+}
+
+/// Recording a recent note is best effort. A broken or locked settings
+/// file must never fail opening or creating the note itself.
+fn remember_opened(state: &AppState, root: &Path, relative: &str) {
+    let Ok(path) = settings_file(state) else {
+        return;
+    };
+    let _ = settings::record_recent(&path, root, relative);
 }
 
 #[tauri::command]
@@ -47,11 +69,14 @@ pub fn open_workspace(
         .file_name()
         .map(|name| name.to_string_lossy().to_string())
         .unwrap_or_else(|| root.to_string_lossy().to_string());
-    let mut slot = state
-        .workspace_root
-        .lock()
-        .map_err(|_| "workspace lock was poisoned".to_string())?;
-    *slot = Some(root);
+    {
+        let mut slot = state
+            .workspace_root
+            .lock()
+            .map_err(|_| "workspace lock was poisoned".to_string())?;
+        *slot = Some(root);
+    }
+    baselines(&state)?.clear();
     Ok(Some(WorkspaceInfo { root_name, notes }))
 }
 
@@ -70,7 +95,10 @@ pub fn create_note(
     name: String,
 ) -> Result<Note, String> {
     let root = root_or_err(&state)?;
-    files::create_note(&root, &parent, &name).map_err(String::from)
+    let note = files::create_note(&root, &parent, &name).map_err(String::from)?;
+    remember_note(&state, &note)?;
+    remember_opened(&state, &root, &note.path);
+    Ok(note)
 }
 
 #[tauri::command]
@@ -92,14 +120,22 @@ pub fn rename_entry(
     to: String,
 ) -> Result<String, String> {
     let root = root_or_err(&state)?;
-    files::rename_entry(&root, &from, &to).map_err(String::from)
+    let next = files::rename_entry(&root, &from, &to).map_err(String::from)?;
+    baselines(&state)?.retarget(&from, &next);
+    // Recent notes follow the rename too, best effort like recording.
+    if let Ok(path) = settings_file(&state) {
+        let _ = settings::retarget_recent(&path, &root, &from, &next);
+    }
+    Ok(next)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn delete_entry(state: State<'_, AppState>, path: String) -> Result<(), String> {
     let root = root_or_err(&state)?;
-    files::delete_entry(&root, &path).map_err(String::from)
+    files::delete_entry(&root, &path).map_err(String::from)?;
+    baselines(&state)?.forget(&path);
+    Ok(())
 }
 
 #[tauri::command]
@@ -126,9 +162,39 @@ pub fn list_notes(state: State<'_, AppState>) -> Result<Vec<String>, String> {
 
 #[tauri::command]
 #[specta::specta]
+pub fn list_recent_notes(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let root = root_or_err(&state)?;
+    let path = settings_file(&state)?;
+    settings::list_recent(&path, &root).map_err(String::from)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn open_note(state: State<'_, AppState>, path: String) -> Result<Note, String> {
     let root = root_or_err(&state)?;
-    files::read_note(&root, &path).map_err(String::from)
+    let note = files::read_note(&root, &path).map_err(String::from)?;
+    remember_note(&state, &note)?;
+    remember_opened(&state, &root, &note.path);
+    Ok(note)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn create_from_template(
+    state: State<'_, AppState>,
+    parent: String,
+    template: String,
+) -> Result<Note, String> {
+    let root = root_or_err(&state)?;
+    let settings_path = settings_file(&state)?;
+    let locale = settings::load_settings(&settings_path)
+        .map_err(String::from)?
+        .locale;
+    let note = templates::create_from_template(&root, &parent, &template, &locale)
+        .map_err(String::from)?;
+    remember_note(&state, &note)?;
+    remember_opened(&state, &root, &note.path);
+    Ok(note)
 }
 
 #[tauri::command]
@@ -139,14 +205,34 @@ pub fn create_sample_note(state: State<'_, AppState>) -> Result<Note, String> {
     if !target.exists() {
         files::write_note(&root, SAMPLE_PATH, SAMPLE_TEXT).map_err(String::from)?;
     }
-    files::read_note(&root, SAMPLE_PATH).map_err(String::from)
+    let note = files::read_note(&root, SAMPLE_PATH).map_err(String::from)?;
+    remember_note(&state, &note)?;
+    remember_opened(&state, &root, &note.path);
+    Ok(note)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn save_note(state: State<'_, AppState>, path: String, text: String) -> Result<(), String> {
+pub fn save_note(
+    state: State<'_, AppState>,
+    path: String,
+    text: String,
+    force: bool,
+) -> Result<files::NoteFingerprint, String> {
     let root = root_or_err(&state)?;
-    files::write_note(&root, &path, &text).map_err(String::from)
+    baselines(&state)?
+        .save(&root, &path, &text, force)
+        .map_err(String::from)
+}
+
+/// Compare the open note with the bytes on disk. Does not change the baseline.
+#[tauri::command]
+#[specta::specta]
+pub fn note_changed_on_disk(state: State<'_, AppState>, path: String) -> Result<bool, String> {
+    let root = root_or_err(&state)?;
+    baselines(&state)?
+        .changed_on_disk(&root, &path)
+        .map_err(String::from)
 }
 
 #[tauri::command]
@@ -216,7 +302,23 @@ pub fn set_locale(state: State<'_, AppState>, locale: String) -> Result<Settings
 
 #[cfg(test)]
 mod tests {
-    use super::export_open_note;
+    use super::{export_open_note, remember_opened};
+    use crate::AppState;
+
+    // covers: features 9 and 10 together, a broken settings file cannot block a note
+    #[test]
+    fn recording_a_recent_note_is_best_effort() {
+        let root = tempfile::tempdir().unwrap();
+        let settings_dir = tempfile::tempdir().unwrap();
+        let settings_path = settings_dir.path().join("settings.json");
+        std::fs::write(&settings_path, "{ broken").unwrap();
+        crate::files::write_note(root.path(), "a.typ", "= Hi\n").unwrap();
+
+        let state = AppState::new();
+        *state.settings_file.lock().unwrap() = Some(settings_path);
+        // Must not panic or fail the caller: it returns nothing.
+        remember_opened(&state, root.path(), "a.typ");
+    }
     use crate::files::SAMPLE_TEXT;
     use crate::typst_engine::Engine;
 

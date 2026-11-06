@@ -43,14 +43,23 @@ export const api = {
   async searchNotes(query: string) {
     return unwrap(await commands.searchNotes(query));
   },
+  async listRecentNotes() {
+    return unwrap(await commands.listRecentNotes());
+  },
+  async createFromTemplate(parent: string, template: string) {
+    return unwrap(await commands.createFromTemplate(parent, template));
+  },
   async openNote(path: string) {
     return unwrap(await commands.openNote(path));
   },
   async createSampleNote() {
     return unwrap(await commands.createSampleNote());
   },
-  async saveNote(path: string, text: string) {
-    return unwrap(await commands.saveNote(path, text));
+  async saveNote(path: string, text: string, force: boolean) {
+    return unwrap(await commands.saveNote(path, text, force));
+  },
+  async noteChangedOnDisk(path: string) {
+    return unwrap(await commands.noteChangedOnDisk(path));
   },
   async renderNote(path: string, source: string, revision: number) {
     return unwrap(await commands.renderNote(path, source, revision));

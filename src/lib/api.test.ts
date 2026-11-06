@@ -10,9 +10,12 @@ vi.mock("../bindings", () => ({
     deleteEntry: vi.fn(),
     listNotes: vi.fn(),
     searchNotes: vi.fn(),
+    listRecentNotes: vi.fn(),
     openNote: vi.fn(),
+    createFromTemplate: vi.fn(),
     createSampleNote: vi.fn(),
     saveNote: vi.fn(),
+    noteChangedOnDisk: vi.fn(),
     renderNote: vi.fn(),
     exportPdf: vi.fn(),
     getSettings: vi.fn(),
@@ -84,6 +87,26 @@ describe("workspace api", () => {
     expect(mocked.searchNotes).toHaveBeenCalledWith("proof");
   });
 
+  it("lists recent notes as paths counted from the root", async () => {
+    mocked.listRecentNotes.mockResolvedValue(["b.typ", "a.typ"] as never);
+
+    await expect(api.listRecentNotes()).resolves.toEqual(["b.typ", "a.typ"]);
+    expect(mocked.listRecentNotes).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates a note from a template in the chosen folder", async () => {
+    mocked.createFromTemplate.mockResolvedValue({
+      path: "lab/lecture-2.typ",
+      text: "= Lecture title\n",
+    } as never);
+
+    await expect(api.createFromTemplate("lab", "lecture")).resolves.toEqual({
+      path: "lab/lecture-2.typ",
+      text: "= Lecture title\n",
+    });
+    expect(mocked.createFromTemplate).toHaveBeenCalledWith("lab", "lecture");
+  });
+
   it("deletes the entry at the given path", async () => {
     mocked.deleteEntry.mockResolvedValue(null as never);
 
@@ -100,6 +123,34 @@ describe("workspace api", () => {
     await expect(api.createNote("", "one.typ")).rejects.toThrow(
       "that name is already taken",
     );
+  });
+
+  it("saves the note and can force the write", async () => {
+    const fingerprint = { hash: "abc", byte_len: 4 };
+    mocked.saveNote.mockResolvedValue(fingerprint as never);
+
+    await expect(
+      api.saveNote("notes/one.typ", "= A\n", false),
+    ).resolves.toEqual(fingerprint);
+    expect(mocked.saveNote).toHaveBeenCalledWith(
+      "notes/one.typ",
+      "= A\n",
+      false,
+    );
+
+    await api.saveNote("notes/one.typ", "= B\n", true);
+    expect(mocked.saveNote).toHaveBeenCalledWith(
+      "notes/one.typ",
+      "= B\n",
+      true,
+    );
+  });
+
+  it("asks Rust whether the open note changed on disk", async () => {
+    mocked.noteChangedOnDisk.mockResolvedValue(true as never);
+
+    await expect(api.noteChangedOnDisk("notes/one.typ")).resolves.toBe(true);
+    expect(mocked.noteChangedOnDisk).toHaveBeenCalledWith("notes/one.typ");
   });
 
   it("exports the open note and returns the PDF path from the root", async () => {
