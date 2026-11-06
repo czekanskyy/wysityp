@@ -2,6 +2,7 @@
 
 **Date**: 2026-11-05
 **Status**: Proposed
+**Ratified**: 2026-11-06. The open choices in Follow up (structure keys, typing `#`, the page feel) were decided by the engineer, and the editable fonts decision was added (AC-12).
 
 ## Summary
 
@@ -21,14 +22,15 @@ You type in the editor the app already has, and the Typst source stays the only 
 - **AC-1**: Decorations, the print preview, and a compile never change the editor buffer or the note file. The buffer stays plain Typst. Saving still writes that buffer, and only that buffer, through the existing save path.
 - **AC-2**: A body paragraph, emphasis, strong text, a heading, a bullet item, a numbered item, a term item, and a quote that the scanner accepts are shown as structure in the editor, in the place of their source, while the selection does not touch them.
 - **AC-3**: Clicking a rendered span moves the caret into that span's source and shows the source there. The editor does not scroll that span to the center. It scrolls only when the caret would leave the window, and then by the smallest move.
-- **AC-4**: A span the scanner cannot close, and a span overlapped by a current error, stays visible as its own source. The editor shows the compiler message with it. The editor never draws an empty box in its place.
+- **AC-4**: A span the scanner cannot close, and a span overlapped by a current error, stays visible as its own source. The editor shows the compiler message with it: the message and hints of the first overlapping error are drawn as one text node on that span, and the same words stay in the diagnostics list. The editor never draws an empty box in its place.
 - **AC-5**: A math span is a placeholder. Clicking it, or moving the caret into it, shows its Typst source in place, dollars included. This feature does not typeset that math and does not add symbol entry.
 - **AC-6**: Arrow keys move the caret through rendered spans and source spans in source order. The caret does not get stuck on a rendered span, and it does not jump over the words of a rendered span. A math span opens as source when an arrow would otherwise skip it.
 - **AC-7**: A selection that covers rendered parts and source parts is one source selection. Copy and cut place the Typst source of that range on the clipboard. Undo reverts source edits only. A decoration change or a preview update is not an undo step.
 - **AC-8**: On a note of at least 5000 words that includes math, one ordinary inserted letter does not scan the whole note, a caret move inside an already open span does not rebuild other spans, and applying a render result does not change the caret or the editor scroll. The editor thread work for that letter stays within 16ms (one display frame) on that fixture. The automated check locks the scan window and the unchanged caret. The 16ms figure is a measurement the build writes down.
-- **AC-9**: Enter in a heading starts a body line. Enter in a list item that has text continues the same marker, and Enter on an empty item removes the marker. Enter in a quote that has text stays inside the quote, and Enter on an empty quote line leaves the quote. Backspace at the first content position of a heading or a list item removes the marker and does not delete the previous paragraph. Tab nests a list item by two spaces, Shift Tab removes two spaces of that indent, and Tab does not move focus out of the editor. These keys do nothing while a composition (an IME input in progress) is active.
-- **AC-10**: An error place in the editor is the diagnostic start and end, counted in UTF 8 bytes in the exact source that was compiled, converted with `byteOffsetToUtf16` against that same source. Marks are applied only when the diagnostic file is the open note (or the file field is empty, which means that note). A diagnostic for some other file stays in the list and does not mark the editor. The marks and the list update only when the render revision is the latest one and that source still equals the editor buffer. Otherwise the editor marks are cleared and the list waits. Byte places from an older source are never applied to a newer buffer. A warning does not force a span back to source. Only severity `error` does.
+- **AC-9**: Enter in a heading starts a body line. Enter in a list item that has text continues the same marker, and Enter on an empty item removes the marker. Enter in a quote that has text stays inside the quote, and Enter on an empty quote line leaves the quote. Backspace at the first content position of a heading or a list item removes the marker and does not delete the previous paragraph. Tab nests a list item by two spaces, Shift Tab removes two spaces of that indent, and Tab does not move focus out of the editor. Tab and Shift Tab act only on an empty selection inside a list item; with a selection, or outside a list item, they change nothing and focus stays in the editor. These keys do nothing while a composition (an IME input in progress) is active.
+- **AC-10**: An error place in the editor is the diagnostic start and end, counted in UTF 8 bytes in the exact source that was compiled, converted with `byteOffsetToUtf16` against that same source. Rust sends the diagnostic file field empty for the main source and as a path counted from the root for any other file; marks are applied only when the field is empty or equals the open note path counted from the root. A diagnostic for some other file stays in the list and does not mark the editor. The marks and the list update only when the render revision is the latest one and that source still equals the editor buffer. Otherwise the editor marks are cleared and the list waits. Byte places from an older source are never applied to a newer buffer. A warning does not force a span back to source. Only severity `error` does.
 - **AC-11**: The print preview shows the compile's SVG pages in order, as images, and replacing those images does not focus the preview or move the editor caret or the editor scroll. A render whose path is outside the opened folder is refused, and the buffer stays as it was.
+- **AC-12**: The student can change two fonts in the settings: the source font and the rendered font. Each is picked from a short list or typed as any family name. The defaults are JetBrains Mono for source and Inter for rendered prose, and the app ships both fonts so the defaults look the same on every machine. The shipped files are page assets loaded with `@font-face` and no `local()`: Inter variable (plain and italic, weights 400 to 700) and JetBrains Mono regular, covering Polish letters, family names `Inter` and `JetBrains Mono`, licence texts beside the files, and nothing registered with Typst. A name the machine and the app do not have falls back to the shipped font, then to a system font. A missing, blank, or null name in the file reads as the default and the file is left as it is. A saved name is trimmed, must be 1 to 200 characters with no quote, comma, or control character, and is quoted as one family in the style; a name that fails this leaves the file unchanged. A settings file that does not parse shows the shipped fonts on screen and `set_fonts` writes nothing. The settings fonts cover the editor only: the print preview and the PDF keep the fonts Typst gives them, and no font choice is ever written into a note.
 
 ## Decision
 
@@ -75,7 +77,7 @@ A selection intersects a span when some selection range has `from < span.to` and
 
 **API surface**:
 
-No new Tauri command. The compile stays `render_note` in `src-tauri/src/commands.rs`, which calls `Engine::render` in `src-tauri/src/typst_engine.rs`.
+No new compile command. The compile stays `render_note` in `src-tauri/src/commands.rs`, which calls `Engine::render` in `src-tauri/src/typst_engine.rs`. The only new command is `set_fonts` for AC-12.
 
 | Call | Kind | Key inputs | Key outputs | Who | Key errors |
 |---|---|---|---|---|---|
@@ -83,6 +85,8 @@ No new Tauri command. The compile stays `render_note` in `src-tauri/src/commands
 | `classifySpans` | New page function in `src/lib/spans.ts` | source (string), change from, change to | The span list for the dirty window, plus the window bounds | The editor, on the page, during the edit | Does not throw the note away. Unclosed constructs return `closed: false`. |
 | `planDecorations` | New page function in `src/lib/spans.ts` | spans, selection ranges, diagnostics already converted to UTF 16 | A decoration plan: hide ranges, style ranges, math widgets, error ranges | `createEditor` in `src/lib/editor.ts` | No empty widget. An ineligible span adds no widget. |
 | Structure keymap | CodeMirror keymap inside `createEditor` | The key event, the selection, the spans | One source change, or nothing | The student | Ignored while composing. Any other key is left to CodeMirror. |
+| `get_settings` | Existing Tauri command, widened | none | `locale`, `source_font`, and `render_font` only, defaults filled in | The open app | An old settings file without the font fields returns the defaults below |
+| `set_fonts` | New Tauri command | source font name, rendered font name | The same three fields, as saved | The open app | An empty name is refused. A name that fails the AC-12 name rule is refused and the file is unchanged |
 
 `byteOffsetToUtf16` and `RenderGuard` in `src/lib/render.ts` stay the byte conversion and the latest revision check. `jumpToDiagnostic` in `src/App.svelte` stays the error click.
 
@@ -105,11 +109,11 @@ The words on the page are the source characters. They are not copied out of an S
 
 - A hidden marker is a small atomic range, so the caret skips the marker characters and does not stop inside them. The words themselves are not atomic.
 - A heading hides its marker and is drawn larger than body text. A deeper level is visibly smaller than the level above it. Exact sizes and colours wait for the design system. Do not invent a palette here.
-- A bullet hides `- `. A numbered item hides `+ ` and shows a number. That number is one plus the count of earlier `enum` siblings at the same depth in the current list run. It is not a number returned by Typst. A term item hides the `/ ` marker and shows the term text that sits before the colon.
+- A bullet hides `- `. A numbered item hides `+ ` and shows a number. That number is one plus the count of earlier `enum` spans at the same depth in the current list run. A list run ends at a blank line; a bullet or a term item between numbered items does not reset the count. It is not a number returned by Typst. A term item hides the `/ ` marker and shows the term text that sits before the colon.
 - A quote hides `#quote`, the attribution argument when it is the simple form above, and the outer brackets. The content is indented. The attribution text, when present, is the source slice of that `[text]`, shown under the quote.
 - Emphasis is italic. Strong is bold. Markers hide while rendered.
 - A rendered math span is a widget whose text is the source between the dollars. The widget is not HTML parsed from the note. It is a text node. It is omitted whenever the selection intersects the span, so the dollars and the source show instead. The widget is not focusable.
-- The rendered page hides line numbers and the active line highlight that the scaffold turns on in `createEditor`. The font for rendered prose is proportional and must cover Polish letters (Segoe UI on Windows is enough). Raw source that stays source may stay monospace.
+- The rendered page hides line numbers and the active line highlight that the scaffold turns on in `createEditor`. The font for rendered prose is proportional, covers Polish letters, and is the rendered font from AC-12 (Inter until the student changes it). Raw source that stays source uses the source font from AC-12 (JetBrains Mono until changed).
 
 **Click, arrows, selection, undo**:
 
@@ -119,7 +123,7 @@ The words on the page are the source characters. They are not copied out of an S
 - Copy and cut use the editor document between anchor and head. There is no second selection on the preview.
 - History stays the CodeMirror history already brought in by the editor setup. Only document changes enter it. Decoration updates and preview updates must not be document changes.
 
-**Structure keys** (lecture speed, pending the ratification in Follow-up):
+**Structure keys** (ratified 2026-11-06):
 
 - Enter in a heading inserts a newline at the caret and does not copy the `=` marker onto the new line.
 - Enter in a bullet, enum, or term item: if the item has text after the marker, insert a newline, the same indent, and the same marker. If the item has no text, delete the marker and the indent so the line is a body line.
@@ -173,6 +177,9 @@ What to measure, on a fixture of at least 5000 words with Polish letters, headin
 | Enter, Backspace, Tab | The characters inserted or deleted | The rules in this spec, using the span `marker`, `level`, and `kind` for the span that contains the caret. |
 | Compile | The source that is compiled | The editor buffer sent with `render_note`, as spec 0001 already fixes. |
 | Save | The bytes on disk | The editor buffer, through the existing save command, after Rust checks the path. |
+| Show source text | The source font family | The `source_font` settings field from `get_settings`. In the style it is followed by JetBrains Mono (shipped), then Consolas, then a generic fixed width font, so an unknown name still shows fixed width text. |
+| Show rendered prose | The rendered font family | The `render_font` settings field from `get_settings`. In the style it is followed by Inter (shipped), then Segoe UI, then a generic sans font. |
+| Offer font picks | The short list in the settings | Source: JetBrains Mono, Consolas. Rendered: Inter, Segoe UI. Any other family name may be typed; the page sends the typed name and nothing else. |
 
 **Key invariants**:
 
@@ -193,7 +200,7 @@ One student, one opened folder, no accounts. This feature does not widen that. `
 
 **Configuration required**:
 
-None. No new setting, variable, or secret. The 350ms pause stays the `scheduleRender` call already in `src/App.svelte`.
+No variable or secret. Two student settings, both optional, in the same settings JSON as `locale` and written by Rust only: `source_font` (default `JetBrains Mono`) and `render_font` (default `Inter`). The app ships the Inter and JetBrains Mono font files and their SIL licence texts, and loads them itself, so the defaults need no font on the machine. The page reads the settings once when the editor is created and again after a saved font change: the editor base font takes the source stack, rendered spans take the render stack, and the source view of feature 9 uses the base font, since it is the same editor. Each writer of the settings file (fonts, language, recents) loads first, changes only its own fields, and writes through the atomic write from spec 0003 (AC-10). The 350ms pause stays the `scheduleRender` call already in `src/App.svelte`.
 
 **Critical test scenarios**:
 
@@ -203,6 +210,7 @@ None. No new setting, variable, or secret. The 350ms pause stays the `scheduleRe
 - Steady caret: applying a matching render result leaves the selection and the editor scroll top unchanged, and the preview images do not take focus. A path outside the folder is refused and the buffer is unchanged. Verifies **AC-8**, **AC-11**.
 - Structure keys: Enter on a heading, Enter on a list item with text, Enter on an empty item, Tab, and Backspace on a marker. Each does the one change named in **AC-9**, including while the surrounding spans are rendered.
 - Long note: a fixture of at least 5000 words, one inserted letter, and the scanner window is the dirty window only. Verifies **AC-8**.
+- Fonts: an old settings file returns the two defaults, a typed family name is stored and shown back, an unknown name falls back without breaking the page, and the note on disk gains no font code. Verifies **AC-12**.
 
 ## Build plan
 
@@ -214,6 +222,7 @@ Skateboard: the first slice is a prose page a student could take into a lecture.
 4. Math placeholders. Classify math, show the inner source as a text widget while the caret is outside, open the source when a click or an arrow enters, and leave empty or unclosed math as source. No symbol list and no typeset formula. Satisfies **AC-5**, **AC-6**.
 5. Structure keys. Add the keymap in `createEditor` for Enter, Backspace, and Tab as AC-9 states, and ignore those handlers while composing. Satisfies **AC-9**.
 6. Long note proof. Add the fixture and the automated window check. Measure the editor thread time for one letter and write that number down against the 16ms budget. Satisfies **AC-8**.
+7. Editable fonts. Ship Inter and JetBrains Mono with their licence texts and load them in the page. Add `source_font` and `render_font` to the settings file and the `set_fonts` command in Rust, widen `get_settings`, and add the two picks (a short list plus a free text name) to the settings area of the page. The editor styles take the family names from the settings, with the fallback order in Value sourcing. Strings in both message files. This slice also serves the source view of feature 9, which shares the same editor. Satisfies **AC-12**.
 
 ## Consequences
 
@@ -230,18 +239,17 @@ Skateboard: the first slice is a prose page a student could take into a lecture.
 - Numbered items on the writing page are counted from sibling markers. A note that changes Typst numbering will not show those numbers until the PDF or the print preview.
 - The scanner is not a full Typst parser. Markup it does not recognize stays source. That is safe, and it means some real Typst will look unrendered until a later feature.
 - Math on this page is the source text in a chip, not a typeset formula. Typeset math waits for the math editing feature.
-- The structure keys and the hidden line numbers are lecture speed choices. They are written down so the build can proceed, and they are listed for you to ratify. If you reject one, update this spec before relying on that key.
+- Shipping two fonts adds a few megabytes to the app and two licence texts to keep beside them. A font a student picks by name may look wider or narrower than the default, and the page does not measure or correct that.
+- The structure keys and the hidden line numbers are lecture speed choices, ratified on 2026-11-06. Changing one later means changing AC-9 and this section together.
 
 **Neutral**:
 
 - The split between the editor pane and the preview pane stays. The preview is for the page pictures. The caret lives in the editor only.
-- No new Rust command, no new setting, and no new app string are required.
+- The rendered spans need no new compile command and no new app string of their own. The fonts slice (AC-12) adds one small command, two settings fields, and its strings in both message files.
 
 ## Follow-up
 
-- [ ] Ratify the structure keys. Until you change them, the build uses these lecture speed choices. Enter in a heading starts a body line. Enter in a list item with text continues that marker, and Enter on an empty item removes the marker. Enter in a quote with text stays inside the quote, and Enter on an empty quote line leaves the quote. Backspace at the start of a heading or list item removes the marker and does not eat the previous paragraph. Tab nests a list item by two spaces, Shift Tab removes that indent, and Tab never moves focus out of the editor.
-- [ ] Ratify that typing `#` does not become a heading. Headings stay Typst `=` marks. A Markdown style shortcut is a later import question, not this feature.
-- [ ] Ratify the page feel. The rendered page hides line numbers and the active line highlight, and it uses a proportional font. The print preview is unchanged.
+- [x] Ratified 2026-11-06: the structure keys as AC-9 states them, typing `#` never becomes a heading, and the page feel (line numbers and the active line mark hidden, a proportional rendered font, the print preview unchanged).
 - [ ] The math editing feature should replace the math placeholder with typeset math and symbol entry. Keep this span range and this click to source rule. Do not design symbol entry in this spec.
 - [ ] The design system feature should restyle rendered spans. This spec sets no palette and no exact type sizes.
 - [ ] The source view feature should turn these decorations off on this same editor buffer. It should not keep a second copy of the note.

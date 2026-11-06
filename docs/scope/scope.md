@@ -78,6 +78,7 @@ The heart of WYSITyp: you type on a page that renders in place for text, heading
   - [ ] Errors, a steady caret, and a print preview that does not take focus, covers AC-4, AC-8, AC-10, AC-11
   - [ ] Math placeholders you can click through, covers AC-5, AC-6
   - [ ] Structure keys and the long note check, covers AC-9, AC-8
+  - [ ] Editable fonts (source and rendered, shipped with the app), covers AC-12
 - [ ] Verify it: `/check verify rendered page editor`
 - [ ] Test it: `/test rendered page editor`
 
@@ -104,6 +105,9 @@ Help students find and start notes fast: search across the text of every note in
 **Spec:** [0003. Recent notes and templates](../specs/0003-recent-notes-and-templates.md) (assumed decision, spec 0003)
 **Code:** `src/App.svelte`, `src/lib/api.ts`, `src-tauri/src/commands.rs`, `src-tauri/src/files.rs`, `src-tauri/src/settings.rs`, `src-tauri/src/templates.rs`
 - [x] Build it: `/develop search, recent notes and templates`
+  - [ ] One recent list per folder (spec 0003 build plan), covers AC-1, AC-2, AC-3, AC-4, AC-8, AC-10
+- [ ] Verify it: `/check verify search, recent notes and templates`
+- [ ] Test it: `/test search, recent notes and templates`
 
 ### 11. Spell checking in Polish and English · needs a decision
 Check spelling as students type, in Polish and in English, underline mistakes on the rendered page, offer corrections, respect math and Typst commands, and let students teach the checker words from their own subjects.
