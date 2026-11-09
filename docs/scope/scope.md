@@ -13,7 +13,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 |---|---------|-------|--------|
 | 1 | Stack and architecture | Foundation | in-progress |
 | 2 | Coding standards and tooling | Foundation | in-progress |
-| 3 | Data model | Foundation | planned |
+| 3 | Data model | Foundation | in-progress |
 | 4 | Design system and UI foundation | Foundation | in-progress |
 | 5 | Workspace and note files | Release 1 | in-progress |
 | 6 | Rendered page editor | Release 1 | in-progress |
@@ -24,7 +24,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 11 | Spell checking in Polish and English | Release 1 | planned |
 | 12 | PDF export | Release 1 | in-progress |
 | 18 | App shell and start surface | Release 1 | done |
-| 19 | Theme and page colour | Release 1 | in-progress |
+| 19 | Theme and page colour | Release 1 | done |
 | 20 | Working editor chrome | Release 1 | planned |
 | 21 | Command palette and shortcut sheet | Release 1 | planned |
 | 22 | Search screen | Release 1 | planned |
@@ -53,10 +53,18 @@ Capture how code in this project is written and checked, then set up the tools t
 - [x] Install the tooling: `/develop tooling`
 - [x] Check it runs clean: `/test tooling`
 
-### 3. Data model · needs a decision
+### 3. Data model · in-progress
 Decide where things live on disk: the folder a student picks, notes as plain Typst files inside it, images that belong to a note, templates, app settings, and any index the app keeps to search fast, all in a shape other tools can still read.
 **Done when:** a student can point the app at a folder of Typst files they already own and nothing needs converting, images and templates have one clear home, and the app can rebuild any index it keeps from the files alone.
-- [ ] Design it (spec): `/architect data model`
+**Spec:** [0006. Data model](../specs/0006-data-model/index.md)
+**Code:** `src-tauri/src/templates.rs`, `src-tauri/src/files.rs`, `src-tauri/templates/`, `src/App.svelte`, `messages/`
+- [x] Design it (spec): `/architect data model`
+- [x] Build it: `/develop data model`
+  - [x] Shipped templates and unsaved note names, covers AC-1, AC-2, AC-3, AC-4, AC-12
+  - [x] Your templates, the editor mode, and the focus check, covers AC-4, AC-5, AC-6, AC-7, AC-8, AC-9, AC-13
+  - [x] Pictures beside the note, and rename, covers AC-10, AC-11, AC-13
+- [ ] Verify it: `/check verify data model`
+- [x] Test it: `/test data model`
 
 ### 4. Design system and UI foundation
 Bring Papier, the visual language in `design/claude-design`, into the app as tokens, spacing, focus, and the shared components. Font families stay as the app has them today. The export is the locked look for colour, space, and components. You may fix small gaps where the export falls short or disagrees with itself. Record each fix in the spec. Do not reopen colour or spacing for a new design.
@@ -150,7 +158,7 @@ Put the Papier shell on the app you already have: the sidebar, the folder tree, 
 - [x] Verify it: `/check verify app shell and start surface` (skipped)
 - [x] Test it: `/test app shell and start surface` (skipped)
 
-### 19. Theme and page colour
+### 19. Theme and page colour · done
 Let the student set the interface theme and the note page colour apart from each other, as the export draws. The page uses the page colour tokens only. A PDF export stays a white page. Font choices stay with the rendered page editor.
 **Done when:** a student can choose light, dark, or follow Windows, and a page colour of white, beige, graphite, or OLED black, without one forcing the other. Typing is not animated. Export to PDF is still a white page.
 **Spec:** [0004. Design system and UI foundation](../specs/0004-design-system-ui-foundation/index.md)
