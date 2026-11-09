@@ -1,0 +1,25 @@
+{
+ "v": 3,
+ "layout": "files",
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-11-09T00:29:52Z"
+ },
+ "title": "WYSITyp Papier",
+ "namespace": "WYSITypPapier",
+ "libraries": [],
+ "sections": {},
+ "groups": [],
+ "assetGroups": {},
+ "blobs": {},
+ "docs": {
+  "readme": "project/README.md",
+  "sections": []
+ },
+ "lastChange": {
+  "by": "Dominik",
+  "at": "2026-11-09T01:10:00Z",
+  "via": "Claude Code (cloud)",
+  "note": "Kolory strony: biały, beż, grafit, czarny OLED (page-*), niezależne od motywu interfejsu"
+ }
+}

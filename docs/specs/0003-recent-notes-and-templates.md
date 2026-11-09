@@ -23,7 +23,7 @@ Feature 10 shipped on an assumed decision recorded by `/develop`, because scope 
 
 - **AC-1**: Opening, creating, using a template for, or making the sample of a note records it. The sidebar lists recent notes for the open folder, newest first, at most 10, with duplicates collapsed. Paths compare after slashes are made forward and case is folded (the same file under a different case or slash spelling counts once on Windows); the newest spelling is kept, at the front, and the tail past 10 is dropped.
 - **AC-2**: Each opened folder keeps its own list. Opening another folder shows that folder list (empty when none), and the first folder list is unchanged when you come back.
-- **AC-3**: An entry that no longer exists, or that climbs out of the open folder, is dropped from that folder list. The app does not crash, and nothing outside the folder is read or written. Listing returns the cleaned paths even when writing the cleaned list back fails; that failure is shown with the one fixed recent list message (`recent_failed` in both message files) and nothing else changes.
+- **AC-3**: An entry that no longer exists, or that climbs out of the open folder, is dropped from that folder list. The app does not crash, and nothing outside the folder is read or written. Listing returns the cleaned paths even when writing the cleaned list back fails. That write failure is not shown to the student; the list is cleaned again on the next read. The `recent_failed` message (in both message files) is shown only when the list cannot be read at all, for example a broken settings file or a recents value that is neither accepted shape. Nothing else changes.
 - **AC-4**: A rename or a move retargets recent entries for the open note and for notes inside a renamed folder, the same retarget the save baseline does. Only the open folder list is touched and every other folder key is left as stored. A failed recents write never changes the rename result, which stays the file command result.
 - **AC-5**: Recording a recent note is best effort. A broken or locked settings file never fails opening, creating, templating, or sampling a note. Reading the recent list itself may report its error in the sidebar.
 - **AC-6**: The three built in templates (a lecture, a problem set, a lab note) each create a new plain `.typ` file inside the open folder through Rust only. The body is ordinary Typst whose first line is a title placeholder, and the words follow the stored language.
@@ -87,6 +87,8 @@ The file the app already writes gains a map from folder identity to a short path
 **Chosen option**: Option 1: recents in the settings JSON, one list per folder; templates as strings in Rust
 
 Ratified on 2026-11-06. The one correction to the shipped build is AC-2: the file holds a small map, one list per folder, not one list overall. Everything else the build assumed is confirmed as built, including best effort recording (AC-5).
+
+AC-3 was amended on 2026-11-06 after verify found the two halves could not both hold with the unchanged command shape. The cleaned list shown is correct and only its persistence is deferred, so a warning would be a false alarm; the list is cleaned again on the next read, in the same best effort spirit as AC-5, and a settings file that stays unwritable still surfaces when the student saves language or fonts through the same atomic write.
 
 **Implementation skills**: `vitest` (`antfu/skills`, `.agents/skills/vitest/`) · `svelte-code-writer` (`sveltejs/ai-tools`, `.agents/skills/svelte-code-writer/`)
 

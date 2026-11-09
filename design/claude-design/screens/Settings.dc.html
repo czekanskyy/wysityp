@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>WYSITyp – ustawienia: wygląd i czcionki</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/wysityppapier/tokens.css">
+<link rel="stylesheet" href="ds/wysityppapier/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.win{width:1280px;height:800px;display:grid;grid-template-columns:232px minmax(0,1fr) 456px;background:var(--color-bg);color:var(--color-text);font:13px var(--font-ui);overflow:hidden}
+.nav{background:var(--color-surface-sunken);border-right:1px solid var(--color-border);padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:6px;color:var(--color-text);text-decoration:none;font-size:13px}
+.nav a:hover{background:var(--color-hover)}
+.nav a[aria-current="page"]{background:var(--color-accent-soft);color:var(--color-accent-soft-text);font-weight:600}
+.nav .grp{margin:10px 10px 4px;font:600 11px var(--font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-faint)}
+.main{padding:20px 28px;overflow:hidden;display:flex;flex-direction:column;gap:13px}
+h2{margin:0;font:600 18px var(--font-ui)}
+h3{margin:0 0 2px;font:600 11px var(--font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-muted)}
+.set{display:grid;grid-template-columns:200px minmax(0,1fr);gap:8px 16px;align-items:center}
+.set .lab{font-size:13px}
+.set .hint{grid-column:2;font-size:11.5px;color:var(--color-text-muted);margin-top:-4px}
+.pcs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.pc{border:1px solid var(--color-border);border-radius:9px;padding:6px;background:var(--color-surface);cursor:pointer;display:flex;flex-direction:column;gap:6px;font:12px var(--font-ui);color:var(--color-text);text-align:left}
+.pc[aria-pressed="true"]{border-color:var(--color-accent);box-shadow:0 0 0 1px var(--color-accent)}
+.pc .sheet{height:54px;border-radius:5px;border:1px solid var(--color-border);padding:7px 8px;display:flex;flex-direction:column;gap:4px;font:600 13px/1 var(--font-prose)}
+.pc .ln{height:3px;border-radius:2px;opacity:.55}
+.sel{display:flex;align-items:center;justify-content:space-between;gap:8px;height:30px;padding:0 10px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);font-size:13px;cursor:pointer}
+.step{display:inline-flex;align-items:center;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);overflow:hidden;height:30px}
+.step button{width:30px;height:100%;border:0;background:transparent;color:var(--color-text);font-size:15px;cursor:pointer}
+.step button:hover{background:var(--color-hover)}
+.step span{min-width:58px;text-align:center;font-variant-numeric:tabular-nums;border-left:1px solid var(--color-border);border-right:1px solid var(--color-border);line-height:28px}
+.sw{position:relative;width:34px;height:20px;border-radius:10px;border:0;background:var(--color-border-strong);cursor:pointer;flex:none}
+.sw::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s}
+.sw[aria-checked="true"]{background:var(--color-accent)}
+.sw[aria-checked="true"]::after{left:16px}
+.row2{display:flex;gap:10px;align-items:center}
+.pv{border-left:1px solid var(--color-border);background:var(--color-surface-sunken);padding:22px;display:flex;flex-direction:column;gap:12px}
+.mini{border-radius:10px;overflow:hidden;border:1px solid var(--color-border-strong);box-shadow:var(--shadow-md);display:grid;grid-template-columns:96px minmax(0,1fr);height:420px;background:var(--color-bg);color:var(--color-text)}
+.mini .sb{background:var(--color-surface-sunken);border-right:1px solid var(--color-border);padding:10px 8px;display:flex;flex-direction:column;gap:5px;font:var(--ui-size) var(--font-ui)}
+.mini .sb div{padding:3px 6px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--color-text-muted)}
+.mini .sb .on{background:var(--color-accent-soft);color:var(--color-accent-soft-text)}
+.mini .ed{display:flex;flex-direction:column;min-width:0}
+.mini .tb{height:28px;border-bottom:1px solid var(--color-border);background:var(--color-surface);display:flex;align-items:center;gap:8px;padding:0 10px}
+.mini .tb i{width:12px;height:3px;border-radius:2px;background:var(--color-text-faint)}
+.mini .desk{flex:1;padding:16px;background:var(--color-bg);display:flex;justify-content:center}
+.paper{width:100%;background:var(--pg-bg);color:var(--pg-text);border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.18);padding:18px 20px;font-family:var(--pg-font);font-size:var(--pg-size);line-height:1.5;display:flex;flex-direction:column;gap:8px}
+.paper h4{margin:0;font-size:1.35em;font-weight:700}
+.paper p{margin:0}
+.paper .m{font-family:var(--font-math);color:var(--pg-math);font-style:italic}
+.paper .blk{text-align:center;font-family:var(--font-math);color:var(--pg-math);font-size:1.15em;padding:2px 0}
+.paper code{font-family:var(--font-mono);font-size:.82em;background:var(--pg-code);padding:1px 4px;border-radius:3px}
+.paper .mut{color:var(--pg-muted);font-size:.85em}
+.paper .box{border-left:3px solid var(--pg-math);padding:4px 8px;background:var(--pg-code);border-radius:0 3px 3px 0}
+</style>
+</helmet>
+<div class="win" data-theme="{{uiTheme}}">
+<nav class="nav" aria-label="Sekcje ustawień">
+<a href="Main.dc.html" style="color: var(--color-text-muted); margin-bottom: 8px;"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Wróć do notatek</a>
+<div class="grp">Aplikacja</div>
+<a href="#wyglad" aria-current="page"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" style="fill: currentColor;"/></svg>Wygląd</a>
+<a href="#czcionki"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 19 5-14 5 14"/><path d="M6 14h6"/><path d="M15 12h5M17.5 9.5v7"/></svg>Czcionki</a>
+<a href="SettingsMore.dc.html"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Edytor</a>
+<a href="SettingsMore.dc.html"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Pliki i kopie zapasowe</a>
+<a href="SettingsMore.dc.html"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg>Eksport PDF</a>
+<a href="SettingsMore.dc.html"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg>Skróty klawiszowe</a>
+<div class="grp">Typst</div>
+<a href="SettingsMore.dc.html"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></svg>Pakiety i szablony</a>
+<div class="grp">Inne</div>
+<a href="SettingsMore.dc.html"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.5 2.5 14.5 0 17M12 3.5c-2.5 2.5-2.5 14.5 0 17"/></svg>Język</a>
+<a href="SettingsMore.dc.html"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6z"/></svg>Prywatność i aktualizacje</a>
+<a href="SettingsMore.dc.html"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg>O aplikacji</a>
+<div style="margin-top: auto; padding: 8px 10px; font-size: 11px; color: var(--color-text-faint);">Zmiany zapisują się od razu i działają na wszystkich ekranach prototypu.</div>
+</nav>
+
+<main class="main">
+<h2 id="wyglad">Wygląd</h2>
+<div class="set">
+<span class="lab">Motyw interfejsu</span>
+<div class="wt-seg" role="radiogroup" aria-label="Motyw interfejsu"><button role="radio" aria-checked="{{uiSys}}" onClick="{{toUiSys}}">Systemowy</button><button role="radio" aria-checked="{{uiLight}}" onClick="{{toUiLight}}">Jasny</button><button role="radio" aria-checked="{{uiDark}}" onClick="{{toUiDark}}">Ciemny</button></div>
+<span class="hint">Pasek boczny, pasek narzędzi, menu i okna dialogowe.</span>
+<span class="lab">Kolor strony</span>
+<div class="row2"><button class="sw" role="switch" aria-checked="{{auto}}" onClick="{{toggleAuto}}" aria-label="Dopasuj do motywu interfejsu"></button><span>Dopasuj do motywu interfejsu</span></div>
+<span class="hint">{{autoHint}}</span>
+</div>
+<div class="pcs" role="radiogroup" aria-label="Kolor strony">
+<button class="pc" role="radio" aria-pressed="{{pWhite}}" onClick="{{toWhite}}"><div class="sheet" style="background: #ffffff; color: #1f1d1a;">Aa<span class="ln" style="background: #1f1d1a; width: 80%;"></span><span class="ln" style="background: #2b4c7e; width: 55%;"></span></div>Biały</button>
+<button class="pc" role="radio" aria-pressed="{{pBeige}}" onClick="{{toBeige}}"><div class="sheet" style="background: #f5eedf; color: #3a2f22;">Aa<span class="ln" style="background: #3a2f22; width: 80%;"></span><span class="ln" style="background: #8a4b1f; width: 55%;"></span></div>Beżowy</button>
+<button class="pc" role="radio" aria-pressed="{{pGraph}}" onClick="{{toGraph}}"><div class="sheet" style="background: #2a2c30; color: #e6e2da;">Aa<span class="ln" style="background: #e6e2da; width: 80%;"></span><span class="ln" style="background: #9cbde8; width: 55%;"></span></div>Grafitowy</button>
+<button class="pc" role="radio" aria-pressed="{{pOled}}" onClick="{{toOled}}"><div class="sheet" style="background: #000000; color: #d8d4cc; border-color: #333;">Aa<span class="ln" style="background: #d8d4cc; width: 80%;"></span><span class="ln" style="background: #8fb2e4; width: 55%;"></span></div>Czarny (OLED)</button>
+</div>
+<div class="set">
+<span class="lab">Kolor akcentu</span>
+<div class="row2"><span style="width: 20px; height: 20px; border-radius: 50%; background: var(--color-accent); box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent);"></span><span style="width: 20px; height: 20px; border-radius: 50%; background: var(--tag-teal-fg);"></span><span style="width: 20px; height: 20px; border-radius: 50%; background: var(--tag-violet-fg);"></span><span style="width: 20px; height: 20px; border-radius: 50%; background: var(--tag-amber-fg);"></span><span style="width: 20px; height: 20px; border-radius: 50%; background: var(--tag-green-fg);"></span></div>
+<span class="lab">Przy eksporcie do PDF</span>
+<div class="wt-seg" role="radiogroup" aria-label="Kolor strony w PDF"><button role="radio" aria-checked="true">Zawsze biała strona</button><button role="radio" aria-checked="false">Jak na ekranie</button></div>
+</div>
+
+<h2 id="czcionki" style="margin-top: 4px;">Czcionki</h2>
+<h3>Strona (domyślne dla nowych notatek)</h3>
+<div class="set">
+<span class="lab">Krój tekstu</span>
+<div class="wt-seg" role="radiogroup" aria-label="Krój tekstu"><button role="radio" aria-checked="{{fLib}}" onClick="{{toLib}}">Libertinus Serif</button><button role="radio" aria-checked="{{fNcm}}" onClick="{{toNcm}}">New Computer Modern</button><button role="radio" aria-checked="{{fAtk}}" onClick="{{toAtk}}">Atkinson Hyperlegible</button></div>
+<span class="lab">Rozmiar tekstu</span>
+<div class="row2"><div class="step"><button onClick="{{sizeDown}}" aria-label="Mniejszy">−</button><span>{{size}} pt</span><button onClick="{{sizeUp}}" aria-label="Większy">+</button></div><span style="font-size: 12px; color: var(--color-text-muted);">Interlinia</span><div class="sel" style="width: 86px;">1,5<svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
+<span class="lab">Krój wzorów i kodu</span>
+<div class="row2"><div class="sel" style="width: 210px;">New Computer Modern Math<svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div><div class="sel" style="width: 150px; font-family: var(--font-mono); font-size: 12px;">JetBrains Mono<svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
+<span class="hint">Zapisuje się jako <code style="font-family: var(--font-mono);">#set text(font: …, size: …)</code> w szablonie. Notatka może to nadpisać.</span>
+</div>
+<h3>Interfejs i edytor źródła</h3>
+<div class="set">
+<span class="lab">Rozmiar interfejsu</span>
+<div class="wt-seg" role="radiogroup" aria-label="Rozmiar interfejsu"><button role="radio" aria-checked="{{uiS}}" onClick="{{toUiS}}">Mały 12</button><button role="radio" aria-checked="{{uiM}}" onClick="{{toUiM}}">Średni 13</button><button role="radio" aria-checked="{{uiL}}" onClick="{{toUiL}}">Duży 15</button></div>
+<span class="lab">Edytor źródła Typst</span>
+<div class="row2"><div class="sel" style="width: 150px; font-family: var(--font-mono); font-size: 12px;">JetBrains Mono<svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div><div class="step"><button aria-label="Mniejszy">−</button><span>14 px</span><button aria-label="Większy">+</button></div><span style="font-size: 12px;">Ligatury</span><button class="sw" role="switch" aria-checked="true" aria-label="Ligatury"></button></div>
+</div>
+</main>
+
+<aside class="pv" aria-label="Podgląd">
+<h3>Podgląd na żywo</h3>
+<div class="mini" data-theme="{{uiTheme}}" style="--pg-bg: {{pgBg}}; --pg-text: {{pgText}}; --pg-muted: {{pgMuted}}; --pg-math: {{pgMath}}; --pg-code: {{pgCode}}; --pg-font: {{pgFont}}; --pg-size: {{pgSize}}; --ui-size: {{uiPx}};">
+<div class="sb"><div style="font-weight: 600; color: var(--color-text);">Notatki</div><div>Algebra</div><div class="on">Analiza 1</div><div>Fizyka</div><div>Statystyka</div></div>
+<div class="ed">
+<div class="tb"><i></i><i></i><i style="width: 18px;"></i><i></i><i></i></div>
+<div class="desk">
+<div class="paper">
+<h4>Całka Riemanna</h4>
+<p>Niech <span class="m">f</span> będzie ograniczona na <span class="m">[a, b]</span>. Funkcja jest <b>całkowalna</b>, gdy</p>
+<div class="blk">∫<sub>a</sub><sup>b</sup> f(x) dx = lim<sub>n→∞</sub> ∑ f(ξ<sub>i</sub>) Δx<sub>i</sub></div>
+<div class="box"><b>Twierdzenie.</b> Każda funkcja ciągła na <span class="m">[a, b]</span> jest całkowalna.</div>
+<p class="mut">Kod: <code>#integral(f, a, b)</code></p>
+</div>
+</div>
+</div>
+</div>
+<p style="margin: 0; font-size: 11.5px; color: var(--color-text-muted); line-height: 1.5;">Motyw interfejsu i kolor strony są niezależne: ciemny edytor może mieć jasną lub beżową kartkę. Kolor strony zmienia też kolor tekstu, wzorów, kodu i bloków.</p>
+</aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+const WT = {
+  get(k, d) { try { return localStorage.getItem('wysityp:' + k) || d; } catch (e) { return d; } },
+  set(k, v) { try { if (v == null) localStorage.removeItem('wysityp:' + k); else localStorage.setItem('wysityp:' + k, v); } catch (e) {} },
+  ui() { const t = WT.get('ui', 'light'); return t === 'dark' ? 'dark' : 'light'; }
+};
+const PAGES = {
+  white: { bg: '#ffffff', text: '#1f1d1a', muted: '#6b665e', math: '#2b4c7e', code: '#f2efe8' },
+  beige: { bg: '#f5eedf', text: '#3a2f22', muted: '#716150', math: '#8a4b1f', code: '#ebe0c9' },
+  graph: { bg: '#2a2c30', text: '#e6e2da', muted: '#a5a199', math: '#9cbde8', code: '#35383d' },
+  oled: { bg: '#000000', text: '#d8d4cc', muted: '#8d8981', math: '#8fb2e4', code: '#141414' }
+};
+const FONTS = { lib: "'Libertinus Serif', var(--font-prose)", ncm: "'New Computer Modern', 'Latin Modern Roman', var(--font-prose)", atk: "'Atkinson Hyperlegible', var(--font-ui)" };
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const ui = WT.get('ui', 'sys'), page = WT.get('page', null);
+    this.state = { ui: ['sys', 'light', 'dark'].includes(ui) ? ui : 'sys', auto: !page, page: page || 'white', font: 'lib', size: 11, uiSize: 'm' };
+  }
+  renderVals() {
+    const s = this.state;
+    const set = (o) => () => {
+      this.setState(o);
+      if (o.ui) WT.set('ui', o.ui);
+      if (o.page) WT.set('page', o.page);
+    };
+    const uiTheme = s.ui === 'sys' ? 'light' : s.ui;
+    const page = s.auto ? (uiTheme === 'dark' ? 'graph' : 'white') : s.page;
+    const p = PAGES[page];
+    return {
+      uiSys: s.ui === 'sys', uiLight: s.ui === 'light', uiDark: s.ui === 'dark',
+      toUiSys: set({ ui: 'sys' }), toUiLight: set({ ui: 'light' }), toUiDark: set({ ui: 'dark' }),
+      uiTheme,
+      auto: s.auto, toggleAuto: () => { const a = !this.state.auto; this.setState({ auto: a }); WT.set('page', a ? null : this.state.page); },
+      autoHint: s.auto ? 'Jasny interfejs – biała strona, ciemny – grafitowa.' : 'Wyłączone: strona ma własny kolor, niezależny od interfejsu.',
+      pWhite: page === 'white', pBeige: page === 'beige', pGraph: page === 'graph', pOled: page === 'oled',
+      toWhite: set({ page: 'white', auto: false }), toBeige: set({ page: 'beige', auto: false }), toGraph: set({ page: 'graph', auto: false }), toOled: set({ page: 'oled', auto: false }),
+      pgBg: p.bg, pgText: p.text, pgMuted: p.muted, pgMath: p.math, pgCode: p.code,
+      fLib: s.font === 'lib', fNcm: s.font === 'ncm', fAtk: s.font === 'atk',
+      toLib: set({ font: 'lib' }), toNcm: set({ font: 'ncm' }), toAtk: set({ font: 'atk' }),
+      pgFont: FONTS[s.font],
+      size: String(s.size).replace('.', ','),
+      pgSize: (s.size * 1.18).toFixed(1) + 'px',
+      sizeDown: () => this.setState({ size: Math.max(8, this.state.size - 0.5) }),
+      sizeUp: () => this.setState({ size: Math.min(16, this.state.size + 0.5) }),
+      uiS: s.uiSize === 's', uiM: s.uiSize === 'm', uiL: s.uiSize === 'l',
+      toUiS: set({ uiSize: 's' }), toUiM: set({ uiSize: 'm' }), toUiL: set({ uiSize: 'l' }),
+      uiPx: { s: '10px', m: '11px', l: '12.5px' }[s.uiSize]
+    };
+  }
+}
+</script>
+</body>
+</html>

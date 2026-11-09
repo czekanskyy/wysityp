@@ -14,7 +14,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 1 | Stack and architecture | Foundation | in-progress |
 | 2 | Coding standards and tooling | Foundation | in-progress |
 | 3 | Data model | Foundation | planned |
-| 4 | Design system and UI foundation | Foundation | planned |
+| 4 | Design system and UI foundation | Foundation | in-progress |
 | 5 | Workspace and note files | Release 1 | in-progress |
 | 6 | Rendered page editor | Release 1 | in-progress |
 | 7 | Math editing | Release 1 | planned |
@@ -23,6 +23,11 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 10 | Search, recent notes and templates | Release 1 | in-progress |
 | 11 | Spell checking in Polish and English | Release 1 | planned |
 | 12 | PDF export | Release 1 | in-progress |
+| 18 | App shell and start surface | Release 1 | planned |
+| 19 | Theme and page colour | Release 1 | planned |
+| 20 | Working editor chrome | Release 1 | planned |
+| 21 | Command palette and shortcut sheet | Release 1 | planned |
+| 22 | Search screen | Release 1 | planned |
 | 13 | Smart suggestions for Typst and math | Release 2 | planned |
 | 14 | Visual geometry and diagrams | Release 3 | planned |
 | 15 | Markdown import | Release 4 | planned |
@@ -53,14 +58,25 @@ Decide where things live on disk: the folder a student picks, notes as plain Typ
 **Done when:** a student can point the app at a folder of Typst files they already own and nothing needs converting, images and templates have one clear home, and the app can rebuild any index it keeps from the files alone.
 - [ ] Design it (spec): `/architect data model`
 
-### 4. Design system and UI foundation · needs a decision
-Set the visual language and the base building blocks for screens, in Polish and English, with keyboard use and focus states treated as part of the design rather than an afterthought for a shortcut driven app.
-**Done when:** `design.md` covers type, colour, spacing and base components in both app languages, and base components handle focus and keyboard use well.
-- [ ] Design it (spec): `/architect design system and UI foundation`
+### 4. Design system and UI foundation
+Bring Papier, the visual language in `design/claude-design`, into the app as tokens, spacing, focus, and the shared components. Font families stay as the app has them today. The export is the locked look for colour, space, and components. You may fix small gaps where the export falls short or disagrees with itself. Record each fix in the spec. Do not reopen colour or spacing for a new design.
+**Done when:** light and dark tokens, spacing, and the shared components match the export. Font families stay as they are today. Focus and keyboard work, Polish labels fit, and the app respects the system setting for less motion. The spec lists every small fix.
+**Spec:** [0004. Design system and UI foundation](../specs/0004-design-system-ui-foundation/index.md)
+**Code:** `src/styles/`, `src/lib/ui/`
+- [x] Design it (spec): `/architect design system and UI foundation`
+- [x] Build it: `/develop design system and UI foundation`
+  - [x] Tokens on the open window, covers AC-1, AC-2, AC-3, AC-4, AC-6
+  - [x] Icons and the small controls, covers AC-5, AC-6, AC-7
+  - [x] Note page and cover, covers AC-3, AC-5, AC-7
+  - [x] Sidebar, toolbar, and command palette components, not mounted on the live screens, covers AC-5
+- [ ] Verify it: `/check verify design system and UI foundation`
+- [ ] Test it: `/test design system and UI foundation`
 
 ## Release 1: The thinnest usable whole
 
 One folder of notes, a page you type on that renders in place, full math, spell checking in Polish and English, and a PDF at the end. A student could take this into a real lecture.
+
+Features 18 to 22 put the Papier look on the parts of this release the app already does. Screens that belong to later work stay with those features.
 
 ### 5. Workspace and note files
 Open a folder on disk, show its folders and notes as a tree, and let students create, rename, move and delete notes and folders, open notes they already have, and switch the app language between Polish and English in settings.
@@ -105,9 +121,9 @@ Help students find and start notes fast: search across the text of every note in
 **Spec:** [0003. Recent notes and templates](../specs/0003-recent-notes-and-templates.md) (assumed decision, spec 0003)
 **Code:** `src/App.svelte`, `src/lib/api.ts`, `src-tauri/src/commands.rs`, `src-tauri/src/files.rs`, `src-tauri/src/settings.rs`, `src-tauri/src/templates.rs`
 - [x] Build it: `/develop search, recent notes and templates`
-  - [ ] One recent list per folder (spec 0003 build plan), covers AC-1, AC-2, AC-3, AC-4, AC-8, AC-10
-- [ ] Verify it: `/check verify search, recent notes and templates`
-- [ ] Test it: `/test search, recent notes and templates`
+  - [x] One recent list per folder (spec 0003 build plan), covers AC-1, AC-2, AC-3, AC-4, AC-8, AC-10
+- [x] Verify it: `/check verify search, recent notes and templates`
+- [x] Test it: `/test search, recent notes and templates`
 
 ### 11. Spell checking in Polish and English · needs a decision
 Check spelling as students type, in Polish and in English, underline mistakes on the rendered page, offer corrections, respect math and Typst commands, and let students teach the checker words from their own subjects.
@@ -119,6 +135,31 @@ Turn the open note into a PDF through Typst itself, with page settings a student
 **Done when:** a finished note exports to a PDF that matches the rendered page, export settings are remembered per note or per student, and a Typst error tells the student where to look instead of failing in silence.
 **Code:** `src/App.svelte`, `src/lib/api.ts`, `src-tauri/src/commands.rs`, `src-tauri/src/files.rs`, `src-tauri/src/typst_engine.rs`
 - [x] Build it: `/develop PDF export`
+
+### 18. App shell and start surface · needs a decision
+Put the Papier shell on the app you already have: the sidebar, the folder tree, a new note, save state, language, and the start surface with templates and recent notes.
+**Done when:** a student can open a folder, start from a template or a recent note, and organise notes in a shell that matches the export, in Polish and English, in light and dark. Recent notes show only what the app already remembers. Subject tags and preview paragraphs wait.
+- [ ] Design it (spec): `/architect app shell and start surface`
+
+### 19. Theme and page colour · needs a decision
+Let the student set the interface theme and the note page colour apart from each other, as the export draws. The page uses the page colour tokens only. A PDF export stays a white page. Font choices stay with the rendered page editor.
+**Done when:** a student can choose light, dark, or follow Windows, and a page colour of white, beige, graphite, or OLED black, without one forcing the other. Typing is not animated. Export to PDF is still a white page.
+- [ ] Design it (spec): `/architect theme and page colour`
+
+### 20. Working editor chrome · needs a decision
+Dress the views the app already has: the rendered page, the source, and the side by side view, plus Typst warnings and the save conflict path. Leave out toolbar controls for work the app cannot do yet.
+**Done when:** a student can switch those views, read a warning, and resolve a save conflict in the new chrome, in both languages and both themes, and no control promises an action that does not exist yet.
+- [ ] Design it (spec): `/architect working editor chrome`
+
+### 21. Command palette and shortcut sheet · needs a decision
+Reach the actions the app already has from the keyboard, through a command palette and a shortcut sheet. The export names two different palette shortcuts. The spec picks one, and both surfaces list only real actions.
+**Done when:** a student can open the palette, run an existing action, and open a sheet that shows the same shortcuts, in Polish and English.
+- [ ] Design it (spec): `/architect command palette and shortcut sheet`
+
+### 22. Search screen · needs a decision
+Restyle search to match the export. Search still finds text inside notes, with the path, line, and snippet it already returns. Replace, and a separate search of folder names or file names, wait.
+**Done when:** a student can search note text and open a hit from a screen that matches the export, in both languages and both themes, and replace is not offered.
+- [ ] Design it (spec): `/architect search screen`
 
 ## Release 2: Faster typing
 
@@ -165,6 +206,11 @@ Kept on purpose, so the plan stays honest about what waits.
 - **Free drawing with a pen**: quick ink waits behind precise diagrams.
 - **Help with sentences beyond spelling**: grammar and style help in Polish and English waits behind spell checking.
 - **Files of any kind stored inside a note**: images belong in Release 1; general attachments wait.
+- **Full toolbar controls from the export**: styles, marks, lists, math, code, links, tables, images, and colours. They wait with the editor, math, and tables features, so the toolbar never offers a dead control.
+- **Subject tags and preview paragraphs** on the start screen.
+- **Search replace, and search by folder name or file name**, drawn on the search screen.
+- **Symbol picker, table grid, and shapes**: they wait with math editing, tables, and visual geometry.
+- **Longer settings screens**: backups, packages, shortcut editing, privacy, and about. Language stays where it is. Theme and page colour belong to feature 19.
 
 ## Legend
 

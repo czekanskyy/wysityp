@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>WYSITyp – wstaw tabelę</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/wysityppapier/tokens.css">
+<link rel="stylesheet" href="ds/wysityppapier/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.pop{position:absolute;left:520px;top:92px;width:640px;background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:12px;box-shadow:var(--shadow-lg);display:grid;grid-template-columns:262px minmax(0,1fr);font-family:var(--font-ui);color:var(--color-text);font-size:13px}
+.pop::before{content:"";position:absolute;left:24px;top:-6px;width:10px;height:10px;background:var(--color-surface-raised);border-left:1px solid var(--color-border);border-top:1px solid var(--color-border);transform:rotate(45deg)}
+.l{padding:14px;display:flex;flex-direction:column;gap:10px;border-right:1px solid var(--color-border)}
+.ttl{font:600 11px var(--font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-muted)}
+.grid{display:grid;grid-template-columns:repeat(10,20px);gap:3px}
+.c{width:20px;height:20px;padding:0;border:1px solid var(--color-border-strong);border-radius:3px;background:var(--color-surface);cursor:pointer}
+.c[aria-selected="true"]{background:var(--color-accent-soft);border-color:var(--color-accent)}
+.size{font:600 14px var(--font-ui);text-align:center}
+.size span{color:var(--color-text-muted);font-weight:400}
+.opt{display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer}
+.chk{width:16px;height:16px;border-radius:4px;border:1px solid var(--color-border-strong);background:var(--color-surface);display:grid;place-items:center;flex:none}
+.chk[aria-checked="true"]{background:var(--color-accent);border-color:var(--color-accent);color:var(--color-on-accent)}
+.r{padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.paper{background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;padding:14px;display:grid;place-items:center;min-height:170px}
+table{border-collapse:collapse;font:13px var(--font-prose);color:var(--color-text)}
+td{padding:4px 10px;min-width:30px;height:20px;color:var(--color-text-faint)}
+.b-all td{border:1px solid var(--color-text-muted)}
+.b-h td{border-top:1px solid var(--color-text-muted);border-bottom:1px solid var(--color-text-muted)}
+td.hd{font-weight:700;color:var(--color-text);background:var(--color-surface-sunken)}
+pre{margin:0;padding:10px;border-radius:7px;background:var(--color-code-bg);color:var(--color-code-text);font:11.5px/1.5 var(--font-mono);white-space:pre-wrap}
+.foot{display:flex;gap:8px;justify-content:flex-end;margin-top:auto}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="position: relative; width: 1280px; height: 800px; overflow: hidden;">
+<dc-import name="Main" theme="{{theme}}" fixed="{{yes}}" view="rendered" hint-size="1280px,800px"></dc-import>
+<div class="pop" role="dialog" aria-label="Wstaw tabelę">
+<div class="l">
+<div class="ttl">Rozmiar</div>
+<div class="grid" role="grid" aria-label="Wiersze × kolumny">
+<button class="c" aria-selected="{{h1_1}}" onMouseEnter="{{e1_1}}" onClick="{{e1_1}}" aria-label="1 × 1"></button>
+<button class="c" aria-selected="{{h1_2}}" onMouseEnter="{{e1_2}}" onClick="{{e1_2}}" aria-label="1 × 2"></button>
+<button class="c" aria-selected="{{h1_3}}" onMouseEnter="{{e1_3}}" onClick="{{e1_3}}" aria-label="1 × 3"></button>
+<button class="c" aria-selected="{{h1_4}}" onMouseEnter="{{e1_4}}" onClick="{{e1_4}}" aria-label="1 × 4"></button>
+<button class="c" aria-selected="{{h1_5}}" onMouseEnter="{{e1_5}}" onClick="{{e1_5}}" aria-label="1 × 5"></button>
+<button class="c" aria-selected="{{h1_6}}" onMouseEnter="{{e1_6}}" onClick="{{e1_6}}" aria-label="1 × 6"></button>
+<button class="c" aria-selected="{{h1_7}}" onMouseEnter="{{e1_7}}" onClick="{{e1_7}}" aria-label="1 × 7"></button>
+<button class="c" aria-selected="{{h1_8}}" onMouseEnter="{{e1_8}}" onClick="{{e1_8}}" aria-label="1 × 8"></button>
+<button class="c" aria-selected="{{h1_9}}" onMouseEnter="{{e1_9}}" onClick="{{e1_9}}" aria-label="1 × 9"></button>
+<button class="c" aria-selected="{{h1_10}}" onMouseEnter="{{e1_10}}" onClick="{{e1_10}}" aria-label="1 × 10"></button>
+<button class="c" aria-selected="{{h2_1}}" onMouseEnter="{{e2_1}}" onClick="{{e2_1}}" aria-label="2 × 1"></button>
+<button class="c" aria-selected="{{h2_2}}" onMouseEnter="{{e2_2}}" onClick="{{e2_2}}" aria-label="2 × 2"></button>
+<button class="c" aria-selected="{{h2_3}}" onMouseEnter="{{e2_3}}" onClick="{{e2_3}}" aria-label="2 × 3"></button>
+<button class="c" aria-selected="{{h2_4}}" onMouseEnter="{{e2_4}}" onClick="{{e2_4}}" aria-label="2 × 4"></button>
+<button class="c" aria-selected="{{h2_5}}" onMouseEnter="{{e2_5}}" onClick="{{e2_5}}" aria-label="2 × 5"></button>
+<button class="c" aria-selected="{{h2_6}}" onMouseEnter="{{e2_6}}" onClick="{{e2_6}}" aria-label="2 × 6"></button>
+<button class="c" aria-selected="{{h2_7}}" onMouseEnter="{{e2_7}}" onClick="{{e2_7}}" aria-label="2 × 7"></button>
+<button class="c" aria-selected="{{h2_8}}" onMouseEnter="{{e2_8}}" onClick="{{e2_8}}" aria-label="2 × 8"></button>
+<button class="c" aria-selected="{{h2_9}}" onMouseEnter="{{e2_9}}" onClick="{{e2_9}}" aria-label="2 × 9"></button>
+<button class="c" aria-selected="{{h2_10}}" onMouseEnter="{{e2_10}}" onClick="{{e2_10}}" aria-label="2 × 10"></button>
+<button class="c" aria-selected="{{h3_1}}" onMouseEnter="{{e3_1}}" onClick="{{e3_1}}" aria-label="3 × 1"></button>
+<button class="c" aria-selected="{{h3_2}}" onMouseEnter="{{e3_2}}" onClick="{{e3_2}}" aria-label="3 × 2"></button>
+<button class="c" aria-selected="{{h3_3}}" onMouseEnter="{{e3_3}}" onClick="{{e3_3}}" aria-label="3 × 3"></button>
+<button class="c" aria-selected="{{h3_4}}" onMouseEnter="{{e3_4}}" onClick="{{e3_4}}" aria-label="3 × 4"></button>
+<button class="c" aria-selected="{{h3_5}}" onMouseEnter="{{e3_5}}" onClick="{{e3_5}}" aria-label="3 × 5"></button>
+<button class="c" aria-selected="{{h3_6}}" onMouseEnter="{{e3_6}}" onClick="{{e3_6}}" aria-label="3 × 6"></button>
+<button class="c" aria-selected="{{h3_7}}" onMouseEnter="{{e3_7}}" onClick="{{e3_7}}" aria-label="3 × 7"></button>
+<button class="c" aria-selected="{{h3_8}}" onMouseEnter="{{e3_8}}" onClick="{{e3_8}}" aria-label="3 × 8"></button>
+<button class="c" aria-selected="{{h3_9}}" onMouseEnter="{{e3_9}}" onClick="{{e3_9}}" aria-label="3 × 9"></button>
+<button class="c" aria-selected="{{h3_10}}" onMouseEnter="{{e3_10}}" onClick="{{e3_10}}" aria-label="3 × 10"></button>
+<button class="c" aria-selected="{{h4_1}}" onMouseEnter="{{e4_1}}" onClick="{{e4_1}}" aria-label="4 × 1"></button>
+<button class="c" aria-selected="{{h4_2}}" onMouseEnter="{{e4_2}}" onClick="{{e4_2}}" aria-label="4 × 2"></button>
+<button class="c" aria-selected="{{h4_3}}" onMouseEnter="{{e4_3}}" onClick="{{e4_3}}" aria-label="4 × 3"></button>
+<button class="c" aria-selected="{{h4_4}}" onMouseEnter="{{e4_4}}" onClick="{{e4_4}}" aria-label="4 × 4"></button>
+<button class="c" aria-selected="{{h4_5}}" onMouseEnter="{{e4_5}}" onClick="{{e4_5}}" aria-label="4 × 5"></button>
+<button class="c" aria-selected="{{h4_6}}" onMouseEnter="{{e4_6}}" onClick="{{e4_6}}" aria-label="4 × 6"></button>
+<button class="c" aria-selected="{{h4_7}}" onMouseEnter="{{e4_7}}" onClick="{{e4_7}}" aria-label="4 × 7"></button>
+<button class="c" aria-selected="{{h4_8}}" onMouseEnter="{{e4_8}}" onClick="{{e4_8}}" aria-label="4 × 8"></button>
+<button class="c" aria-selected="{{h4_9}}" onMouseEnter="{{e4_9}}" onClick="{{e4_9}}" aria-label="4 × 9"></button>
+<button class="c" aria-selected="{{h4_10}}" onMouseEnter="{{e4_10}}" onClick="{{e4_10}}" aria-label="4 × 10"></button>
+<button class="c" aria-selected="{{h5_1}}" onMouseEnter="{{e5_1}}" onClick="{{e5_1}}" aria-label="5 × 1"></button>
+<button class="c" aria-selected="{{h5_2}}" onMouseEnter="{{e5_2}}" onClick="{{e5_2}}" aria-label="5 × 2"></button>
+<button class="c" aria-selected="{{h5_3}}" onMouseEnter="{{e5_3}}" onClick="{{e5_3}}" aria-label="5 × 3"></button>
+<button class="c" aria-selected="{{h5_4}}" onMouseEnter="{{e5_4}}" onClick="{{e5_4}}" aria-label="5 × 4"></button>
+<button class="c" aria-selected="{{h5_5}}" onMouseEnter="{{e5_5}}" onClick="{{e5_5}}" aria-label="5 × 5"></button>
+<button class="c" aria-selected="{{h5_6}}" onMouseEnter="{{e5_6}}" onClick="{{e5_6}}" aria-label="5 × 6"></button>
+<button class="c" aria-selected="{{h5_7}}" onMouseEnter="{{e5_7}}" onClick="{{e5_7}}" aria-label="5 × 7"></button>
+<button class="c" aria-selected="{{h5_8}}" onMouseEnter="{{e5_8}}" onClick="{{e5_8}}" aria-label="5 × 8"></button>
+<button class="c" aria-selected="{{h5_9}}" onMouseEnter="{{e5_9}}" onClick="{{e5_9}}" aria-label="5 × 9"></button>
+<button class="c" aria-selected="{{h5_10}}" onMouseEnter="{{e5_10}}" onClick="{{e5_10}}" aria-label="5 × 10"></button>
+<button class="c" aria-selected="{{h6_1}}" onMouseEnter="{{e6_1}}" onClick="{{e6_1}}" aria-label="6 × 1"></button>
+<button class="c" aria-selected="{{h6_2}}" onMouseEnter="{{e6_2}}" onClick="{{e6_2}}" aria-label="6 × 2"></button>
+<button class="c" aria-selected="{{h6_3}}" onMouseEnter="{{e6_3}}" onClick="{{e6_3}}" aria-label="6 × 3"></button>
+<button class="c" aria-selected="{{h6_4}}" onMouseEnter="{{e6_4}}" onClick="{{e6_4}}" aria-label="6 × 4"></button>
+<button class="c" aria-selected="{{h6_5}}" onMouseEnter="{{e6_5}}" onClick="{{e6_5}}" aria-label="6 × 5"></button>
+<button class="c" aria-selected="{{h6_6}}" onMouseEnter="{{e6_6}}" onClick="{{e6_6}}" aria-label="6 × 6"></button>
+<button class="c" aria-selected="{{h6_7}}" onMouseEnter="{{e6_7}}" onClick="{{e6_7}}" aria-label="6 × 7"></button>
+<button class="c" aria-selected="{{h6_8}}" onMouseEnter="{{e6_8}}" onClick="{{e6_8}}" aria-label="6 × 8"></button>
+<button class="c" aria-selected="{{h6_9}}" onMouseEnter="{{e6_9}}" onClick="{{e6_9}}" aria-label="6 × 9"></button>
+<button class="c" aria-selected="{{h6_10}}" onMouseEnter="{{e6_10}}" onClick="{{e6_10}}" aria-label="6 × 10"></button>
+<button class="c" aria-selected="{{h7_1}}" onMouseEnter="{{e7_1}}" onClick="{{e7_1}}" aria-label="7 × 1"></button>
+<button class="c" aria-selected="{{h7_2}}" onMouseEnter="{{e7_2}}" onClick="{{e7_2}}" aria-label="7 × 2"></button>
+<button class="c" aria-selected="{{h7_3}}" onMouseEnter="{{e7_3}}" onClick="{{e7_3}}" aria-label="7 × 3"></button>
+<button class="c" aria-selected="{{h7_4}}" onMouseEnter="{{e7_4}}" onClick="{{e7_4}}" aria-label="7 × 4"></button>
+<button class="c" aria-selected="{{h7_5}}" onMouseEnter="{{e7_5}}" onClick="{{e7_5}}" aria-label="7 × 5"></button>
+<button class="c" aria-selected="{{h7_6}}" onMouseEnter="{{e7_6}}" onClick="{{e7_6}}" aria-label="7 × 6"></button>
+<button class="c" aria-selected="{{h7_7}}" onMouseEnter="{{e7_7}}" onClick="{{e7_7}}" aria-label="7 × 7"></button>
+<button class="c" aria-selected="{{h7_8}}" onMouseEnter="{{e7_8}}" onClick="{{e7_8}}" aria-label="7 × 8"></button>
+<button class="c" aria-selected="{{h7_9}}" onMouseEnter="{{e7_9}}" onClick="{{e7_9}}" aria-label="7 × 9"></button>
+<button class="c" aria-selected="{{h7_10}}" onMouseEnter="{{e7_10}}" onClick="{{e7_10}}" aria-label="7 × 10"></button>
+<button class="c" aria-selected="{{h8_1}}" onMouseEnter="{{e8_1}}" onClick="{{e8_1}}" aria-label="8 × 1"></button>
+<button class="c" aria-selected="{{h8_2}}" onMouseEnter="{{e8_2}}" onClick="{{e8_2}}" aria-label="8 × 2"></button>
+<button class="c" aria-selected="{{h8_3}}" onMouseEnter="{{e8_3}}" onClick="{{e8_3}}" aria-label="8 × 3"></button>
+<button class="c" aria-selected="{{h8_4}}" onMouseEnter="{{e8_4}}" onClick="{{e8_4}}" aria-label="8 × 4"></button>
+<button class="c" aria-selected="{{h8_5}}" onMouseEnter="{{e8_5}}" onClick="{{e8_5}}" aria-label="8 × 5"></button>
+<button class="c" aria-selected="{{h8_6}}" onMouseEnter="{{e8_6}}" onClick="{{e8_6}}" aria-label="8 × 6"></button>
+<button class="c" aria-selected="{{h8_7}}" onMouseEnter="{{e8_7}}" onClick="{{e8_7}}" aria-label="8 × 7"></button>
+<button class="c" aria-selected="{{h8_8}}" onMouseEnter="{{e8_8}}" onClick="{{e8_8}}" aria-label="8 × 8"></button>
+<button class="c" aria-selected="{{h8_9}}" onMouseEnter="{{e8_9}}" onClick="{{e8_9}}" aria-label="8 × 9"></button>
+<button class="c" aria-selected="{{h8_10}}" onMouseEnter="{{e8_10}}" onClick="{{e8_10}}" aria-label="8 × 10"></button>
+</div>
+<div class="size">{{rows}} × {{cols}} <span>(wiersze × kolumny)</span></div>
+<div style="height: 1px; background: var(--color-border);"></div>
+<div class="opt" onClick="{{tHead}}"><span class="chk" role="checkbox" aria-checked="{{head}}"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; stroke-width: 3;"><path d="m5 12 5 5 9-10"/></svg></span>Wiersz nagłówka</div>
+<div class="opt" onClick="{{tFirst}}"><span class="chk" role="checkbox" aria-checked="{{first}}"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; stroke-width: 3;"><path d="m5 12 5 5 9-10"/></svg></span>Pierwsza kolumna jako nagłówek</div>
+<div class="ttl" style="margin-top: 4px;">Linie</div>
+<div class="wt-seg" role="radiogroup" aria-label="Linie"><button role="radio" aria-checked="{{bAll}}" onClick="{{toAll}}">Siatka</button><button role="radio" aria-checked="{{bH}}" onClick="{{toH}}">Poziome</button><button role="radio" aria-checked="{{bNone}}" onClick="{{toNone}}">Brak</button></div>
+<div style="font-size: 11.5px; color: var(--color-text-muted);">Klawiatura: strzałki zmieniają rozmiar, Enter wstawia. Większa tabela: wpisz wymiary niżej.</div>
+<div style="display: flex; gap: 6px; align-items: center; font-size: 12px;"><input class="wt-input" value="{{rows}}" style="width: 52px; height: 28px;" aria-label="Wiersze"> × <input class="wt-input" value="{{cols}}" style="width: 52px; height: 28px;" aria-label="Kolumny"></div>
+</div>
+<div class="r">
+<div class="ttl">Podgląd na stronie</div>
+<div class="paper"><table class="{{bcls}}"><tbody>
+<sc-if value="{{row1}}" hint-placeholder-val="{{true}}"><tr><sc-if value="{{v1_1}}" hint-placeholder-val="{{true}}"><td class="{{cls1_1}}">{{x1_1}}</td></sc-if><sc-if value="{{v1_2}}" hint-placeholder-val="{{true}}"><td class="{{cls1_2}}">{{x1_2}}</td></sc-if><sc-if value="{{v1_3}}" hint-placeholder-val="{{true}}"><td class="{{cls1_3}}">{{x1_3}}</td></sc-if><sc-if value="{{v1_4}}" hint-placeholder-val="{{true}}"><td class="{{cls1_4}}">{{x1_4}}</td></sc-if><sc-if value="{{v1_5}}" hint-placeholder-val="{{true}}"><td class="{{cls1_5}}">{{x1_5}}</td></sc-if><sc-if value="{{v1_6}}" hint-placeholder-val="{{true}}"><td class="{{cls1_6}}">{{x1_6}}</td></sc-if></tr></sc-if>
+<sc-if value="{{row2}}" hint-placeholder-val="{{true}}"><tr><sc-if value="{{v2_1}}" hint-placeholder-val="{{true}}"><td class="{{cls2_1}}">{{x2_1}}</td></sc-if><sc-if value="{{v2_2}}" hint-placeholder-val="{{true}}"><td class="{{cls2_2}}">{{x2_2}}</td></sc-if><sc-if value="{{v2_3}}" hint-placeholder-val="{{true}}"><td class="{{cls2_3}}">{{x2_3}}</td></sc-if><sc-if value="{{v2_4}}" hint-placeholder-val="{{true}}"><td class="{{cls2_4}}">{{x2_4}}</td></sc-if><sc-if value="{{v2_5}}" hint-placeholder-val="{{true}}"><td class="{{cls2_5}}">{{x2_5}}</td></sc-if><sc-if value="{{v2_6}}" hint-placeholder-val="{{true}}"><td class="{{cls2_6}}">{{x2_6}}</td></sc-if></tr></sc-if>
+<sc-if value="{{row3}}" hint-placeholder-val="{{true}}"><tr><sc-if value="{{v3_1}}" hint-placeholder-val="{{true}}"><td class="{{cls3_1}}">{{x3_1}}</td></sc-if><sc-if value="{{v3_2}}" hint-placeholder-val="{{true}}"><td class="{{cls3_2}}">{{x3_2}}</td></sc-if><sc-if value="{{v3_3}}" hint-placeholder-val="{{true}}"><td class="{{cls3_3}}">{{x3_3}}</td></sc-if><sc-if value="{{v3_4}}" hint-placeholder-val="{{true}}"><td class="{{cls3_4}}">{{x3_4}}</td></sc-if><sc-if value="{{v3_5}}" hint-placeholder-val="{{true}}"><td class="{{cls3_5}}">{{x3_5}}</td></sc-if><sc-if value="{{v3_6}}" hint-placeholder-val="{{true}}"><td class="{{cls3_6}}">{{x3_6}}</td></sc-if></tr></sc-if>
+<sc-if value="{{row4}}" hint-placeholder-val="{{true}}"><tr><sc-if value="{{v4_1}}" hint-placeholder-val="{{true}}"><td class="{{cls4_1}}">{{x4_1}}</td></sc-if><sc-if value="{{v4_2}}" hint-placeholder-val="{{true}}"><td class="{{cls4_2}}">{{x4_2}}</td></sc-if><sc-if value="{{v4_3}}" hint-placeholder-val="{{true}}"><td class="{{cls4_3}}">{{x4_3}}</td></sc-if><sc-if value="{{v4_4}}" hint-placeholder-val="{{true}}"><td class="{{cls4_4}}">{{x4_4}}</td></sc-if><sc-if value="{{v4_5}}" hint-placeholder-val="{{true}}"><td class="{{cls4_5}}">{{x4_5}}</td></sc-if><sc-if value="{{v4_6}}" hint-placeholder-val="{{true}}"><td class="{{cls4_6}}">{{x4_6}}</td></sc-if></tr></sc-if>
+<sc-if value="{{row5}}" hint-placeholder-val="{{true}}"><tr><sc-if value="{{v5_1}}" hint-placeholder-val="{{true}}"><td class="{{cls5_1}}">{{x5_1}}</td></sc-if><sc-if value="{{v5_2}}" hint-placeholder-val="{{true}}"><td class="{{cls5_2}}">{{x5_2}}</td></sc-if><sc-if value="{{v5_3}}" hint-placeholder-val="{{true}}"><td class="{{cls5_3}}">{{x5_3}}</td></sc-if><sc-if value="{{v5_4}}" hint-placeholder-val="{{true}}"><td class="{{cls5_4}}">{{x5_4}}</td></sc-if><sc-if value="{{v5_5}}" hint-placeholder-val="{{true}}"><td class="{{cls5_5}}">{{x5_5}}</td></sc-if><sc-if value="{{v5_6}}" hint-placeholder-val="{{true}}"><td class="{{cls5_6}}">{{x5_6}}</td></sc-if></tr></sc-if>
+<sc-if value="{{row6}}" hint-placeholder-val="{{true}}"><tr><sc-if value="{{v6_1}}" hint-placeholder-val="{{true}}"><td class="{{cls6_1}}">{{x6_1}}</td></sc-if><sc-if value="{{v6_2}}" hint-placeholder-val="{{true}}"><td class="{{cls6_2}}">{{x6_2}}</td></sc-if><sc-if value="{{v6_3}}" hint-placeholder-val="{{true}}"><td class="{{cls6_3}}">{{x6_3}}</td></sc-if><sc-if value="{{v6_4}}" hint-placeholder-val="{{true}}"><td class="{{cls6_4}}">{{x6_4}}</td></sc-if><sc-if value="{{v6_5}}" hint-placeholder-val="{{true}}"><td class="{{cls6_5}}">{{x6_5}}</td></sc-if><sc-if value="{{v6_6}}" hint-placeholder-val="{{true}}"><td class="{{cls6_6}}">{{x6_6}}</td></sc-if></tr></sc-if>
+</tbody></table></div>
+<div style="font-size: 11px; color: var(--color-text-faint);">{{more}}</div>
+<div class="ttl">Kod Typst</div>
+<pre>{{code}}</pre>
+<div class="foot"><a href="Main.dc.html" class="wt-btn ghost" style="text-decoration: none;">Anuluj</a><a href="Main.dc.html" class="wt-btn primary" style="text-decoration: none;">Wstaw tabelę {{rows}} × {{cols}}</a></div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+const WT = {
+  get(k, d) { try { return localStorage.getItem('wysityp:' + k) || d; } catch (e) { return d; } },
+  set(k, v) { try { if (v == null) localStorage.removeItem('wysityp:' + k); else localStorage.setItem('wysityp:' + k, v); } catch (e) {} },
+  ui() { const t = WT.get('ui', 'light'); return t === 'dark' ? 'dark' : 'light'; }
+};
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { r: 4, c: 3, head: true, first: false, lines: 'h' };
+  }
+  renderVals() {
+    const s = this.state, theme = WT.ui(), v = {};
+    for (let r = 1; r <= 8; r++) for (let c = 1; c <= 10; c++) {
+      v['h' + r + '_' + c] = r <= s.r && c <= s.c;
+      v['e' + r + '_' + c] = () => this.setState({ r, c });
+    }
+    for (let r = 1; r <= 6; r++) {
+      v['row' + r] = r <= s.r;
+      for (let c = 1; c <= 6; c++) {
+        v['v' + r + '_' + c] = c <= s.c;
+        const hd = (s.head && r === 1) || (s.first && c === 1);
+        v['cls' + r + '_' + c] = hd ? 'hd' : '';
+        v['x' + r + '_' + c] = hd ? (r === 1 ? 'Kol. ' + c : 'W. ' + r) : '·';
+      }
+    }
+    v.rows = s.r; v.cols = s.c;
+    v.more = (s.r > 6 || s.c > 6) ? 'Podgląd pokazuje do 6 × 6 komórek.' : '';
+    v.head = s.head; v.first = s.first;
+    v.tHead = () => this.setState({ head: !this.state.head });
+    v.tFirst = () => this.setState({ first: !this.state.first });
+    v.bAll = s.lines === 'all'; v.bH = s.lines === 'h'; v.bNone = s.lines === 'none';
+    v.toAll = () => this.setState({ lines: 'all' });
+    v.toH = () => this.setState({ lines: 'h' });
+    v.toNone = () => this.setState({ lines: 'none' });
+    v.bcls = s.lines === 'all' ? 'b-all' : s.lines === 'h' ? 'b-h' : '';
+    const stroke = s.lines === 'all' ? '' : s.lines === 'h' ? '\n  stroke: (x: none),' : '\n  stroke: none,';
+    const cells = Array.from({ length: s.c }, () => '[]').join(', ');
+    let body = '';
+    let start = 1;
+    if (s.head) { body += '\n  table.header(' + Array.from({ length: s.c }, (_, i) => '[*Kol. ' + (i + 1) + '*]').join(', ') + '),'; start = 2; }
+    for (let r = start; r <= Math.min(s.r, start + 1); r++) body += '\n  ' + cells + ',';
+    if (s.r > start + 1) body += '\n  // … jeszcze ' + (s.r - start - 1) + ' wiersz(e)';
+    v.code = '#table(\n  columns: ' + s.c + ',' + stroke + body + '\n)';
+    v.theme = theme; v.yes = true;
+    return v;
+  }
+}
+</script>
+</body>
+</html>
