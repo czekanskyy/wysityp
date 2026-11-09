@@ -1,0 +1,20 @@
+<!-- @dsCard group="Edytor" height=640 subtitle="Treść notatki: proza, matematyka, kod" -->
+<!doctype html>
+<html lang="pl">
+<head><meta charset="utf-8"><title>NoteTypography</title></head>
+<body class="wt">
+<article class="wt-note">
+<h1>Całka Riemanna</h1>
+<p>Niech funkcja będzie <strong>ograniczona</strong> na przedziale domkniętym, <span class="wt-mi-inline">f : [a, b] → ℝ</span>. Jeśli jest ciągła, zachodzi podstawowe twierdzenie rachunku całkowego:</p>
+<span class="wt-mi-block">∫<sub>a</sub><sup>b</sup> f(x) dx = F(b) − F(a)</span>
+<p>W źródle Typst: <span class="wt-mi-source">$integral_a^b f(x) dif x$</span></p>
+<ul><li>funkcja pierwotna spełnia <span class="wt-mi-inline">F′ = f</span>,</li><li>całka nie zależy od wyboru <mark>funkcji pierwotnej</mark>.</li></ul>
+<blockquote>„Całka to granica sum, a nie pole – pole to tylko interpretacja.”</blockquote>
+<p>Przybliżenie numeryczne, funkcja <code>integrate()</code>:</p>
+<pre><code>def integrate(f, a, b, n=1000):
+    h = (b - a) / n
+    return h * sum(f(a + i * h) for i in range(n))</code></pre>
+<p><span class="wt-markup">== </span>Zbieżność · <span class="wt-err">$x^2 +$</span> <span style="font:13px var(--font-ui);color:var(--color-text-muted)">← niedomknięty wzór zostaje źródłem z błędem</span></p>
+</article>
+</body>
+</html>

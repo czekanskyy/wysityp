@@ -41,14 +41,56 @@ export function createEditor(
             onChange(update.state.doc.toString());
           }
         }),
+        // Colours and fonts come from the design tokens (src/styles), so the
+        // editor follows the light and dark theme without its own palette.
         EditorView.theme({
-          "&": { height: "100%", fontSize: "14px" },
-          ".cm-scroller": {
-            fontFamily: "Consolas, 'Cascadia Mono', monospace",
-            lineHeight: "1.55",
+          "&": {
+            height: "100%",
+            fontSize: "14px",
+            color: "var(--color-text)",
+            backgroundColor: "var(--color-surface-raised)",
           },
-          ".cm-content": { padding: "16px 0" },
+          ".cm-scroller": {
+            fontFamily: "var(--font-mono)",
+            lineHeight: "var(--leading-code)",
+          },
+          ".cm-content": {
+            padding: "16px 0",
+            caretColor: "var(--color-accent)",
+          },
+          ".cm-cursor, .cm-dropCursor": {
+            borderLeftColor: "var(--color-accent)",
+          },
           "&.cm-focused": { outline: "none" },
+          ".cm-gutters": {
+            backgroundColor: "var(--color-surface-raised)",
+            color: "var(--color-text-faint)",
+            border: "none",
+          },
+          ".cm-activeLine": { backgroundColor: "var(--color-hover)" },
+          ".cm-activeLineGutter": {
+            backgroundColor: "var(--color-hover)",
+            color: "var(--color-text-muted)",
+          },
+          "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
+            { backgroundColor: "var(--color-selection)" },
+          ".cm-selectionMatch": {
+            backgroundColor: "var(--color-accent-soft)",
+          },
+          "&.cm-focused .cm-matchingBracket": {
+            backgroundColor: "var(--color-accent-soft)",
+            outline: "1px solid var(--color-border-strong)",
+          },
+          ".cm-panels": {
+            backgroundColor: "var(--color-bg)",
+            color: "var(--color-text)",
+          },
+          ".cm-tooltip": {
+            backgroundColor: "var(--color-surface-raised)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-md)",
+            boxShadow: "var(--shadow-md)",
+          },
         }),
         keymap.of([]),
       ],

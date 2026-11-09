@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>WYSITyp – szukaj i zamień</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/wysityppapier/tokens.css">
+<link rel="stylesheet" href="ds/wysityppapier/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.hit{background:var(--color-highlight);color:inherit;border-radius:2px;padding:0 1px}
+.hit.cur{outline:2px solid var(--color-accent);outline-offset:0}
+.del{background:var(--color-danger-soft);color:var(--color-danger);text-decoration:line-through;border-radius:2px;padding:0 1px}
+.ins{background:var(--color-success-soft);color:var(--color-success);border-radius:2px;padding:0 1px}
+.res{display:flex;align-items:baseline;gap:8px;padding:3px 8px 3px 30px;border-radius:5px;font:12.5px/1.45 var(--font-ui);color:var(--color-text-muted)}
+.res:hover{background:var(--color-hover)}
+.res .ln{flex:none;width:22px;text-align:right;font:11px var(--font-mono);color:var(--color-text-faint)}
+.res .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--color-text)}
+.fileh{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border-radius:5px;font:500 13px var(--font-ui)}
+.fileh .path{font-weight:400;font-size:12px;color:var(--color-text-muted)}
+.fileh .cnt{margin-left:auto;min-width:20px;padding:0 6px;border-radius:999px;background:var(--color-surface-sunken);font:600 11px/18px var(--font-ui);text-align:center;color:var(--color-text-muted)}
+.tog{display:inline-grid;place-items:center;width:24px;height:22px;border:0;border-radius:4px;background:transparent;color:var(--color-text-muted);font:600 11px var(--font-mono);cursor:pointer}
+.tog[aria-pressed="true"]{background:var(--color-accent-soft);color:var(--color-accent-soft-text);box-shadow:inset 0 0 0 1px var(--color-accent)}
+.inbox{position:relative;display:flex;align-items:center;gap:2px;height:30px;padding:0 4px 0 8px;background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:7px}
+.inbox.focus{border-color:var(--color-focus-ring);box-shadow:0 0 0 3px var(--color-accent-soft)}
+.inbox input{flex:1;min-width:0;border:0;background:none;font:13px var(--font-ui);color:var(--color-text);outline:none}
+.lab{font:600 11px var(--font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-muted)}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="width: 1280px; height: 800px; display: flex; overflow: hidden; background: var(--color-bg); color: var(--color-text); font-family: var(--font-ui); font-size: 13px;">
+
+<aside aria-label="Szukaj i zamień" style="flex: none; width: 360px; height: 800px; display: flex; flex-direction: column; background: var(--color-bg); border-right: 1px solid var(--color-border);">
+<div style="display: flex; align-items: center; gap: 8px; padding: 12px 12px 4px;">
+<a href="Main.dc.html" class="wt-ibtn sm" aria-label="Wróć do notatek" title="Wróć do notatek (Esc)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></a>
+<h2 style="margin: 0; flex: 1; font: 600 14px var(--font-ui);">Szukaj w notatkach</h2>
+<span class="wt-kbd"><kbd>Ctrl</kbd><kbd>⇧</kbd><kbd>F</kbd></span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 8px 12px 12px; border-bottom: 1px solid var(--color-border);">
+<div style="display: flex; gap: 4px; align-items: flex-start;">
+<button class="wt-ibtn sm" aria-label="Pokaż zamianę" aria-expanded="{{replaceOpen}}" onClick="{{toggleReplace}}" style="margin-top: 1px;"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true" style="{{chev}}"><path d="m9 6 6 6-6 6"/></svg></button>
+<div style="flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0;">
+<div class="inbox focus">
+<label for="q" style="position: absolute; clip-path: inset(50%);">Szukaj</label>
+<input id="q" value="całk" aria-label="Szukaj">
+<button class="tog" aria-pressed="{{caseOn}}" onClick="{{toggleCase}}" title="Uwzględniaj wielkość liter">Aa</button>
+<button class="tog" aria-pressed="{{wordOn}}" onClick="{{toggleWord}}" title="Całe wyrazy" style="text-decoration: underline;">ab</button>
+<button class="tog" aria-pressed="{{regexOn}}" onClick="{{toggleRegex}}" title="Wyrażenie regularne">.*</button>
+<button class="tog" aria-pressed="{{accentOn}}" onClick="{{toggleAccent}}" title="Ignoruj polskie znaki (ł = l, ą = a)">ąa</button>
+</div>
+<sc-if value="{{replaceOpen}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; gap: 4px;">
+<div class="inbox" style="flex: 1;">
+<label for="r" style="position: absolute; clip-path: inset(50%);">Zamień na</label>
+<input id="r" value="całkowanie" aria-label="Zamień na">
+<button class="tog" aria-pressed="false" title="Zachowaj wielkość liter">AB</button>
+</div>
+<button class="wt-ibtn sm" aria-label="Zamień bieżące" title="Zamień bieżące (Ctrl+Shift+1)" style="width: 30px; height: 30px; border: 1px solid var(--color-border); background: var(--color-surface-raised);"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11l-3-3"/><path d="M20 17H9l3 3"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Zamień wszystkie" title="Zamień wszystkie (Ctrl+Alt+Enter)" style="width: 30px; height: 30px; border: 1px solid var(--color-border); background: var(--color-surface-raised);"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11l-3-3"/><path d="M20 17H9l3 3"/><path d="M4 12h16"/></svg></button>
+</div>
+</sc-if>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; padding-left: 32px;">
+<span class="lab">Szukaj w</span>
+<div class="wt-seg" role="radiogroup" aria-label="Szukaj w" style="align-self: flex-start;">
+<button role="radio" aria-checked="{{scopeAll}}" onClick="{{scopeToAll}}">Nazwy i treść</button>
+<button role="radio" aria-checked="{{scopeNames}}" onClick="{{scopeToNames}}">Tylko nazwy</button>
+<button role="radio" aria-checked="{{scopeText}}" onClick="{{scopeToText}}">Tylko treść</button>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
+<span class="lab" style="margin-right: 4px;">Foldery</span>
+<span class="wt-tag" style="--fg: var(--tag-blue-fg); --bg: var(--tag-blue-bg);">Analiza matematyczna<span class="x"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg></span></span>
+<button class="wt-btn ghost sm" style="height: 22px;"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Dodaj</button>
+</div>
+<label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-muted);"><input type="checkbox" checked style="accent-color: var(--color-accent); margin: 0;"> Szukaj też we wzorach i kodzie</label>
+</div>
+</div>
+
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 4px; font-size: 12px; color: var(--color-text-muted);">
+<span>14 trafień w 5 notatkach · 2 nazwy</span>
+<span style="display: flex; gap: 2px;">
+<button class="wt-ibtn sm" aria-label="Zwiń wszystko"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5-5 5 5"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Otwórz wyniki jako notatkę"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></button>
+</span>
+</div>
+
+<div style="flex: 1; overflow: hidden; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 2px;">
+<sc-if value="{{showNames}}" hint-placeholder-val="{{true}}">
+<div class="lab" style="padding: 6px 8px 2px;">Nazwy folderów i plików</div>
+<div class="fileh"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--color-text-muted);"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/></svg><span>Wykład 7 – <span class="hit">całk</span>a Riemanna</span></div>
+<div class="fileh"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--color-text-muted);"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/></svg><span><span class="hit">Całk</span>i niewłaściwe</span><span class="path">Analiza / Lista 5</span></div>
+</sc-if>
+<sc-if value="{{showText}}" hint-placeholder-val="{{true}}">
+<div class="lab" style="padding: 10px 8px 2px;">Treść</div>
+<div class="fileh"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--color-text-faint);"><path d="m6 9 6 6 6-6"/></svg>Wykład 7 – całka Riemanna<span class="cnt">6</span></div>
+<div class="res"><span class="ln">4</span><span class="tx">= <span class="del">Całk</span><span class="ins">Całkowanie</span>a Riemanna</span></div>
+<div class="res" style="background: var(--color-accent-soft);"><span class="ln">8</span><span class="tx">…podstawowe twierdzenie rachunku <span class="hit cur">całk</span>owego</span></div>
+<div class="res"><span class="ln">12</span><span class="tx"><span class="hit">całk</span>a nie zależy od wyboru funkcji…</span></div>
+<div class="res"><span class="ln">15</span><span class="tx">„<span class="hit">Całk</span>a to granica sum, a nie pole…”</span></div>
+<div class="fileh"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--color-text-faint);"><path d="m6 9 6 6 6-6"/></svg>Ćwiczenia 3<span class="cnt">4</span></div>
+<div class="res"><span class="ln">2</span><span class="tx"><span class="hit">Całk</span>owanie przez podstawienie, t = x²</span></div>
+<div class="res"><span class="ln">9</span><span class="tx">$ integral_0^1 x e^(x^2) dif x $ – <span class="hit">całk</span>a oznaczona</span></div>
+<div class="fileh"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--color-text-faint);"><path d="m9 6 6 6-6 6"/></svg>Lista 4 – szeregi<span class="cnt">2</span></div>
+<div class="fileh"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--color-text-faint);"><path d="m9 6 6 6-6 6"/></svg>Wykład 6 – pochodne<span class="cnt">1</span></div>
+<div class="fileh"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--color-text-faint);"><path d="m9 6 6 6-6 6"/></svg>Kinematyka – notatki<span class="path">Fizyka</span><span class="cnt">1</span></div>
+</sc-if>
+</div>
+</aside>
+
+<main style="flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-surface);">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 44px; padding: 0 16px; font-size: 13px; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border);">
+<span>Analiza matematyczna › <strong style="color: var(--color-text); font-weight: 500;">Wykład 7 – całka Riemanna</strong></span>
+<span style="display: flex; align-items: center; gap: 6px;">Trafienie 2 z 14
+<button class="wt-ibtn sm" aria-label="Poprzednie trafienie" title="Poprzednie (Shift+F3)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Następne trafienie" title="Następne (F3)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+</span>
+</div>
+<div style="flex: 1; overflow: hidden;">
+<article class="wt-note" style="padding: 40px 48px;">
+<h1><span class="del">Całk</span><span class="ins">Całkowanie</span>a Riemanna</h1>
+<p>Niech funkcja będzie <strong>ograniczona</strong> na przedziale domkniętym, <span class="wt-mi-inline">f : [a, b] → ℝ</span>. Jeśli jest ciągła, zachodzi podstawowe twierdzenie rachunku <span class="hit cur">całk</span>owego:</p>
+<span class="wt-mi-block">∫<sub>a</sub><sup>b</sup> f(x) dx = F(b) − F(a)</span>
+<ul>
+<li>funkcja pierwotna spełnia <span class="wt-mi-inline">F′ = f</span>,</li>
+<li><span class="hit">całk</span>a nie zależy od wyboru funkcji pierwotnej.</li>
+</ul>
+<blockquote>„<span class="hit">Całk</span>a to granica sum, a nie pole – pole to tylko interpretacja.”</blockquote>
+</article>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+const WT = {
+  get(k, d) { try { return localStorage.getItem('wysityp:' + k) || d; } catch (e) { return d; } },
+  set(k, v) { try { if (v == null) localStorage.removeItem('wysityp:' + k); else localStorage.setItem('wysityp:' + k, v); } catch (e) {} },
+  ui() { const t = WT.get('ui', 'light'); return t === 'dark' ? 'dark' : 'light'; }
+};
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { replaceOpen: true, caseOn: false, wordOn: false, regexOn: false, accentOn: true, scope: 'all' };
+  }
+  renderVals() {
+    const theme = WT.ui();
+    const s = this.state;
+    const flip = (k) => () => this.setState({ [k]: !this.state[k] });
+    return {
+      theme,
+      replaceOpen: s.replaceOpen,
+      chev: s.replaceOpen ? 'transform: rotate(90deg)' : '',
+      caseOn: s.caseOn, wordOn: s.wordOn, regexOn: s.regexOn, accentOn: s.accentOn,
+      toggleReplace: flip('replaceOpen'), toggleCase: flip('caseOn'), toggleWord: flip('wordOn'), toggleRegex: flip('regexOn'), toggleAccent: flip('accentOn'),
+      scopeAll: s.scope === 'all', scopeNames: s.scope === 'names', scopeText: s.scope === 'text',
+      showNames: s.scope !== 'text', showText: s.scope !== 'names',
+      scopeToAll: () => this.setState({ scope: 'all' }),
+      scopeToNames: () => this.setState({ scope: 'names' }),
+      scopeToText: () => this.setState({ scope: 'text' })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>WYSITyp Papier</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--color-bg); color: var(--color-text); font-family: var(--font-ui); overflow: hidden; }
+  .cover { position: relative; width: 960px; height: 288px; overflow: hidden; }
+  .art { position: absolute; top: 0; left: 480px; width: 480px; height: 288px; }
+  .art svg { display: block; width: 480px; height: 288px; }
+  .paper { fill: var(--color-surface); stroke: var(--color-border); stroke-width: 1; }
+  .ink { fill: var(--color-accent); }
+  .deep { fill: var(--color-text); }
+  .math { fill: var(--color-math); }
+  .mark { fill: var(--color-highlight); }
+  .rule { stroke: var(--color-border-strong); stroke-width: 1; }
+  .margin { stroke: var(--color-accent); stroke-width: 1; }
+  .lg { rx: var(--radius-lg); }
+  .md { rx: var(--radius-md); }
+  .sm { rx: var(--radius-sm); }
+  .words { position: absolute; left: var(--space-8); bottom: var(--space-8); max-width: 440px; }
+  .name { margin: 0; font-family: var(--font-prose); font-size: 72px; line-height: .95; font-weight: 700; letter-spacing: -.01em; color: var(--color-text); }
+  .tag { margin: var(--space-2) 0 0 2px; font-size: 14px; line-height: 20px; color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+<div class="art" aria-hidden="true">
+<svg viewBox="0 0 480 288" width="480" height="288">
+<!--
+  blocks      color-surface sheet 272×304 bled off top and bottom (the page) · color-accent 112×200 slab (the one ink) · color-text 96×96 · color-math 64×136 (formulas) · color-highlight 72×24 once (a marker stroke) — about a third of 960×288
+  arrangement one tall paper sheet with the ink slab standing beside it and satellites cut into the sheet, edges on space-4 and space-6 steps
+  pattern     ruled notebook lines: README says "the page is the product" and the note is a sheet of paper; five hairlines in color-border-strong at a space-8 pitch across the sheet, one margin line in color-accent
+  scales      sides in space-2 multiples; gutters space-4; pitch space-8 (32px); corners radius-lg sheet and slab, radius-md math, radius-sm marker
+-->
+<rect class="paper lg" x="24" y="-16" width="272" height="320" rx="10"/>
+<line class="rule" x1="24" y1="72" x2="296" y2="72"/>
+<line class="rule" x1="24" y1="104" x2="296" y2="104"/>
+<line class="rule" x1="24" y1="136" x2="296" y2="136"/>
+<line class="rule" x1="24" y1="168" x2="296" y2="168"/>
+<line class="rule" x1="24" y1="200" x2="296" y2="200"/>
+<line class="margin" x1="72" y1="-16" x2="72" y2="304"/>
+<rect class="mark sm" x="96" y="80" width="72" height="24" rx="5"/>
+<rect class="math md" x="200" y="112" width="64" height="136" rx="7"/>
+<rect class="ink lg" x="312" y="56" width="112" height="200" rx="10"/>
+<rect class="deep md" x="440" y="168" width="96" height="96" rx="7"/>
+</svg>
+</div>
+<div class="words">
+<p class="name">WYSITyp Papier</p>
+<p class="tag">Notatki w Typst, które czyta się jak kartkę z wykładu.</p>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,236 @@
+/*
+ * Base layer: document defaults, focus, selection, scrollbars, and the
+ * typography of a note. Reads only tokens.css.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: var(--leading-ui);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--color-selection);
+}
+
+/* One focus look everywhere. Only for keyboard focus. */
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Thin, quiet scrollbars that still show on hover. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Note typography                                                     */
+/* The writing surface and any rendered preview of a note use this.  */
+/* ------------------------------------------------------------------ */
+
+.note-prose {
+  max-width: var(--note-measure);
+  margin-inline: auto;
+  font-family: var(--font-prose);
+  font-size: var(--note-text);
+  line-height: var(--leading-note);
+  color: var(--color-text);
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  hyphens: auto;
+}
+
+.note-prose :where(h1, h2, h3, h4) {
+  font-family: var(--font-prose);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-bold);
+  margin: 1.6em 0 0.5em;
+}
+
+.note-prose h1 {
+  font-size: var(--note-h1);
+  margin-top: 0.4em;
+}
+
+.note-prose h2 {
+  font-size: var(--note-h2);
+}
+
+.note-prose h3 {
+  font-size: var(--note-h3);
+}
+
+.note-prose h4 {
+  font-size: var(--note-h4);
+}
+
+.note-prose p {
+  margin: 0 0 0.85em;
+}
+
+.note-prose :where(ul, ol) {
+  margin: 0 0 0.85em;
+  padding-left: 1.5em;
+}
+
+.note-prose li {
+  margin: 0.2em 0;
+}
+
+.note-prose li::marker {
+  color: var(--color-text-muted);
+}
+
+.note-prose blockquote {
+  margin: 0 0 0.85em;
+  padding: 0.1em 0 0.1em 1em;
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.note-prose strong {
+  font-weight: var(--weight-bold);
+}
+
+.note-prose mark {
+  background: var(--color-highlight);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 0.1em;
+}
+
+.note-prose a {
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+/* Inline code: `x` in Typst. */
+.note-prose code,
+.note-code-inline {
+  font-family: var(--font-mono);
+  font-size: var(--code-scale);
+  color: var(--color-code-text);
+  background: var(--color-code-bg);
+  border-radius: var(--radius-xs);
+  padding: 0.1em 0.3em;
+  font-variant-ligatures: none;
+}
+
+/* Code block: ```lang ...``` in Typst. */
+.note-prose pre,
+.note-code-block {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: var(--leading-code);
+  color: var(--color-code-text);
+  background: var(--color-code-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  margin: 0 0 1em;
+  overflow-x: auto;
+  tab-size: 2;
+  hyphens: none;
+}
+
+.note-prose pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* Inline math: $x^2$ in Typst. Kept on the line, never broken. */
+.note-math-inline {
+  font-family: var(--font-math);
+  font-size: var(--math-scale);
+  font-variant-numeric: lining-nums;
+  white-space: nowrap;
+  border-radius: var(--radius-xs);
+  padding: 0 0.12em;
+}
+
+/* Block math: $ x^2 $ with spaces in Typst. Centred, scrolls if wide. */
+.note-math-block {
+  display: block;
+  font-family: var(--font-math);
+  font-size: 1.15em;
+  font-variant-numeric: lining-nums;
+  text-align: center;
+  margin: 0.6em 0 1em;
+  padding: var(--space-2) var(--space-3);
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+}
+
+/* A math span that is open as source, or hovered: show its edges. */
+.note-math-inline:hover,
+.note-math-block:hover,
+.note-math-source {
+  background: var(--color-math-soft);
+}
+
+.note-math-source {
+  font-family: var(--font-mono);
+  font-size: var(--code-scale);
+  color: var(--color-math);
+}
+
+/* Typst markers left visible as source (= - + / > $ #). */
+.note-markup {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--color-markup);
+}
+
+/* An error under a span. Wavy, like spell checking, plus colour. */
+.note-error {
+  text-decoration: underline wavy var(--color-danger);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 0.2em;
+}
+
+.note-warning {
+  text-decoration: underline wavy var(--color-warning);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 0.2em;
+}
