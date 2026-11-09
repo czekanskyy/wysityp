@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>WYSITyp – wstaw kształt</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/wysityppapier/tokens.css">
+<link rel="stylesheet" href="ds/wysityppapier/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.scrim{position:absolute;inset:0;background:var(--color-overlay)}
+.dlg{position:absolute;left:110px;top:70px;width:1060px;height:660px;background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:14px;box-shadow:var(--shadow-lg);display:grid;grid-template-rows:auto minmax(0,1fr) auto;font:13px var(--font-ui);color:var(--color-text);overflow:hidden}
+.hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--color-border)}
+.cols{display:grid;grid-template-columns:232px minmax(0,1fr) 268px;min-height:0}
+.lib{padding:12px;border-right:1px solid var(--color-border);display:flex;flex-direction:column;gap:6px;overflow:hidden;background:var(--color-surface-sunken)}
+.ttl{font:600 11px var(--font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-muted);margin-top:4px}
+.shps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.shp{display:flex;align-items:center;gap:8px;height:34px;padding:0 8px;border:1px solid transparent;border-radius:7px;background:transparent;font:12.5px var(--font-ui);color:var(--color-text);cursor:pointer;text-align:left;min-width:0}
+.shp span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shp:hover{background:var(--color-hover)}
+.shp[aria-pressed="true"]{background:var(--color-accent-soft);border-color:var(--color-accent);color:var(--color-accent-soft-text)}
+.stage{padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.page{flex:1;border:1px solid var(--color-border);border-radius:8px;background-color:var(--color-surface);background-image:radial-gradient(var(--color-border) 1px,transparent 1px);background-size:16px 16px;display:grid;place-items:center;position:relative}
+.page svg{width:420px;height:290px;fill:none;stroke:var(--sk);stroke-width:var(--sw);stroke-linejoin:round;stroke-linecap:round}
+.page .f{fill:var(--fl)}
+.page .pt{fill:var(--sk)}
+.page .dash{stroke-dasharray:5 5;stroke-width:1;opacity:.7}
+.page .acc{stroke:var(--color-accent)}
+.page text{fill:var(--color-text);stroke:none;font:italic 15px var(--font-math)}
+.page text.acc{fill:var(--color-accent-text)}
+.handles{position:absolute;inset:36px 60px;border:1px dashed var(--color-accent);border-radius:2px;pointer-events:none}
+.handles i{position:absolute;width:8px;height:8px;background:var(--color-surface);border:1.5px solid var(--color-accent);border-radius:2px}
+pre{margin:0;padding:10px 12px;border-radius:7px;background:var(--color-code-bg);color:var(--color-code-text);font:11.5px/1.5 var(--font-mono);white-space:pre-wrap}
+.props{padding:14px;border-left:1px solid var(--color-border);display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px}
+.sws{display:flex;gap:6px}
+.sw{width:22px;height:22px;border-radius:50%;border:1px solid var(--color-border-strong);cursor:pointer;padding:0}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 2px var(--color-surface-raised),0 0 0 4px var(--color-accent)}
+.num{display:flex;align-items:center;gap:6px}
+.num .wt-input{width:64px;height:28px}
+.ft{display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--color-border)}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="position: relative; width: 1280px; height: 800px; overflow: hidden;">
+<dc-import name="Main" theme="{{theme}}" fixed="{{yes}}" view="rendered" hint-size="1280px,800px"></dc-import>
+<div class="scrim"></div>
+<div class="dlg" role="dialog" aria-label="Wstaw kształt" style="--sk: {{stroke}}; --fl: {{fill}}; --sw: {{width}};">
+<div class="hd"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="5"/><path d="M13 4h7v7h-7z"/></svg><b style="font-size: 14px;">Wstaw kształt</b><div class="wt-search" style="margin-left: auto; width: 260px;"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.5-4.5"/></svg><span>Szukaj kształtu…</span></div><a href="Main.dc.html" class="wt-ibtn sm" aria-label="Zamknij"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></a></div>
+<div class="cols">
+<div class="lib">
+<div class="ttl">Linie</div><div class="shps"><button class="shp" aria-pressed="{{s_seg}}" onClick="{{p_seg}}"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18 20 6"/><circle cx="4" cy="18" r="1.4"/><circle cx="20" cy="6" r="1.4"/></svg><span>Odcinek</span></button><button class="shp" aria-pressed="{{s_arrow}}" onClick="{{p_arrow}}"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18 19 7"/><path d="M13 6.5h6.5V13"/></svg><span>Strzałka / wektor</span></button><button class="shp" aria-pressed="{{s_arc}}" onClick="{{p_arc}}"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18a9 9 0 0 1 14-10"/></svg><span>Łuk</span></button></div>
+<div class="ttl">Wielokąty</div><div class="shps"><button class="shp" aria-pressed="{{s_rect}}" onClick="{{p_rect}}"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="1"/></svg><span>Prostokąt</span></button><button class="shp" aria-pressed="{{s_square}}" onClick="{{p_square}}"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1"/></svg><span>Kwadrat</span></button><button class="shp" aria-pressed="{{s_tri}}" onClick="{{p_tri}}"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 21 19H3z"/></svg><span>Trójkąt</span></button><button class="shp" aria-pressed="{{s_poly}}" onClick="{{p_poly}}"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 20 9.3l-3 9.2H7L4 9.3z"/></svg><span>Wielokąt foremny</span></button></div>
+<div class="ttl">Krzywe</div><div class="shps"><button class="shp" aria-pressed="{{s_circle}}" onClick="{{p_circle}}"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg><span>Okrąg</span></button><button class="shp" aria-pressed="{{s_ellipse}}" onClick="{{p_ellipse}}"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg><span>Elipsa</span></button></div>
+<div class="ttl">Geometria</div><div class="shps"><button class="shp" aria-pressed="{{s_angle}}" onClick="{{p_angle}}"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M4 19 15 6"/><path d="M10 19a6 6 0 0 0-2-4.5"/></svg><span>Kąt</span></button><button class="shp" aria-pressed="{{s_axes}}" onClick="{{p_axes}}"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4M4 20h16"/><path d="m2.5 6 1.5-2 1.5 2M18 18.5l2 1.5-2 1.5"/></svg><span>Układ współrzędnych</span></button><button class="shp" aria-pressed="{{s_plot}}" onClick="{{p_plot}}"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V4M3 20h18"/><path d="M5 17c4 0 5-10 8-10s4 6 7 6" class="nf"/></svg><span>Wykres funkcji</span></button></div>
+<div style="margin-top: auto; font-size: 11px; color: var(--color-text-muted); line-height: 1.45;">Kąt, układ i wykres korzystają z pakietu CeTZ – instaluje się sam przy pierwszym użyciu i zostaje w pamięci offline.</div>
+</div>
+<div class="stage">
+<div class="page">
+<svg viewBox="0 0 320 220" aria-label="Podgląd kształtu">
+<sc-if value="{{s_seg}}" hint-placeholder-val="{{false}}"><g><path d="M60 170 260 50"/><circle cx="60" cy="170" r="4" class="pt"/><circle cx="260" cy="50" r="4" class="pt"/><text x="44" y="192">A</text><text x="266" y="44">B</text></g></sc-if>
+<sc-if value="{{s_arrow}}" hint-placeholder-val="{{false}}"><g><path d="M60 170 252 56"/><path d="m226 52 28 2-12 26" class="nf"/><text x="150" y="98">v⃗</text></g></sc-if>
+<sc-if value="{{s_arc}}" hint-placeholder-val="{{false}}"><g><path d="M80 170a110 110 0 0 1 170-90" class="nf"/></g></sc-if>
+<sc-if value="{{s_rect}}" hint-placeholder-val="{{false}}"><g><rect x="60" y="55" width="200" height="120" class="f"/><text x="152" y="194">a</text><text x="268" y="120">b</text></g></sc-if>
+<sc-if value="{{s_square}}" hint-placeholder-val="{{false}}"><g><rect x="100" y="45" width="130" height="130" class="f"/><text x="160" y="194">a</text></g></sc-if>
+<sc-if value="{{s_tri}}" hint-placeholder-val="{{true}}"><g><path d="M80 175 260 175 130 50z" class="f"/><text x="64" y="192">A</text><text x="266" y="192">B</text><text x="124" y="40">C</text><path d="M80 175v-0" /><path d="M130 50v125" class="dash"/><text x="136" y="130">h</text></g></sc-if>
+<sc-if value="{{s_poly}}" hint-placeholder-val="{{false}}"><g><path d="M160 40 236 95 207 185H113L84 95z" class="f"/></g></sc-if>
+<sc-if value="{{s_circle}}" hint-placeholder-val="{{false}}"><g><circle cx="160" cy="112" r="78" class="f"/><circle cx="160" cy="112" r="3" class="pt"/><path d="M160 112h78" class="dash"/><text x="192" y="104">r</text><text x="146" y="130">S</text></g></sc-if>
+<sc-if value="{{s_ellipse}}" hint-placeholder-val="{{false}}"><g><ellipse cx="160" cy="112" rx="110" ry="66" class="f"/><path d="M50 112h220M160 46v132" class="dash"/></g></sc-if>
+<sc-if value="{{s_angle}}" hint-placeholder-val="{{false}}"><g><path d="M70 180h210M70 180 220 50" class="nf"/><path d="M130 180a60 60 0 0 0-15-40" class="nf acc"/><text x="138" y="160" class="acc">α</text></g></sc-if>
+<sc-if value="{{s_axes}}" hint-placeholder-val="{{false}}"><g><path d="M40 112h250M160 200V24" class="nf"/><path d="m282 107 8 5-8 5M155 32l5-8 5 8" class="nf"/><path d="M100 109v6M220 109v6M157 52h6M157 172h6" class="nf"/><text x="280" y="132">x</text><text x="168" y="34">y</text><text x="146" y="130">0</text></g></sc-if>
+<sc-if value="{{s_plot}}" hint-placeholder-val="{{false}}"><g><path d="M40 180h250M60 200V24" class="nf"/><path d="M60 170C110 168 120 40 170 40s70 100 110 100" class="nf acc"/><text x="210" y="60" class="acc">f(x) = x·e⁻ˣ</text></g></sc-if>
+</svg>
+<div class="handles"><i style="left: -5px; top: -5px;"></i><i style="right: -5px; top: -5px;"></i><i style="left: -5px; bottom: -5px;"></i><i style="right: -5px; bottom: -5px;"></i><i style="left: calc(50% - 4px); top: -5px;"></i><i style="left: calc(50% - 4px); bottom: -5px;"></i></div>
+</div>
+<pre>{{code}}</pre>
+</div>
+<div class="props">
+<div class="ttl" style="margin-top: 0;">{{label}}</div>
+<div class="row">Kontur<div class="sws">
+<button class="sw" style="background: var(--color-text);" aria-label="Atrament" aria-pressed="{{sk0}}" onClick="{{toSk0}}"></button>
+<button class="sw" style="background: var(--color-accent);" aria-label="Niebieski" aria-pressed="{{sk1}}" onClick="{{toSk1}}"></button>
+<button class="sw" style="background: var(--tag-red-fg);" aria-label="Czerwony" aria-pressed="{{sk2}}" onClick="{{toSk2}}"></button>
+<button class="sw" style="background: var(--tag-green-fg);" aria-label="Zielony" aria-pressed="{{sk3}}" onClick="{{toSk3}}"></button>
+</div></div>
+<div class="row">Grubość<div class="wt-seg" role="radiogroup" aria-label="Grubość"><button role="radio" aria-checked="{{w1}}" onClick="{{toW1}}">0,5 pt</button><button role="radio" aria-checked="{{w2}}" onClick="{{toW2}}">1 pt</button><button role="radio" aria-checked="{{w3}}" onClick="{{toW3}}">2 pt</button></div></div>
+<div class="row">Styl linii<div class="wt-seg" role="radiogroup" aria-label="Styl linii"><button role="radio" aria-checked="true">───</button><button role="radio" aria-checked="false">- - -</button><button role="radio" aria-checked="false">· · ·</button></div></div>
+<div class="row">Wypełnienie<div class="sws">
+<button class="sw" style="background: var(--color-surface);" aria-label="Brak" aria-pressed="{{fl0}}" onClick="{{toFl0}}"></button>
+<button class="sw" style="background: var(--color-accent-soft);" aria-label="Niebieskie" aria-pressed="{{fl1}}" onClick="{{toFl1}}"></button>
+<button class="sw" style="background: var(--tag-amber-bg);" aria-label="Bursztynowe" aria-pressed="{{fl2}}" onClick="{{toFl2}}"></button>
+<button class="sw" style="background: var(--tag-green-bg);" aria-label="Zielone" aria-pressed="{{fl3}}" onClick="{{toFl3}}"></button>
+</div></div>
+<div style="height: 1px; background: var(--color-border);"></div>
+<div class="row">Rozmiar<div class="num"><input class="wt-input" value="5 cm" aria-label="Szerokość">×<input class="wt-input" value="3 cm" aria-label="Wysokość"></div></div>
+<div class="row">Opisy wierzchołków<div class="wt-seg" role="radiogroup" aria-label="Opisy"><button role="radio" aria-checked="true">A, B, C</button><button role="radio" aria-checked="false">Brak</button></div></div>
+<div class="row">Na stronie<div class="wt-seg" role="radiogroup" aria-label="Umieszczenie"><button role="radio" aria-checked="true">Blok</button><button role="radio" aria-checked="false">W linii</button></div></div>
+<div class="row">Podpis<input class="wt-input" value="Rys. 1. Trójkąt ABC" style="width: 150px; height: 28px;" aria-label="Podpis"></div>
+<div style="font-size: 11px; color: var(--color-text-muted); line-height: 1.45;">Po wstawieniu kształt można dalej edytować: dwuklik otwiera ten panel, uchwyty zmieniają rozmiar.</div>
+</div>
+</div>
+<div class="ft"><span style="font-size: 12px; color: var(--color-text-muted);"><span class="wt-kbd">Enter</span> wstaw · <span class="wt-kbd">Esc</span> anuluj</span><a href="Main.dc.html" class="wt-btn ghost" style="margin-left: auto; text-decoration: none;">Anuluj</a><a href="Main.dc.html" class="wt-btn primary" style="text-decoration: none;">Wstaw kształt</a></div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+const WT = {
+  get(k, d) { try { return localStorage.getItem('wysityp:' + k) || d; } catch (e) { return d; } },
+  set(k, v) { try { if (v == null) localStorage.removeItem('wysityp:' + k); else localStorage.setItem('wysityp:' + k, v); } catch (e) {} },
+  ui() { const t = WT.get('ui', 'light'); return t === 'dark' ? 'dark' : 'light'; }
+};
+const SH = {"seg": ["Odcinek", "#line(start: (0pt, 0pt), end: (4cm, 2.4cm))"], "arrow": ["Strzałka / wektor", "#cetz.canvas({ line((0,0), (4,2.4), mark: (end: \">\")) })"], "arc": ["Łuk", "#cetz.canvas({ arc((0,0), start: 0deg, stop: 120deg, radius: 2) })"], "rect": ["Prostokąt", "#rect(width: 5cm, height: 3cm, stroke: 1pt + ink, fill: tint)"], "square": ["Kwadrat", "#square(size: 3cm, stroke: 1pt + ink, fill: tint)"], "tri": ["Trójkąt", "#polygon((0cm, 3cm), (4.5cm, 3cm), (1.25cm, 0cm), stroke: 1pt + ink, fill: tint)"], "poly": ["Wielokąt foremny", "#polygon.regular(vertices: 5, size: 4cm, stroke: 1pt + ink, fill: tint)"], "circle": ["Okrąg", "#circle(radius: 2cm, stroke: 1pt + ink, fill: tint)"], "ellipse": ["Elipsa", "#ellipse(width: 6cm, height: 3.6cm, stroke: 1pt + ink, fill: tint)"], "angle": ["Kąt", "#cetz.canvas({ import cetz.angle: angle; angle((0,0), (4,0), (3,2.6), label: $alpha$) })"], "axes": ["Układ współrzędnych", "#cetz.canvas({ import cetz.draw: *; line((-3,0),(3,0), mark: (end: \">\")); line((0,-2),(0,2.5), mark: (end: \">\")) })"], "plot": ["Wykres funkcji", "#cetz.canvas({ import cetz-plot: plot; plot.plot(size: (6,3), { plot.add(domain: (0, 5), x => x * calc.exp(-x)) }) })"]};
+const SK = ['var(--color-text)', 'var(--color-accent)', 'var(--tag-red-fg)', 'var(--tag-green-fg)'];
+const SKN = ['ink', 'blue', 'red', 'green'];
+const FL = ['transparent', 'var(--color-accent-soft)', 'var(--tag-amber-bg)', 'var(--tag-green-bg)'];
+const FLN = ['none', 'blue.lighten(85%)', 'yellow.lighten(70%)', 'green.lighten(85%)'];
+const W = ['1.25', '2', '3.5'];
+const WN = ['0.5pt', '1pt', '2pt'];
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { shape: 'tri', sk: 0, fl: 1, w: 1 };
+  }
+  renderVals() {
+    const s = this.state, theme = WT.ui(), v = {};
+    Object.keys(SH).forEach(k => { v['s_' + k] = s.shape === k; v['p_' + k] = () => this.setState({ shape: k }); });
+    [0, 1, 2, 3].forEach(i => {
+      v['sk' + i] = s.sk === i; v['toSk' + i] = () => this.setState({ sk: i });
+      v['fl' + i] = s.fl === i; v['toFl' + i] = () => this.setState({ fl: i });
+    });
+    [0, 1, 2].forEach(i => { v['w' + (i + 1)] = s.w === i; v['toW' + (i + 1)] = () => this.setState({ w: i }); });
+    v.stroke = SK[s.sk]; v.fill = FL[s.fl]; v.width = W[s.w];
+    v.label = SH[s.shape][0];
+    v.code = SH[s.shape][1].replace('1pt + ink', WN[s.w] + ' + ' + SKN[s.sk]).replace('fill: tint', 'fill: ' + FLN[s.fl]);
+    v.theme = theme; v.yes = true;
+    return v;
+  }
+}
+</script>
+</body>
+</html>

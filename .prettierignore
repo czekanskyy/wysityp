@@ -7,3 +7,4 @@ bun.lock
 project.inlang/cache
 docs
 **/*.md
+design/claude-design

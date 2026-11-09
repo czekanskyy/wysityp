@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>WYSITyp – pełny pasek narzędzi</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/wysityppapier/tokens.css">
+<link rel="stylesheet" href="ds/wysityppapier/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.lab{margin:0;font:600 11px var(--font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-muted)}
+.dd{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:0;border-radius:5px;background:transparent;font:500 13px var(--font-ui);color:var(--color-text);cursor:pointer}
+.dd:hover{background:var(--color-hover)}
+.frame{background:var(--color-surface);border:1px solid var(--color-border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow-xs)}
+.mh{padding:8px 8px 2px;font:600 11px var(--font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-muted)}
+.sw{width:14px;height:14px;border-radius:3px;flex:none}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="width: 1280px; height: 800px; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 22px; background: var(--color-bg); color: var(--color-text); font-family: var(--font-ui); font-size: 13px; overflow: hidden;">
+
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<p class="lab" style="display: flex; justify-content: space-between;">Pełny pasek – okno od 1200 px<a href="Main.dc.html" style="text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--color-accent-text);">← Wróć do edytora</a></p>
+<div class="frame">
+<div class="wt-toolbar" role="toolbar" aria-label="Formatowanie" style="border-bottom: 0; flex-wrap: nowrap;">
+<div class="items" style="overflow: visible;">
+<button class="wt-ibtn sm" aria-label="Cofnij" title="Cofnij (Ctrl+Z)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Ponów" title="Ponów (Ctrl+Y)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+<span class="wt-sep"></span>
+<button class="dd" aria-haspopup="menu" style="width: 112px; justify-content: space-between;">Nagłówek 2<svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+<span class="wt-sep"></span>
+<button class="wt-ibtn sm" aria-label="Pogrubienie" aria-pressed="true" title="Pogrubienie (Ctrl+B)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h6a3.5 3.5 0 0 1 0 7H7z"/><path d="M7 12h7a3.5 3.5 0 0 1 0 7H7z"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Kursywa" title="Kursywa (Ctrl+I)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h-4"/><path d="M14 19h-4"/><path d="M14 5 10 19"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Podkreślenie" title="Podkreślenie (Ctrl+U)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v6a5 5 0 0 0 10 0V5"/><path d="M5 20h14"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Przekreślenie" title="Przekreślenie (Ctrl+Shift+X)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M16 7a4 3 0 0 0-4-2c-2.5 0-4 1.3-4 3 0 1 .5 1.8 1.5 2.4"/><path d="M8 17a4 3 0 0 0 4 2c2.5 0 4-1.3 4-3"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Indeks górny" title="Indeks górny (Ctrl+.)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 8 8 10"/><path d="m12 8-8 10"/><path d="M16 5.5a2 2 0 1 1 3.5 1.4L16 10h4"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Indeks dolny" title="Indeks dolny (Ctrl+,)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 6 8 10"/><path d="m12 6-8 10"/><path d="M16 15.5a2 2 0 1 1 3.5 1.4L16 20h4"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Kod w linii" title="Kod w linii (Ctrl+E)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 8-4 4 4 4"/><path d="m15 8 4 4-4 4"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Zakreślenie" title="Zakreślenie (Ctrl+Shift+H)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 11-5 5v3h3l5-5"/><path d="m9 11 6-6 4 4-6 6z"/><path d="M14 20h6" style="stroke: var(--color-warning); stroke-width: 3;"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Kolor tekstu" title="Kolor tekstu" style="width: 38px;"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 16 6-12 6 12"/><path d="M8.5 11h7"/><path d="M4 20h16" style="stroke: var(--color-danger); stroke-width: 3;"/></svg><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true" style="width: 10px;"><path d="m6 9 6 6 6-6"/></svg></button>
+<span class="wt-sep"></span>
+<button class="wt-ibtn sm" aria-label="Lista punktowana" title="Lista punktowana (- spacja)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><circle cx="4.5" cy="6" r=".75"/><circle cx="4.5" cy="12" r=".75"/><circle cx="4.5" cy="18" r=".75"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Lista numerowana" title="Lista numerowana (+ spacja)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10"/><path d="M10 12h10"/><path d="M10 18h10"/><path d="M4 5l1.5-1v5"/><path d="M3.5 14.5a1.5 1.5 0 1 1 2.6 1L3.5 19H6.5"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Lista terminów" title="Lista terminów (/ spacja)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h7"/><path d="M8 10h12"/><path d="M4 14h7"/><path d="M8 18h12"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Cytat" title="Cytat"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h5v-5H5.5C5.5 9.5 7 8 9 7.5"/><path d="M14 18h5v-5h-3.5c0-3.5 1.5-5 3.5-5.5"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Zmniejsz wcięcie" title="Zmniejsz wcięcie (Shift+Tab)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6H10"/><path d="M20 12h-8"/><path d="M20 18H10"/><path d="m7 9-3 3 3 3"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Zwiększ wcięcie" title="Zwiększ wcięcie (Tab)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6H10"/><path d="M20 12h-8"/><path d="M20 18H10"/><path d="m4 9 3 3-3 3"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Wyrównanie" title="Wyrównanie" style="width: 38px;"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16"/><path d="M4 10h10"/><path d="M4 14h16"/><path d="M4 18h10"/></svg><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true" style="width: 10px;"><path d="m6 9 6 6 6-6"/></svg></button>
+<span class="wt-sep"></span>
+<button class="wt-ibtn sm" aria-label="Wzór w linii" title="Wzór w linii (Ctrl+M)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5H7l6 7-6 7h11"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Wzór blokowy" title="Wzór blokowy (Ctrl+Shift+M)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 8H9l3.5 4L9 16h6"/></svg></button>
+<a href="Symbols.dc.html" class="wt-ibtn sm" aria-label="Symbol" title="Symbol (Ctrl+Shift+S)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19h4v-2a6 6 0 1 1 6 0v2h4"/></svg></a>
+<a href="Table.dc.html" class="wt-ibtn sm" aria-label="Tabela" title="Tabela (Ctrl+Shift+T)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M3 15h18"/><path d="M10 4v16"/></svg></a>
+<button class="wt-ibtn sm" aria-label="Obraz" title="Obraz"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.75"/><path d="m21 16-5-5-9 9"/></svg></button>
+<a href="Shapes.dc.html" class="wt-ibtn sm" aria-label="Kształt" title="Kształt geometryczny"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="5"/><path d="M13 4h7v7h-7z"/></svg></a>
+<button class="wt-ibtn sm" aria-label="Blok kodu" title="Blok kodu (Ctrl+Shift+K)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 10-2 2 2 2"/><path d="m14 10 2 2-2 2"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Odnośnik" title="Odnośnik (Ctrl+K)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Przypis" title="Przypis (Ctrl+Alt+F)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10"/><path d="M4 12h10"/><path d="M4 17h6"/><path d="M18 4v5"/><path d="M16.5 5.5 18 4"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Odsyłacz" title="Odsyłacz do etykiety (@)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M15.5 12v1.5a2.5 2.5 0 0 0 5 0V12a8.5 8.5 0 1 0-3.5 6.9"/></svg></button>
+<span class="wt-sep"></span>
+<button class="dd" aria-haspopup="menu"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8"/><path d="M8 13h5"/></svg>Bloki<svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+</div>
+<div class="end">
+<div class="wt-seg" role="radiogroup" aria-label="Widok"><button role="radio" aria-checked="false" aria-label="Źródło"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 8-4 4 4 4"/><path d="m15 8 4 4-4 4"/></svg></button><button role="radio" aria-checked="false" aria-label="Podział"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg></button><button role="radio" aria-checked="true" aria-label="Strona"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+</div>
+</div>
+</div>
+<div style="display: flex; gap: 0; font-size: 11px; color: var(--color-text-muted); padding-left: 4px;">
+<span style="width: 72px;">Historia</span><span style="width: 128px;">Styl akapitu</span><span style="width: 294px;">Znaki: B I U S, indeksy, kod, zakreślenie, kolor</span><span style="width: 222px;">Akapit: listy, cytat, wcięcia, wyrównanie</span><span style="width: 318px;">Wstaw: wzory, symbol, tabela, obraz, kształt, kod, link, przypis, @</span><span>Bloki Typst</span>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 236px 300px 260px minmax(0, 1fr); gap: 24px; align-items: start;">
+
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<p class="lab">Styl akapitu</p>
+<div class="wt-menu" role="menu" aria-label="Styl akapitu" style="width: 236px;">
+<div class="wt-mi" role="menuitem"><span class="l">Akapit</span><span class="k">Ctrl+Alt+0</span></div>
+<div class="wt-mi" role="menuitem"><span class="l" style="font: 700 20px var(--font-prose);">Nagłówek 1</span><span class="k">Ctrl+Alt+1</span></div>
+<div class="wt-mi focus" role="menuitem"><span class="l" style="font: 700 17px var(--font-prose);">Nagłówek 2</span><span class="k">Ctrl+Alt+2</span></div>
+<div class="wt-mi" role="menuitem"><span class="l" style="font: 700 15px var(--font-prose);">Nagłówek 3</span><span class="k">Ctrl+Alt+3</span></div>
+<div class="wt-mi" role="menuitem"><span class="l" style="font: 700 13px var(--font-prose);">Nagłówek 4</span><span class="k">Ctrl+Alt+4</span></div>
+<div class="wt-msep" role="separator"></div>
+<div class="wt-mi" role="menuitem"><span class="l" style="font-style: italic; color: var(--color-text-muted);">Cytat</span><span class="k">&gt; spacja</span></div>
+<div class="wt-mi" role="menuitem"><span class="l" style="font-family: var(--font-mono); font-size: 12px;">Blok kodu</span><span class="k">```</span></div>
+<div class="wt-mi" role="menuitem"><span class="l" style="font-family: var(--font-math); font-size: 15px;">Wzór blokowy</span><span class="k">$$</span></div>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<p class="lab">Bloki Typst (twierdzenia)</p>
+<div class="wt-menu" role="menu" aria-label="Bloki" style="width: 300px;">
+<div class="mh">Matematyka</div>
+<div class="wt-mi" role="menuitem"><span class="sw" style="background: var(--tag-blue-bg); box-shadow: inset 3px 0 0 var(--tag-blue-fg);"></span><span class="l">Definicja</span><span class="k">#definition</span></div>
+<div class="wt-mi focus" role="menuitem"><span class="sw" style="background: var(--tag-violet-bg); box-shadow: inset 3px 0 0 var(--tag-violet-fg);"></span><span class="l">Twierdzenie</span><span class="k">#theorem</span></div>
+<div class="wt-mi" role="menuitem"><span class="sw" style="background: var(--tag-violet-bg);"></span><span class="l">Lemat / Wniosek</span><span class="k">#lemma</span></div>
+<div class="wt-mi" role="menuitem"><span class="sw" style="background: var(--tag-gray-bg); box-shadow: inset 3px 0 0 var(--tag-gray-fg);"></span><span class="l">Dowód</span><span class="k">#proof</span></div>
+<div class="wt-mi" role="menuitem"><span class="sw" style="background: var(--tag-green-bg); box-shadow: inset 3px 0 0 var(--tag-green-fg);"></span><span class="l">Przykład</span><span class="k">#example</span></div>
+<div class="wt-msep" role="separator"></div>
+<div class="mh">Notatki</div>
+<div class="wt-mi" role="menuitem"><span class="sw" style="background: var(--tag-amber-bg); box-shadow: inset 3px 0 0 var(--tag-amber-fg);"></span><span class="l">Uwaga / Na egzamin</span><span class="k">#note</span></div>
+<div class="wt-mi" role="menuitem"><span class="sw" style="background: var(--tag-teal-bg); box-shadow: inset 3px 0 0 var(--tag-teal-fg);"></span><span class="l">Zadanie z rozwiązaniem</span><span class="k">#exercise</span></div>
+<div class="wt-mi" role="menuitem"><span class="ic"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><path d="M4 6h16" style="stroke-dasharray: 2 3;"/></svg></span><span class="l">Podział strony</span><span class="k">#pagebreak</span></div>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<p class="lab">Kolor tekstu i zakreślenia</p>
+<div class="wt-menu" style="width: 260px; padding: 10px; gap: 10px;">
+<div class="mh" style="padding: 0;">Tekst</div>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px;">
+<button aria-label="Domyślny" style="height: 26px; border-radius: 5px; border: 2px solid var(--color-accent); background: var(--color-surface); font: 700 13px var(--font-prose); color: var(--color-text);">A</button>
+<button aria-label="Czerwony" style="height: 26px; border-radius: 5px; border: 1px solid var(--color-border); background: var(--color-surface); font: 700 13px var(--font-prose); color: var(--tag-red-fg);">A</button>
+<button aria-label="Pomarańczowy" style="height: 26px; border-radius: 5px; border: 1px solid var(--color-border); background: var(--color-surface); font: 700 13px var(--font-prose); color: var(--tag-amber-fg);">A</button>
+<button aria-label="Zielony" style="height: 26px; border-radius: 5px; border: 1px solid var(--color-border); background: var(--color-surface); font: 700 13px var(--font-prose); color: var(--tag-green-fg);">A</button>
+<button aria-label="Morski" style="height: 26px; border-radius: 5px; border: 1px solid var(--color-border); background: var(--color-surface); font: 700 13px var(--font-prose); color: var(--tag-teal-fg);">A</button>
+<button aria-label="Niebieski" style="height: 26px; border-radius: 5px; border: 1px solid var(--color-border); background: var(--color-surface); font: 700 13px var(--font-prose); color: var(--tag-blue-fg);">A</button>
+<button aria-label="Fioletowy" style="height: 26px; border-radius: 5px; border: 1px solid var(--color-border); background: var(--color-surface); font: 700 13px var(--font-prose); color: var(--tag-violet-fg);">A</button>
+</div>
+<div class="mh" style="padding: 0;">Zakreślenie</div>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px;">
+<button aria-label="Brak" style="height: 26px; border-radius: 5px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-muted);"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 19 5"/></svg></button>
+<button aria-label="Żółty" style="height: 26px; border-radius: 5px; border: 2px solid var(--color-accent); background: var(--color-highlight);"></button>
+<button aria-label="Czerwony" style="height: 26px; border-radius: 5px; border: 1px solid var(--color-border); background: var(--tag-red-bg);"></button>
+<button aria-label="Zielony" style="height: 26px; border-radius: 5px; border: 1px solid var(--color-border); background: var(--tag-green-bg);"></button>
+<button aria-label="Morski" style="height: 26px; border-radius: 5px; border: 1px solid var(--color-border); background: var(--tag-teal-bg);"></button>
+<button aria-label="Niebieski" style="height: 26px; border-radius: 5px; border: 1px solid var(--color-border); background: var(--tag-blue-bg);"></button>
+<button aria-label="Fioletowy" style="height: 26px; border-radius: 5px; border: 1px solid var(--color-border); background: var(--tag-violet-bg);"></button>
+</div>
+<p style="margin: 0; font: 11px/1.4 var(--font-ui); color: var(--color-text-muted);">Zapisuje się jako <code style="font-family: var(--font-mono);">#text(fill: red)[…]</code> i <code style="font-family: var(--font-mono);">#highlight[…]</code>.</p>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px; min-width: 0;">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<p class="lab">Pływający pasek nad zaznaczeniem</p>
+<div class="frame" style="position: relative; padding: 52px 20px 18px; font: 16px/1.6 var(--font-prose);">
+<div style="position: absolute; left: 40px; top: 10px; display: flex; align-items: center; gap: 2px; padding: 3px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px; box-shadow: var(--shadow-md);">
+<button class="wt-ibtn sm" aria-label="Pogrubienie" aria-pressed="true"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h6a3.5 3.5 0 0 1 0 7H7z"/><path d="M7 12h7a3.5 3.5 0 0 1 0 7H7z"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Kursywa"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h-4"/><path d="M14 19h-4"/><path d="M14 5 10 19"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Podkreślenie"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v6a5 5 0 0 0 10 0V5"/><path d="M5 20h14"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Zakreślenie"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 11-5 5v3h3l5-5"/><path d="m9 11 6-6 4 4-6 6z"/></svg></button>
+<span class="wt-sep" style="margin: 0 2px;"></span>
+<button class="wt-ibtn sm" aria-label="Zamień na wzór"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5H7l6 7-6 7h11"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Odnośnik"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></button>
+</div>
+<span style="color: var(--color-text);">Funkcja jest <strong style="background: var(--color-selection);">całkowalna w sensie Riemanna</strong>, gdy sumy górne i dolne mają wspólną granicę.</span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<p class="lab">Wąskie okno – reszta chowa się pod ⋯</p>
+<div class="frame" style="width: 100%;">
+<div class="wt-toolbar" style="border-bottom: 0;">
+<div class="items">
+<button class="wt-ibtn sm" aria-label="Cofnij"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+<span class="wt-sep"></span>
+<button class="dd" style="padding: 0 6px;">Akapit<svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Pogrubienie"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h6a3.5 3.5 0 0 1 0 7H7z"/><path d="M7 12h7a3.5 3.5 0 0 1 0 7H7z"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Kursywa"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h-4"/><path d="M14 19h-4"/><path d="M14 5 10 19"/></svg></button>
+<span class="wt-sep"></span>
+<button class="wt-ibtn sm" aria-label="Wzór"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5H7l6 7-6 7h11"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Symbol"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19h4v-2a6 6 0 1 1 6 0v2h4"/></svg></button>
+<button class="wt-ibtn sm" aria-label="Więcej narzędzi" aria-expanded="false" style="border: 1px solid var(--color-border);"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18.5" cy="12" r="1"/></svg></button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+const WT = {
+  get(k, d) { try { return localStorage.getItem('wysityp:' + k) || d; } catch (e) { return d; } },
+  set(k, v) { try { if (v == null) localStorage.removeItem('wysityp:' + k); else localStorage.setItem('wysityp:' + k, v); } catch (e) {} },
+  ui() { const t = WT.get('ui', 'light'); return t === 'dark' ? 'dark' : 'light'; }
+};
+class Component extends DCLogic {
+  renderVals() { return { theme: WT.ui() }; }
+}
+</script>
+</body>
+</html>

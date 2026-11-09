@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>WYSITyp – start</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/wysityppapier/tokens.css">
+<link rel="stylesheet" href="ds/wysityppapier/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="width: 1280px; height: 800px; display: flex; overflow: hidden; background: var(--color-bg); color: var(--color-text); font-family: var(--font-ui); font-size: 13px;">
+
+<nav class="wt-sidebar" aria-label="Notatki" style="flex: none; height: 800px;">
+<div class="head">
+<div class="wt-ws"><span class="mark">W</span><span class="name">Studia · semestr 3</span><button class="wt-ibtn sm" aria-label="Nowa notatka"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button></div>
+<a href="Search.dc.html" class="wt-search" style="text-decoration: none; color: inherit;"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><span>Szukaj lub polecenie…</span><span class="wt-kbd"><kbd>Ctrl</kbd><kbd>K</kbd></span></a>
+</div>
+<div class="body">
+<section>
+<div class="wt-sec-title"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>Notatki</div>
+<div class="wt-tree" role="tree" aria-label="Notatki">
+<div role="treeitem" aria-level="1" aria-expanded="false" aria-selected="false" class="wt-row" style="--level:1"><span class="tw"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span><span class="kind"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h7.5A2.5 2.5 0 0 1 21 10v6.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5z"/></svg></span><span class="lbl">Analiza matematyczna</span><span class="badge">12</span></div>
+<div role="treeitem" aria-level="1" aria-expanded="false" aria-selected="false" class="wt-row" style="--level:1"><span class="tw"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span><span class="kind"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h7.5A2.5 2.5 0 0 1 21 10v6.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5z"/></svg></span><span class="lbl">Fizyka</span><span class="badge">7</span></div>
+<div role="treeitem" aria-level="1" aria-expanded="false" aria-selected="false" class="wt-row" style="--level:1"><span class="tw"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span><span class="kind"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h7.5A2.5 2.5 0 0 1 21 10v6.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5z"/></svg></span><span class="lbl">Algebra liniowa</span><span class="badge">5</span></div>
+<div role="treeitem" aria-level="1" aria-selected="false" class="wt-row" style="--level:1"><span class="tw"></span><span class="kind"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/></svg></span><span class="lbl">Plan semestru</span></div>
+</div>
+</section>
+</div>
+<div class="foot">
+<a href="Settings.dc.html" class="wt-ibtn sm" aria-label="Ustawienia"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></a>
+<button class="wt-ibtn sm" aria-label="Przełącz motyw"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+<span class="wt-saved">Wszystko zapisane</span>
+</div>
+</nav>
+
+<main style="flex: 1; min-width: 0; overflow: hidden; background: var(--color-surface);">
+<div style="max-width: 880px; margin: 0 auto; padding: 64px 48px; display: flex; flex-direction: column; gap: 40px;">
+
+<header style="display: flex; flex-direction: column; gap: 8px;">
+<p style="margin: 0; font: 600 11px var(--font-ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted);">Poniedziałek, 9 listopada</p>
+<h1 style="margin: 0; font: 700 30px/1.25 var(--font-prose); letter-spacing: -0.01em;">Dzień dobry. Co dziś notujemy?</h1>
+<div style="display: flex; gap: 8px; margin-top: 8px;">
+<a href="Main.dc.html" class="wt-btn primary" style="text-decoration: none;"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Nowa notatka</a>
+<button class="wt-btn secondary"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17V7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h6A2.5 2.5 0 0 1 19.5 10v.5"/><path d="M3 17l2.4-5.6A2 2 0 0 1 7.2 10.2H20a1 1 0 0 1 .9 1.4L18.6 17.8A2 2 0 0 1 16.8 19H5a2 2 0 0 1-2-2z"/></svg>Otwórz inny folder</button>
+</div>
+</header>
+
+<section style="display: flex; flex-direction: column; gap: 12px;">
+<h2 style="margin: 0; font: 600 11px var(--font-ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted);">Zacznij od szablonu</h2>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+<a href="Main.dc.html" class="wt-card" style="text-align: left; font: inherit; color: inherit; cursor: pointer;"><span class="h"><span class="bd"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/></svg></span><span><span class="ti" style="display: block;">Wykład</span><span class="me" style="display: block;">lecture.typ</span></span></span><span class="tx">Tytuł, data, prowadzący i miejsce na definicje oraz twierdzenia.</span></a>
+<a href="Main.dc.html" class="wt-card hover" style="text-align: left; font: inherit; color: inherit; cursor: pointer;"><span class="h"><span class="bd"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5H7l6 7-6 7h11"/></svg></span><span><span class="ti" style="display: block;">Lista zadań</span><span class="me" style="display: block;">problem-set.typ</span></span></span><span class="tx">Numerowane zadania z miejscem na rozwiązanie i odpowiedź.</span></a>
+<a href="Main.dc.html" class="wt-card" style="text-align: left; font: inherit; color: inherit; cursor: pointer;"><span class="h"><span class="bd"><svg class="wt-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M3 15h18"/><path d="M10 4v16"/></svg></span><span><span class="ti" style="display: block;">Laboratorium</span><span class="me" style="display: block;">lab.typ</span></span></span><span class="tx">Cel, aparatura, tabela pomiarów, niepewności i wnioski.</span></a>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+<h2 style="margin: 0; font: 600 11px var(--font-ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted);">Ostatnio otwierane</h2>
+<div style="display: flex; gap: 6px;">
+<span class="wt-tag sel" style="--fg: var(--tag-blue-fg); --bg: var(--tag-blue-bg);">Analiza</span>
+<span class="wt-tag" style="--fg: var(--tag-green-fg); --bg: var(--tag-green-bg);">Fizyka</span>
+<span class="wt-tag" style="--fg: var(--tag-violet-fg); --bg: var(--tag-violet-bg);">Algebra</span>
+<span class="wt-tag" style="--fg: var(--tag-amber-fg); --bg: var(--tag-amber-bg);">Na egzamin</span>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+<a href="Main.dc.html" class="wt-card" style="text-decoration: none; color: inherit;"><div class="h" style="padding-right: 32px;"><div><div class="ti">Wykład 7 – całka Riemanna</div><div class="me">Analiza matematyczna · wczoraj, 10:15</div></div></div><div class="tx">Podział przedziału, sumy górne i dolne, kryterium całkowalności, podstawowe twierdzenie rachunku całkowego…</div><span class="act"><button class="wt-ibtn sm" aria-label="Więcej działań"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18.5" cy="12" r="1"/></svg></button></span></a>
+<a href="Main.dc.html" class="wt-card" style="text-decoration: none; color: inherit;"><div class="h" style="padding-right: 32px;"><div><div class="ti">Wykład 6 – pochodne</div><div class="me">Analiza matematyczna · 30 października</div></div></div><div class="tx">Definicja przez granicę ilorazu różnicowego, reguła łańcuchowa, twierdzenie Lagrange’a…</div><span class="act"><button class="wt-ibtn sm" aria-label="Więcej działań"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18.5" cy="12" r="1"/></svg></button></span></a>
+<a href="Main.dc.html" class="wt-card" style="text-decoration: none; color: inherit;"><div class="h" style="padding-right: 32px;"><div><div class="ti">Lista 4 – szeregi</div><div class="me">Analiza matematyczna · 28 października</div></div></div><div class="tx">Zad. 3: zbadać zbieżność szeregu ∑ 1/(n ln n) kryterium całkowym…</div><span class="act"><button class="wt-ibtn sm" aria-label="Więcej działań"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18.5" cy="12" r="1"/></svg></button></span></a>
+<a href="Main.dc.html" class="wt-card" style="text-decoration: none; color: inherit;"><div class="h" style="padding-right: 32px;"><div><div class="ti">Ćwiczenia 3</div><div class="me">Analiza matematyczna · 23 października</div></div></div><div class="tx">Całkowanie przez podstawienie, t = x², granice całkowania po zamianie zmiennej…</div><span class="act"><button class="wt-ibtn sm" aria-label="Więcej działań"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18.5" cy="12" r="1"/></svg></button></span></a>
+</div>
+</section>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+const WT = {
+  get(k, d) { try { return localStorage.getItem('wysityp:' + k) || d; } catch (e) { return d; } },
+  set(k, v) { try { if (v == null) localStorage.removeItem('wysityp:' + k); else localStorage.setItem('wysityp:' + k, v); } catch (e) {} },
+  ui() { const t = WT.get('ui', 'light'); return t === 'dark' ? 'dark' : 'light'; }
+};
+class Component extends DCLogic {
+  renderVals() { return { theme: WT.ui() }; }
+}
+</script>
+</body>
+</html>

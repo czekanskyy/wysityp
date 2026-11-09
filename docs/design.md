@@ -6,6 +6,7 @@ Papier is the visual language of WYSITyp. It is a calm, paper like workspace wit
 - Base layer and note typography: `src/styles/base.css`
 - Components: `src/lib/ui/` (import from `src/lib/ui/index.ts`)
 - Live preview: run `bun run dev` and open `http://127.0.0.1:1420/design.html` (dev only, not in the app build)
+- Claude Design export (reference screens and the token book): [`design/claude-design/`](../design/claude-design/README.md)
 
 ## Principles
 

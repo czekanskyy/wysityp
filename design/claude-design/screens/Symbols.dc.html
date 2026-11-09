@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>WYSITyp – wstaw symbol</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/wysityppapier/tokens.css">
+<link rel="stylesheet" href="ds/wysityppapier/components/bundle.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.pop{position:absolute;left:600px;top:92px;width:600px;background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:12px;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden;font-family:var(--font-ui);color:var(--color-text)}
+.pop::before{content:"";position:absolute;left:24px;top:-6px;width:10px;height:10px;background:var(--color-surface-raised);border-left:1px solid var(--color-border);border-top:1px solid var(--color-border);transform:rotate(45deg)}
+.head{display:flex;align-items:center;gap:8px;padding:12px 12px 8px}
+.srch{flex:1;display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:1px solid var(--color-border);border-radius:7px;background:var(--color-surface);font-size:13px;color:var(--color-text-faint)}
+.tabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid var(--color-border);overflow:hidden}
+.tab{border:0;background:transparent;padding:8px 9px 9px;font:500 12.5px var(--font-ui);color:var(--color-text-muted);border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--color-text)}
+.tab[aria-selected="true"]{color:var(--color-accent-text);border-bottom-color:var(--color-accent)}
+.body{display:grid;grid-template-columns:minmax(0,1fr) 176px;min-height:300px}
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:12px;align-content:start}
+.cell{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:54px;border:1px solid transparent;border-radius:7px;background:transparent;cursor:pointer;color:var(--color-text);min-width:0}
+.cell:hover{background:var(--color-hover)}
+.cell[aria-selected="true"]{background:var(--color-accent-soft);border-color:var(--color-accent)}
+.g{font:22px/1 var(--font-math);color:var(--color-math)}
+.cell[aria-selected="true"] .g{color:var(--color-accent-text)}
+.n{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:10px var(--font-mono);color:var(--color-text-faint)}
+.det{border-left:1px solid var(--color-border);padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--color-surface-sunken)}
+.big{height:84px;display:grid;place-items:center;background:var(--color-surface);border:1px solid var(--color-border);border-radius:9px;font:44px/1 var(--font-math);color:var(--color-math)}
+.kv{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--color-text-muted)}
+.kv code{font:12.5px var(--font-mono);color:var(--color-code-text);background:var(--color-code-bg);padding:2px 5px;border-radius:4px;align-self:flex-start}
+.foot{display:flex;align-items:center;gap:14px;padding:8px 12px;border-top:1px solid var(--color-border);font-size:11.5px;color:var(--color-text-muted)}
+.foot .wt-kbd{margin-right:3px}
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="position: relative; width: 1280px; height: 800px; overflow: hidden;">
+<dc-import name="Main" theme="{{theme}}" fixed="{{yes}}" view="rendered" hint-size="1280px,800px"></dc-import>
+<div class="pop" role="dialog" aria-label="Wstaw symbol">
+<div class="head">
+<div class="srch"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.5-4.5"/></svg>Szukaj: nazwa, opis albo narysuj „~=”…</div>
+<div class="wt-seg" role="radiogroup" aria-label="Wstaw jako"><button role="radio" aria-checked="{{asMath}}" onClick="{{toMath}}">We wzorze</button><button role="radio" aria-checked="{{asText}}" onClick="{{toText}}">W tekście</button></div>
+<a href="Main.dc.html" class="wt-ibtn sm" aria-label="Zamknij" title="Zamknij (Esc)"><svg class="wt-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></a>
+</div>
+<div class="tabs" role="tablist" aria-label="Sekcje symboli">
+<button role="tab" class="tab" aria-selected="{{t_recent}}" onClick="{{go_recent}}">Ostatnie</button>
+<button role="tab" class="tab" aria-selected="{{t_greek}}" onClick="{{go_greek}}">Greckie</button>
+<button role="tab" class="tab" aria-selected="{{t_ops}}" onClick="{{go_ops}}">Operatory</button>
+<button role="tab" class="tab" aria-selected="{{t_rel}}" onClick="{{go_rel}}">Relacje</button>
+<button role="tab" class="tab" aria-selected="{{t_arr}}" onClick="{{go_arr}}">Strzałki</button>
+<button role="tab" class="tab" aria-selected="{{t_sets}}" onClick="{{go_sets}}">Zbiory i logika</button>
+<button role="tab" class="tab" aria-selected="{{t_misc}}" onClick="{{go_misc}}">Analiza i inne</button>
+</div>
+<div class="body">
+<div>
+<sc-if value="{{t_recent}}" hint-placeholder-val="{{false}}">
+<div class="grid" role="grid" aria-label="Ostatnie">
+<button class="cell" role="gridcell" aria-selected="{{s0}}" onClick="{{p0}}" title="alpha"><span class="g">α</span><span class="n">alpha</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s1}}" onClick="{{p1}}" title="integral"><span class="g">∫</span><span class="n">integral</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s2}}" onClick="{{p2}}" title="arrow.r"><span class="g">→</span><span class="n">arrow.r</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s3}}" onClick="{{p3}}" title="RR"><span class="g">ℝ</span><span class="n">RR</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s4}}" onClick="{{p4}}" title="lt.eq"><span class="g">≤</span><span class="n">lt.eq</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s5}}" onClick="{{p5}}" title="sum"><span class="g">∑</span><span class="n">sum</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s6}}" onClick="{{p6}}" title="diff"><span class="g">∂</span><span class="n">diff</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s7}}" onClick="{{p7}}" title="in"><span class="g">∈</span><span class="n">in</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s8}}" onClick="{{p8}}" title="epsilon"><span class="g">ε</span><span class="n">epsilon</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s9}}" onClick="{{p9}}" title="arrow.r.double"><span class="g">⇒</span><span class="n">arrow.r.double</span></button>
+</div>
+</sc-if>
+<sc-if value="{{t_greek}}" hint-placeholder-val="{{true}}">
+<div class="grid" role="grid" aria-label="Greckie">
+<button class="cell" role="gridcell" aria-selected="{{s10}}" onClick="{{p10}}" title="alpha"><span class="g">α</span><span class="n">alpha</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s11}}" onClick="{{p11}}" title="beta"><span class="g">β</span><span class="n">beta</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s12}}" onClick="{{p12}}" title="gamma"><span class="g">γ</span><span class="n">gamma</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s13}}" onClick="{{p13}}" title="delta"><span class="g">δ</span><span class="n">delta</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s14}}" onClick="{{p14}}" title="epsilon"><span class="g">ε</span><span class="n">epsilon</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s15}}" onClick="{{p15}}" title="zeta"><span class="g">ζ</span><span class="n">zeta</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s16}}" onClick="{{p16}}" title="eta"><span class="g">η</span><span class="n">eta</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s17}}" onClick="{{p17}}" title="theta"><span class="g">θ</span><span class="n">theta</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s18}}" onClick="{{p18}}" title="iota"><span class="g">ι</span><span class="n">iota</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s19}}" onClick="{{p19}}" title="kappa"><span class="g">κ</span><span class="n">kappa</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s20}}" onClick="{{p20}}" title="lambda"><span class="g">λ</span><span class="n">lambda</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s21}}" onClick="{{p21}}" title="mu"><span class="g">μ</span><span class="n">mu</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s22}}" onClick="{{p22}}" title="nu"><span class="g">ν</span><span class="n">nu</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s23}}" onClick="{{p23}}" title="xi"><span class="g">ξ</span><span class="n">xi</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s24}}" onClick="{{p24}}" title="pi"><span class="g">π</span><span class="n">pi</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s25}}" onClick="{{p25}}" title="rho"><span class="g">ρ</span><span class="n">rho</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s26}}" onClick="{{p26}}" title="sigma"><span class="g">σ</span><span class="n">sigma</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s27}}" onClick="{{p27}}" title="tau"><span class="g">τ</span><span class="n">tau</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s28}}" onClick="{{p28}}" title="upsilon"><span class="g">υ</span><span class="n">upsilon</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s29}}" onClick="{{p29}}" title="phi"><span class="g">φ</span><span class="n">phi</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s30}}" onClick="{{p30}}" title="chi"><span class="g">χ</span><span class="n">chi</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s31}}" onClick="{{p31}}" title="psi"><span class="g">ψ</span><span class="n">psi</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s32}}" onClick="{{p32}}" title="omega"><span class="g">ω</span><span class="n">omega</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s33}}" onClick="{{p33}}" title="epsilon.alt"><span class="g">ϵ</span><span class="n">epsilon.alt</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s34}}" onClick="{{p34}}" title="theta.alt"><span class="g">ϑ</span><span class="n">theta.alt</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s35}}" onClick="{{p35}}" title="phi.alt"><span class="g">ϕ</span><span class="n">phi.alt</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s36}}" onClick="{{p36}}" title="Gamma"><span class="g">Γ</span><span class="n">Gamma</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s37}}" onClick="{{p37}}" title="Delta"><span class="g">Δ</span><span class="n">Delta</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s38}}" onClick="{{p38}}" title="Theta"><span class="g">Θ</span><span class="n">Theta</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s39}}" onClick="{{p39}}" title="Lambda"><span class="g">Λ</span><span class="n">Lambda</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s40}}" onClick="{{p40}}" title="Xi"><span class="g">Ξ</span><span class="n">Xi</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s41}}" onClick="{{p41}}" title="Pi"><span class="g">Π</span><span class="n">Pi</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s42}}" onClick="{{p42}}" title="Sigma"><span class="g">Σ</span><span class="n">Sigma</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s43}}" onClick="{{p43}}" title="Phi"><span class="g">Φ</span><span class="n">Phi</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s44}}" onClick="{{p44}}" title="Psi"><span class="g">Ψ</span><span class="n">Psi</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s45}}" onClick="{{p45}}" title="Omega"><span class="g">Ω</span><span class="n">Omega</span></button>
+</div>
+</sc-if>
+<sc-if value="{{t_ops}}" hint-placeholder-val="{{false}}">
+<div class="grid" role="grid" aria-label="Operatory">
+<button class="cell" role="gridcell" aria-selected="{{s46}}" onClick="{{p46}}" title="plus"><span class="g">+</span><span class="n">plus</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s47}}" onClick="{{p47}}" title="minus"><span class="g">−</span><span class="n">minus</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s48}}" onClick="{{p48}}" title="plus.minus"><span class="g">±</span><span class="n">plus.minus</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s49}}" onClick="{{p49}}" title="minus.plus"><span class="g">∓</span><span class="n">minus.plus</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s50}}" onClick="{{p50}}" title="times"><span class="g">×</span><span class="n">times</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s51}}" onClick="{{p51}}" title="div"><span class="g">÷</span><span class="n">div</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s52}}" onClick="{{p52}}" title="dot.op"><span class="g">·</span><span class="n">dot.op</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s53}}" onClick="{{p53}}" title="compose"><span class="g">∘</span><span class="n">compose</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s54}}" onClick="{{p54}}" title="plus.circle"><span class="g">⊕</span><span class="n">plus.circle</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s55}}" onClick="{{p55}}" title="times.circle"><span class="g">⊗</span><span class="n">times.circle</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s56}}" onClick="{{p56}}" title="sum"><span class="g">∑</span><span class="n">sum</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s57}}" onClick="{{p57}}" title="product"><span class="g">∏</span><span class="n">product</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s58}}" onClick="{{p58}}" title="integral"><span class="g">∫</span><span class="n">integral</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s59}}" onClick="{{p59}}" title="integral.double"><span class="g">∬</span><span class="n">integral.double</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s60}}" onClick="{{p60}}" title="integral.cont"><span class="g">∮</span><span class="n">integral.cont</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s61}}" onClick="{{p61}}" title="diff"><span class="g">∂</span><span class="n">diff</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s62}}" onClick="{{p62}}" title="nabla"><span class="g">∇</span><span class="n">nabla</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s63}}" onClick="{{p63}}" title="sqrt"><span class="g">√</span><span class="n">sqrt</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s64}}" onClick="{{p64}}" title="infinity"><span class="g">∞</span><span class="n">infinity</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s65}}" onClick="{{p65}}" title="prime"><span class="g">′</span><span class="n">prime</span></button>
+</div>
+</sc-if>
+<sc-if value="{{t_rel}}" hint-placeholder-val="{{false}}">
+<div class="grid" role="grid" aria-label="Relacje">
+<button class="cell" role="gridcell" aria-selected="{{s66}}" onClick="{{p66}}" title="eq"><span class="g">=</span><span class="n">eq</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s67}}" onClick="{{p67}}" title="eq.not"><span class="g">≠</span><span class="n">eq.not</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s68}}" onClick="{{p68}}" title="approx"><span class="g">≈</span><span class="n">approx</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s69}}" onClick="{{p69}}" title="equiv"><span class="g">≡</span><span class="n">equiv</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s70}}" onClick="{{p70}}" title="tilde.op"><span class="g">∼</span><span class="n">tilde.op</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s71}}" onClick="{{p71}}" title="tilde.equiv"><span class="g">≅</span><span class="n">tilde.equiv</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s72}}" onClick="{{p72}}" title="lt"><span class="g"><</span><span class="n">lt</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s73}}" onClick="{{p73}}" title="gt"><span class="g">></span><span class="n">gt</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s74}}" onClick="{{p74}}" title="lt.eq"><span class="g">≤</span><span class="n">lt.eq</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s75}}" onClick="{{p75}}" title="gt.eq"><span class="g">≥</span><span class="n">gt.eq</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s76}}" onClick="{{p76}}" title="lt.double"><span class="g">≪</span><span class="n">lt.double</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s77}}" onClick="{{p77}}" title="gt.double"><span class="g">≫</span><span class="n">gt.double</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s78}}" onClick="{{p78}}" title="prop"><span class="g">∝</span><span class="n">prop</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s79}}" onClick="{{p79}}" title="perp"><span class="g">⊥</span><span class="n">perp</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s80}}" onClick="{{p80}}" title="parallel"><span class="g">∥</span><span class="n">parallel</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s81}}" onClick="{{p81}}" title="divides"><span class="g">∣</span><span class="n">divides</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s82}}" onClick="{{p82}}" title="prec"><span class="g">≺</span><span class="n">prec</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s83}}" onClick="{{p83}}" title="succ"><span class="g">≻</span><span class="n">succ</span></button>
+</div>
+</sc-if>
+<sc-if value="{{t_arr}}" hint-placeholder-val="{{false}}">
+<div class="grid" role="grid" aria-label="Strzałki">
+<button class="cell" role="gridcell" aria-selected="{{s84}}" onClick="{{p84}}" title="arrow.r"><span class="g">→</span><span class="n">arrow.r</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s85}}" onClick="{{p85}}" title="arrow.l"><span class="g">←</span><span class="n">arrow.l</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s86}}" onClick="{{p86}}" title="arrow.l.r"><span class="g">↔</span><span class="n">arrow.l.r</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s87}}" onClick="{{p87}}" title="arrow.r.double"><span class="g">⇒</span><span class="n">arrow.r.double</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s88}}" onClick="{{p88}}" title="arrow.l.double"><span class="g">⇐</span><span class="n">arrow.l.double</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s89}}" onClick="{{p89}}" title="arrow.l.r.double"><span class="g">⇔</span><span class="n">arrow.l.r.double</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s90}}" onClick="{{p90}}" title="arrow.r.bar"><span class="g">↦</span><span class="n">arrow.r.bar</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s91}}" onClick="{{p91}}" title="arrow.r.long"><span class="g">⟶</span><span class="n">arrow.r.long</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s92}}" onClick="{{p92}}" title="arrow.r.double.long"><span class="g">⟹</span><span class="n">arrow.r.double.long</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s93}}" onClick="{{p93}}" title="arrow.t"><span class="g">↑</span><span class="n">arrow.t</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s94}}" onClick="{{p94}}" title="arrow.b"><span class="g">↓</span><span class="n">arrow.b</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s95}}" onClick="{{p95}}" title="arrow.t.b"><span class="g">↕</span><span class="n">arrow.t.b</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s96}}" onClick="{{p96}}" title="arrow.r.hook"><span class="g">↪</span><span class="n">arrow.r.hook</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s97}}" onClick="{{p97}}" title="harpoon.rt"><span class="g">⇀</span><span class="n">harpoon.rt</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s98}}" onClick="{{p98}}" title="arrow.r.squiggly"><span class="g">⇝</span><span class="n">arrow.r.squiggly</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s99}}" onClick="{{p99}}" title="arrow.tr"><span class="g">↗</span><span class="n">arrow.tr</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s100}}" onClick="{{p100}}" title="arrow.br"><span class="g">↘</span><span class="n">arrow.br</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s101}}" onClick="{{p101}}" title="arrow.r.long.bar"><span class="g">⟼</span><span class="n">arrow.r.long.bar</span></button>
+</div>
+</sc-if>
+<sc-if value="{{t_sets}}" hint-placeholder-val="{{false}}">
+<div class="grid" role="grid" aria-label="Zbiory i logika">
+<button class="cell" role="gridcell" aria-selected="{{s102}}" onClick="{{p102}}" title="in"><span class="g">∈</span><span class="n">in</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s103}}" onClick="{{p103}}" title="in.not"><span class="g">∉</span><span class="n">in.not</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s104}}" onClick="{{p104}}" title="in.rev"><span class="g">∋</span><span class="n">in.rev</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s105}}" onClick="{{p105}}" title="subset"><span class="g">⊂</span><span class="n">subset</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s106}}" onClick="{{p106}}" title="subset.eq"><span class="g">⊆</span><span class="n">subset.eq</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s107}}" onClick="{{p107}}" title="supset"><span class="g">⊃</span><span class="n">supset</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s108}}" onClick="{{p108}}" title="supset.eq"><span class="g">⊇</span><span class="n">supset.eq</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s109}}" onClick="{{p109}}" title="union"><span class="g">∪</span><span class="n">union</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s110}}" onClick="{{p110}}" title="sect"><span class="g">∩</span><span class="n">sect</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s111}}" onClick="{{p111}}" title="without"><span class="g">∖</span><span class="n">without</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s112}}" onClick="{{p112}}" title="emptyset"><span class="g">∅</span><span class="n">emptyset</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s113}}" onClick="{{p113}}" title="forall"><span class="g">∀</span><span class="n">forall</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s114}}" onClick="{{p114}}" title="exists"><span class="g">∃</span><span class="n">exists</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s115}}" onClick="{{p115}}" title="exists.not"><span class="g">∄</span><span class="n">exists.not</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s116}}" onClick="{{p116}}" title="not"><span class="g">¬</span><span class="n">not</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s117}}" onClick="{{p117}}" title="and"><span class="g">∧</span><span class="n">and</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s118}}" onClick="{{p118}}" title="or"><span class="g">∨</span><span class="n">or</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s119}}" onClick="{{p119}}" title="top"><span class="g">⊤</span><span class="n">top</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s120}}" onClick="{{p120}}" title="bot"><span class="g">⊥</span><span class="n">bot</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s121}}" onClick="{{p121}}" title="NN"><span class="g">ℕ</span><span class="n">NN</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s122}}" onClick="{{p122}}" title="ZZ"><span class="g">ℤ</span><span class="n">ZZ</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s123}}" onClick="{{p123}}" title="QQ"><span class="g">ℚ</span><span class="n">QQ</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s124}}" onClick="{{p124}}" title="RR"><span class="g">ℝ</span><span class="n">RR</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s125}}" onClick="{{p125}}" title="CC"><span class="g">ℂ</span><span class="n">CC</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s126}}" onClick="{{p126}}" title="therefore"><span class="g">∴</span><span class="n">therefore</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s127}}" onClick="{{p127}}" title="because"><span class="g">∵</span><span class="n">because</span></button>
+</div>
+</sc-if>
+<sc-if value="{{t_misc}}" hint-placeholder-val="{{false}}">
+<div class="grid" role="grid" aria-label="Analiza i inne">
+<button class="cell" role="gridcell" aria-selected="{{s128}}" onClick="{{p128}}" title="infinity"><span class="g">∞</span><span class="n">infinity</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s129}}" onClick="{{p129}}" title="diff"><span class="g">∂</span><span class="n">diff</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s130}}" onClick="{{p130}}" title="nabla"><span class="g">∇</span><span class="n">nabla</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s131}}" onClick="{{p131}}" title="planck.reduce"><span class="g">ℏ</span><span class="n">planck.reduce</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s132}}" onClick="{{p132}}" title="ell"><span class="g">ℓ</span><span class="n">ell</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s133}}" onClick="{{p133}}" title="degree"><span class="g">°</span><span class="n">degree</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s134}}" onClick="{{p134}}" title="angle"><span class="g">∠</span><span class="n">angle</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s135}}" onClick="{{p135}}" title="triangle.stroked.t"><span class="g">△</span><span class="n">triangle.stroked.t</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s136}}" onClick="{{p136}}" title="dots.h"><span class="g">…</span><span class="n">dots.h</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s137}}" onClick="{{p137}}" title="dots.h.c"><span class="g">⋯</span><span class="n">dots.h.c</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s138}}" onClick="{{p138}}" title="dots.v"><span class="g">⋮</span><span class="n">dots.v</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s139}}" onClick="{{p139}}" title="dots.down"><span class="g">⋱</span><span class="n">dots.down</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s140}}" onClick="{{p140}}" title="floor.l"><span class="g">⌊</span><span class="n">floor.l</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s141}}" onClick="{{p141}}" title="floor.r"><span class="g">⌋</span><span class="n">floor.r</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s142}}" onClick="{{p142}}" title="ceil.l"><span class="g">⌈</span><span class="n">ceil.l</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s143}}" onClick="{{p143}}" title="ceil.r"><span class="g">⌉</span><span class="n">ceil.r</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s144}}" onClick="{{p144}}" title="angle.l"><span class="g">⟨</span><span class="n">angle.l</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s145}}" onClick="{{p145}}" title="angle.r"><span class="g">⟩</span><span class="n">angle.r</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s146}}" onClick="{{p146}}" title="bar.v.double"><span class="g">‖</span><span class="n">bar.v.double</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s147}}" onClick="{{p147}}" title="aleph"><span class="g">ℵ</span><span class="n">aleph</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s148}}" onClick="{{p148}}" title="permille"><span class="g">‰</span><span class="n">permille</span></button>
+<button class="cell" role="gridcell" aria-selected="{{s149}}" onClick="{{p149}}" title="qed"><span class="g">∎</span><span class="n">qed</span></button>
+</div>
+</sc-if>
+</div>
+<div class="det">
+<div class="big" aria-hidden="true">{{glyph}}</div>
+<div style="font-weight: 600; font-size: 13px;">{{name}}</div>
+<div class="kv">Typst<code>{{code}}</code></div>
+<div class="kv">Unicode<code>{{uni}}</code></div>
+<div class="kv">Sekcja<span style="font-size: 12px; color: var(--color-text);">{{sec}}</span></div>
+<a href="Main.dc.html" class="wt-btn primary" style="margin-top: auto; text-decoration: none;">Wstaw {{glyph}}</a>
+</div>
+</div>
+<div class="foot">
+<span><span class="wt-kbd">←↑→↓</span>wybór</span>
+<span><span class="wt-kbd">Enter</span>wstaw</span>
+<span><span class="wt-kbd">Shift+Enter</span>wstaw i zostaw otwarte</span>
+<span style="margin-left: auto;">We wzorze wystarczy wpisać nazwę, np. <code style="font-family: var(--font-mono);">alpha</code></span>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+const WT = {
+  get(k, d) { try { return localStorage.getItem('wysityp:' + k) || d; } catch (e) { return d; } },
+  set(k, v) { try { if (v == null) localStorage.removeItem('wysityp:' + k); else localStorage.setItem('wysityp:' + k, v); } catch (e) {} },
+  ui() { const t = WT.get('ui', 'light'); return t === 'dark' ? 'dark' : 'light'; }
+};
+const SYM = [["α", "alpha", "Ostatnie"], ["∫", "integral", "Ostatnie"], ["→", "arrow.r", "Ostatnie"], ["ℝ", "RR", "Ostatnie"], ["≤", "lt.eq", "Ostatnie"], ["∑", "sum", "Ostatnie"], ["∂", "diff", "Ostatnie"], ["∈", "in", "Ostatnie"], ["ε", "epsilon", "Ostatnie"], ["⇒", "arrow.r.double", "Ostatnie"], ["α", "alpha", "Greckie"], ["β", "beta", "Greckie"], ["γ", "gamma", "Greckie"], ["δ", "delta", "Greckie"], ["ε", "epsilon", "Greckie"], ["ζ", "zeta", "Greckie"], ["η", "eta", "Greckie"], ["θ", "theta", "Greckie"], ["ι", "iota", "Greckie"], ["κ", "kappa", "Greckie"], ["λ", "lambda", "Greckie"], ["μ", "mu", "Greckie"], ["ν", "nu", "Greckie"], ["ξ", "xi", "Greckie"], ["π", "pi", "Greckie"], ["ρ", "rho", "Greckie"], ["σ", "sigma", "Greckie"], ["τ", "tau", "Greckie"], ["υ", "upsilon", "Greckie"], ["φ", "phi", "Greckie"], ["χ", "chi", "Greckie"], ["ψ", "psi", "Greckie"], ["ω", "omega", "Greckie"], ["ϵ", "epsilon.alt", "Greckie"], ["ϑ", "theta.alt", "Greckie"], ["ϕ", "phi.alt", "Greckie"], ["Γ", "Gamma", "Greckie"], ["Δ", "Delta", "Greckie"], ["Θ", "Theta", "Greckie"], ["Λ", "Lambda", "Greckie"], ["Ξ", "Xi", "Greckie"], ["Π", "Pi", "Greckie"], ["Σ", "Sigma", "Greckie"], ["Φ", "Phi", "Greckie"], ["Ψ", "Psi", "Greckie"], ["Ω", "Omega", "Greckie"], ["+", "plus", "Operatory"], ["−", "minus", "Operatory"], ["±", "plus.minus", "Operatory"], ["∓", "minus.plus", "Operatory"], ["×", "times", "Operatory"], ["÷", "div", "Operatory"], ["·", "dot.op", "Operatory"], ["∘", "compose", "Operatory"], ["⊕", "plus.circle", "Operatory"], ["⊗", "times.circle", "Operatory"], ["∑", "sum", "Operatory"], ["∏", "product", "Operatory"], ["∫", "integral", "Operatory"], ["∬", "integral.double", "Operatory"], ["∮", "integral.cont", "Operatory"], ["∂", "diff", "Operatory"], ["∇", "nabla", "Operatory"], ["√", "sqrt", "Operatory"], ["∞", "infinity", "Operatory"], ["′", "prime", "Operatory"], ["=", "eq", "Relacje"], ["≠", "eq.not", "Relacje"], ["≈", "approx", "Relacje"], ["≡", "equiv", "Relacje"], ["∼", "tilde.op", "Relacje"], ["≅", "tilde.equiv", "Relacje"], ["<", "lt", "Relacje"], [">", "gt", "Relacje"], ["≤", "lt.eq", "Relacje"], ["≥", "gt.eq", "Relacje"], ["≪", "lt.double", "Relacje"], ["≫", "gt.double", "Relacje"], ["∝", "prop", "Relacje"], ["⊥", "perp", "Relacje"], ["∥", "parallel", "Relacje"], ["∣", "divides", "Relacje"], ["≺", "prec", "Relacje"], ["≻", "succ", "Relacje"], ["→", "arrow.r", "Strzałki"], ["←", "arrow.l", "Strzałki"], ["↔", "arrow.l.r", "Strzałki"], ["⇒", "arrow.r.double", "Strzałki"], ["⇐", "arrow.l.double", "Strzałki"], ["⇔", "arrow.l.r.double", "Strzałki"], ["↦", "arrow.r.bar", "Strzałki"], ["⟶", "arrow.r.long", "Strzałki"], ["⟹", "arrow.r.double.long", "Strzałki"], ["↑", "arrow.t", "Strzałki"], ["↓", "arrow.b", "Strzałki"], ["↕", "arrow.t.b", "Strzałki"], ["↪", "arrow.r.hook", "Strzałki"], ["⇀", "harpoon.rt", "Strzałki"], ["⇝", "arrow.r.squiggly", "Strzałki"], ["↗", "arrow.tr", "Strzałki"], ["↘", "arrow.br", "Strzałki"], ["⟼", "arrow.r.long.bar", "Strzałki"], ["∈", "in", "Zbiory i logika"], ["∉", "in.not", "Zbiory i logika"], ["∋", "in.rev", "Zbiory i logika"], ["⊂", "subset", "Zbiory i logika"], ["⊆", "subset.eq", "Zbiory i logika"], ["⊃", "supset", "Zbiory i logika"], ["⊇", "supset.eq", "Zbiory i logika"], ["∪", "union", "Zbiory i logika"], ["∩", "sect", "Zbiory i logika"], ["∖", "without", "Zbiory i logika"], ["∅", "emptyset", "Zbiory i logika"], ["∀", "forall", "Zbiory i logika"], ["∃", "exists", "Zbiory i logika"], ["∄", "exists.not", "Zbiory i logika"], ["¬", "not", "Zbiory i logika"], ["∧", "and", "Zbiory i logika"], ["∨", "or", "Zbiory i logika"], ["⊤", "top", "Zbiory i logika"], ["⊥", "bot", "Zbiory i logika"], ["ℕ", "NN", "Zbiory i logika"], ["ℤ", "ZZ", "Zbiory i logika"], ["ℚ", "QQ", "Zbiory i logika"], ["ℝ", "RR", "Zbiory i logika"], ["ℂ", "CC", "Zbiory i logika"], ["∴", "therefore", "Zbiory i logika"], ["∵", "because", "Zbiory i logika"], ["∞", "infinity", "Analiza i inne"], ["∂", "diff", "Analiza i inne"], ["∇", "nabla", "Analiza i inne"], ["ℏ", "planck.reduce", "Analiza i inne"], ["ℓ", "ell", "Analiza i inne"], ["°", "degree", "Analiza i inne"], ["∠", "angle", "Analiza i inne"], ["△", "triangle.stroked.t", "Analiza i inne"], ["…", "dots.h", "Analiza i inne"], ["⋯", "dots.h.c", "Analiza i inne"], ["⋮", "dots.v", "Analiza i inne"], ["⋱", "dots.down", "Analiza i inne"], ["⌊", "floor.l", "Analiza i inne"], ["⌋", "floor.r", "Analiza i inne"], ["⌈", "ceil.l", "Analiza i inne"], ["⌉", "ceil.r", "Analiza i inne"], ["⟨", "angle.l", "Analiza i inne"], ["⟩", "angle.r", "Analiza i inne"], ["‖", "bar.v.double", "Analiza i inne"], ["ℵ", "aleph", "Analiza i inne"], ["‰", "permille", "Analiza i inne"], ["∎", "qed", "Analiza i inne"]];
+const SECTIONS = ["recent", "greek", "ops", "rel", "arr", "sets", "misc"];
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'greek', sel: SYM.findIndex(s => s[1] === 'theta'), math: true };
+  }
+  renderVals() {
+    const s = this.state, theme = WT.ui();
+    const v = {};
+    SECTIONS.forEach(k => { v['t_' + k] = s.tab === k; v['go_' + k] = () => this.setState({ tab: k }); });
+    SYM.forEach((x, i) => { v['s' + i] = s.sel === i; v['p' + i] = () => this.setState({ sel: i }); });
+    const cur = SYM[s.sel] || SYM[0];
+    const cp = cur[0].codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
+    v.glyph = cur[0];
+    v.name = cur[1];
+    v.code = s.math ? cur[1] : '$' + cur[1] + '$';
+    v.uni = 'U+' + cp;
+    v.sec = cur[2];
+    v.asMath = s.math; v.asText = !s.math;
+    v.toMath = () => this.setState({ math: true });
+    v.toText = () => this.setState({ math: false });
+    v.theme = theme; v.yes = true;
+    return v;
+  }
+}
+</script>
+</body>
+</html>
