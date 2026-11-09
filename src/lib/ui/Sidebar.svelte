@@ -11,9 +11,11 @@
   import { tick } from "svelte";
   import Icon from "./Icon.svelte";
   import IconButton from "./IconButton.svelte";
+  import Menu from "./Menu.svelte";
   import type {
     SidebarFooterEntry,
     SidebarItem,
+    SidebarLanguage,
     SidebarSection,
   } from "./types";
 
@@ -30,6 +32,15 @@
     onToggle: (id: string) => void;
     saveStatus: string;
     footer: readonly SidebarFooterEntry[];
+    mark?: string;
+    onWorkspace?: () => void;
+    newDisabled?: boolean;
+    searchDisabled?: boolean;
+    searchValue?: string;
+    expandLabel?: string;
+    collapseLabel?: string;
+    onChoose?: (id: string) => void;
+    language?: SidebarLanguage;
   };
 
   let {
@@ -45,11 +56,21 @@
     onToggle,
     saveStatus,
     footer,
+    mark,
+    onWorkspace,
+    newDisabled = false,
+    searchDisabled = false,
+    searchValue,
+    expandLabel,
+    collapseLabel,
+    onChoose,
+    language,
   }: Props = $props();
 
   let activeBySection = $state<Record<string, string>>({});
   const searchId = nextSearchId();
-  const mark = $derived(Array.from(workspaceName)[0] ?? "");
+  const shownMark = $derived(mark ?? Array.from(workspaceName)[0] ?? "");
+  const twistNamed = $derived(Boolean(expandLabel && collapseLabel));
 
   function rowsIn(section: SidebarSection): SidebarItem[] {
     if (!section.expanded) return [];
@@ -67,9 +88,19 @@
     activeBySection = { ...activeBySection, [sectionId]: itemId };
   }
 
-  function activate(item: SidebarItem) {
+  function eventInsideMenu(event: Event): boolean {
+    const target = event.target;
+    return target instanceof Element && target.closest(".tree-menu") !== null;
+  }
+
+  function choose(item: SidebarItem) {
     if (item.kind === "note") onOpen(item.id);
+    else if (onChoose) onChoose(item.id);
     else onToggle(item.id);
+  }
+
+  function twistLabel(item: SidebarItem): string {
+    return item.expanded ? (collapseLabel ?? "") : (expandLabel ?? "");
   }
 
   async function onRowKey(
@@ -110,23 +141,66 @@
       onToggle(item.id);
       return;
     }
-    if ((event.key === "Enter" || event.key === " ") && item.kind === "note") {
-      event.preventDefault();
-      onOpen(item.id);
+    if (event.key === "Enter" || event.key === " ") {
+      if (item.kind === "note") {
+        event.preventDefault();
+        onOpen(item.id);
+      } else if (onChoose) {
+        event.preventDefault();
+        onChoose(item.id);
+      }
     }
   }
 </script>
 
+{#snippet languageSelect()}
+  {#if language}
+    <label class="locale-select">
+      <span class="visually-hidden">{language.label}</span>
+      <select
+        aria-label={language.label}
+        value={language.value}
+        onchange={(event) => {
+          const select = event.currentTarget;
+          language?.onChange(select.value);
+          if (language) select.value = language.value;
+        }}
+      >
+        {#each language.options as option (option.value)}
+          <option value={option.value}>{option.label}</option>
+        {/each}
+      </select>
+    </label>
+  {/if}
+{/snippet}
+
 <nav class="sidebar" aria-label={navLabel}>
   <div class="sidebar-head">
     <div class="workspace">
-      {#if mark}
-        <span class="workspace-mark" aria-hidden="true">{mark}</span>
+      {#if shownMark}
+        <span class="workspace-mark" aria-hidden="true">{shownMark}</span>
       {/if}
-      <span class="workspace-name one-line" title={workspaceName}>
-        {workspaceName}
-      </span>
-      <IconButton label={newLabel} icon="plus" size="sm" onclick={onNew} />
+      {#if onWorkspace}
+        <button
+          type="button"
+          class="workspace-name one-line"
+          title={workspaceName}
+          onclick={onWorkspace}
+        >
+          {workspaceName}
+        </button>
+      {:else}
+        <span class="workspace-name one-line" title={workspaceName}>
+          {workspaceName}
+        </span>
+      {/if}
+      <IconButton
+        label={newLabel}
+        icon="plus"
+        size="sm"
+        disabled={newDisabled}
+        onclick={onNew}
+      />
     </div>
     <div class="search-wrap">
       <Icon id="search" size="sm" />
@@ -138,36 +212,60 @@
         placeholder={searchLabel}
         title={searchLabel}
         autocomplete="off"
-        oninput={(event) => onSearch(event.currentTarget.value)}
+        spellcheck="false"
+        disabled={searchDisabled}
+        value={searchValue}
+        oninput={(event) => {
+          if (searchDisabled) return;
+          onSearch(event.currentTarget.value);
+        }}
       />
     </div>
   </div>
   <div class="sidebar-body">
     {#each sections as section (section.id)}
-      <section>
-        <button
-          type="button"
-          class="section-title"
-          aria-expanded={section.expanded}
-          title={section.title}
-          onclick={() => section.onToggle()}
-        >
-          <Icon
-            id={section.expanded ? "chevronDown" : "chevronRight"}
-            size="sm"
-          />
-          <span class="one-line">{section.title}</span>
-        </button>
+      <section aria-busy={section.busy ? "true" : undefined}>
+        <div class="section-head">
+          <button
+            type="button"
+            class="section-title"
+            aria-expanded={section.expanded}
+            title={section.title}
+            onclick={() => section.onToggle()}
+          >
+            <Icon
+              id={section.expanded ? "chevronDown" : "chevronRight"}
+              size="sm"
+            />
+            <span class="one-line">{section.title}</span>
+          </button>
+          {#if section.action}
+            <button
+              type="button"
+              class="section-action"
+              title={section.action.label}
+              disabled={section.action.disabled}
+              onclick={() => section.action?.onclick()}
+            >
+              <span class="one-line">{section.action.label}</span>
+            </button>
+          {/if}
+        </div>
+        {#if section.expanded && section.notice}
+          <p class="section-notice">{section.notice}</p>
+        {/if}
         {#if section.expanded}
           <div class="tree" role="tree" aria-label={section.title}>
             {#each rowsIn(section) as item (item.id)}
               <div
                 class="tree-row"
                 class:selected={item.selected}
+                class:current={item.current}
                 role="treeitem"
                 data-id={item.id}
                 aria-level={item.level}
                 aria-selected={item.selected ? "true" : "false"}
+                aria-current={item.current ? "page" : undefined}
                 aria-expanded={item.kind === "folder"
                   ? item.expanded
                     ? "true"
@@ -175,15 +273,37 @@
                   : undefined}
                 tabindex={tabFor(section, item)}
                 style:--level={item.level}
-                title={item.label}
-                onclick={() => {
+                title={item.title ?? item.label}
+                onclick={(event) => {
+                  if (eventInsideMenu(event)) return;
                   remember(section.id, item.id);
-                  activate(item);
+                  choose(item);
                 }}
-                onkeydown={(event) => onRowKey(event, section, item)}
+                onkeydown={(event) => {
+                  if (eventInsideMenu(event)) return;
+                  onRowKey(event, section, item);
+                }}
               >
                 <span class="tree-twist">
-                  {#if item.kind === "folder"}
+                  {#if item.kind === "folder" && twistNamed}
+                    <button
+                      type="button"
+                      class="twist-btn"
+                      tabindex="-1"
+                      aria-label={twistLabel(item)}
+                      aria-expanded={item.expanded ? "true" : "false"}
+                      onclick={(event) => {
+                        event.stopPropagation();
+                        onToggle(item.id);
+                      }}
+                      onkeydown={(event) => event.stopPropagation()}
+                    >
+                      <Icon
+                        id={item.expanded ? "chevronDown" : "chevronRight"}
+                        size="sm"
+                      />
+                    </button>
+                  {:else if item.kind === "folder"}
                     <Icon
                       id={item.expanded ? "chevronDown" : "chevronRight"}
                       size="sm"
@@ -204,6 +324,14 @@
                 {#if item.unsaved}
                   <span class="unsaved-dot" aria-hidden="true">●</span>
                 {/if}
+                {#if item.count !== undefined}
+                  <span class="tree-count">{item.count}</span>
+                {/if}
+                {#if item.menu && item.menu.length > 0 && item.menuLabel}
+                  <span class="tree-menu">
+                    <Menu label={item.menuLabel} entries={item.menu} />
+                  </span>
+                {/if}
               </div>
             {/each}
           </div>
@@ -221,7 +349,13 @@
       >
         <span class="one-line">{entry.label}</span>
       </button>
+      {#if index === 0}
+        {@render languageSelect()}
+      {/if}
     {/each}
+    {#if footer.length === 0}
+      {@render languageSelect()}
+    {/if}
     <span class="save-status one-line" title={saveStatus}>{saveStatus}</span>
   </div>
 </nav>

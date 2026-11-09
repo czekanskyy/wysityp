@@ -76,5 +76,18 @@
   "template_problem_set": "Zestaw zadań",
   "template_lab": "Notatka laboratoryjna",
   "template_created": "Utworzono",
-  "template_failed": "Szablon nie utworzył notatki"
+  "template_failed": "Szablon nie utworzył notatki",
+  "close_note": "Zamknij notatkę",
+  "notes_heading": "Notatki",
+  "row_menu": "Działania",
+  "template_lecture_body": "Tytuł, data, prowadzący i miejsce na definicje oraz twierdzenia.",
+  "template_problem_set_body": "Numerowane zadania z miejscem na rozwiązanie i odpowiedź.",
+  "template_lab_body": "Cel, aparatura, tabela pomiarów, niepewności i wnioski.",
+  "greeting_0": "Hej",
+  "greeting_1": "Cześć",
+  "greeting_2": "No to piszemy",
+  "greeting_3": "Zaczynamy",
+  "greeting_4": "Miło cię widzieć",
+  "greeting_5": "Notatki czekają",
+  "greeting_6": "Wchodzisz w to"
 }
