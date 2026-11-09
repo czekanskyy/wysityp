@@ -24,18 +24,18 @@
     type SaveTicket,
   } from "./lib/noteSafety";
   import { byteOffsetToUtf16, debounce, RenderGuard } from "./lib/render";
-  import { formatNoteDate, greetingIndex, localDateStamp } from "./lib/greeting";
+  import {
+    formatNoteDate,
+    greetingIndex,
+    localDateStamp,
+  } from "./lib/greeting";
   import { m } from "./paraglide/messages.js";
   import Button from "./lib/ui/Button.svelte";
   import Card from "./lib/ui/Card.svelte";
   import SegmentedControl from "./lib/ui/SegmentedControl.svelte";
   import Sidebar from "./lib/ui/Sidebar.svelte";
   import TextField from "./lib/ui/TextField.svelte";
-  import type {
-    SegmentOptions,
-    SidebarItem,
-    SidebarSection,
-  } from "./lib/ui";
+  import type { SegmentOptions, SidebarItem, SidebarSection } from "./lib/ui";
   import type { RenderDiagnostic, SearchHit, TreeNode } from "./bindings";
 
   let locale = $state<AppLocale>(currentLocale());
@@ -718,7 +718,10 @@
     return cut === -1 ? path : path.slice(cut + 1);
   }
 
-  function entryMenu(path: string, name: string): Pick<SidebarItem, "menu" | "menuLabel"> {
+  function entryMenu(
+    path: string,
+    name: string,
+  ): Pick<SidebarItem, "menu" | "menuLabel"> {
     return {
       menuLabel: `${labels.rowMenu} ${name}`,
       menu: [
@@ -1222,7 +1225,9 @@
             />
           </div>
           <section class="start-block" aria-labelledby="templates-heading">
-            <h2 id="templates-heading" class="text-lg">{labels.templatesLabel}</h2>
+            <h2 id="templates-heading" class="text-lg">
+              {labels.templatesLabel}
+            </h2>
             <div class="card-grid">
               {#each templateChoices as template (template.id)}
                 <Card
@@ -1237,7 +1242,9 @@
             </div>
           </section>
           <section class="start-block" aria-labelledby="recent-cards-heading">
-            <h2 id="recent-cards-heading" class="text-lg">{labels.recentNotes}</h2>
+            <h2 id="recent-cards-heading" class="text-lg">
+              {labels.recentNotes}
+            </h2>
             {#if !rootName}
               <p class="muted">{labels.recentEmpty}</p>
             {:else if recentError}

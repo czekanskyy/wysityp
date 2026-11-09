@@ -209,8 +209,6 @@ input:focus-visible {
   font-size: 0.95rem;
 }
 
-
-
 .pane h2 .path {
   margin-left: 0.6rem;
   color: var(--ink-soft);
