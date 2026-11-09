@@ -9,20 +9,28 @@ use crate::files;
 
 pub const DEFAULT_LOCALE: &str = "pl";
 pub const LOCALES: [&str; 2] = ["pl", "en"];
+pub const DEFAULT_THEME: &str = "system";
+pub const THEMES: [&str; 3] = ["system", "light", "dark"];
+pub const DEFAULT_PAGE_COLOR: &str = "white";
+pub const PAGE_COLORS: [&str; 4] = ["white", "beige", "graphite", "oled"];
 pub const RECENT_LIMIT: usize = 10;
 
-/// What the page is allowed to see. Language lives only in `locale`.
-/// Recent notes are a separate command so the workspace identity never
-/// travels to the page.
+/// What the page is allowed to see: `locale`, `theme`, and `page_color`.
+/// Recent notes stay on their own command so the workspace identity
+/// never travels to the page.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct Settings {
     pub locale: String,
+    pub theme: String,
+    pub page_color: String,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             locale: DEFAULT_LOCALE.to_string(),
+            theme: DEFAULT_THEME.to_string(),
+            page_color: DEFAULT_PAGE_COLOR.to_string(),
         }
     }
 }
@@ -102,9 +110,10 @@ impl RecentNotes {
 /// The settings file as one JSON object.
 ///
 /// Every writer loads this, changes only the fields it owns, and writes
-/// the object back through [`files::write_atomically`]. `locale` and
-/// `recent_notes` are the fields this module understands. Font fields
-/// and anything else stay in `object` and ride along on every save.
+/// the object back through [`files::write_atomically`]. `locale`,
+/// `theme`, `page_color`, and `recent_notes` are the fields this module
+/// understands. Font fields and anything else stay in `object` and ride
+/// along on every save.
 #[derive(Debug, Clone)]
 struct SettingsFile {
     locale: String,
@@ -161,9 +170,7 @@ pub fn spoken_word(raw: &str) -> Option<String> {
 }
 
 pub fn load_settings(path: &Path) -> AppResult<Settings> {
-    Ok(Settings {
-        locale: load_file(path)?.locale,
-    })
+    Ok(settings_view(&load_file(path)?))
 }
 
 pub fn set_locale(path: &Path, locale: &str) -> AppResult<Settings> {
@@ -176,9 +183,63 @@ pub fn set_locale(path: &Path, locale: &str) -> AppResult<Settings> {
         .object
         .insert("locale".to_string(), Value::String(file.locale.clone()));
     save_file(path, &file)?;
-    Ok(Settings {
-        locale: file.locale,
-    })
+    Ok(settings_view(&file))
+}
+
+/// Write only `theme`. A value outside `system`, `light`, and `dark`
+/// leaves the file untouched.
+pub fn set_theme(path: &Path, theme: &str) -> AppResult<Settings> {
+    if !THEMES.contains(&theme) {
+        return Err(AppError::BadTheme(theme.to_string()));
+    }
+    let mut file = load_file(path)?;
+    let _ = file
+        .object
+        .insert("theme".to_string(), Value::String(theme.to_string()));
+    save_file(path, &file)?;
+    Ok(settings_view(&file))
+}
+
+/// Write only `page_color`. A value outside the four page colours
+/// leaves the file untouched.
+pub fn set_page_color(path: &Path, page_color: &str) -> AppResult<Settings> {
+    if !PAGE_COLORS.contains(&page_color) {
+        return Err(AppError::BadPageColor(page_color.to_string()));
+    }
+    let mut file = load_file(path)?;
+    let _ = file.object.insert(
+        "page_color".to_string(),
+        Value::String(page_color.to_string()),
+    );
+    save_file(path, &file)?;
+    Ok(settings_view(&file))
+}
+
+fn settings_view(file: &SettingsFile) -> Settings {
+    Settings {
+        locale: file.locale.clone(),
+        theme: resolved_setting(&file.object, "theme", THEMES.as_slice(), DEFAULT_THEME),
+        page_color: resolved_setting(
+            &file.object,
+            "page_color",
+            PAGE_COLORS.as_slice(),
+            DEFAULT_PAGE_COLOR,
+        ),
+    }
+}
+
+/// A missing key, a value that is not a string, or a string outside
+/// `allowed` reads as `fallback`. This does not write the object.
+fn resolved_setting(
+    object: &Map<String, Value>,
+    key: &str,
+    allowed: &[&str],
+    fallback: &str,
+) -> String {
+    match object.get(key) {
+        Some(Value::String(value)) if allowed.contains(&value.as_str()) => value.clone(),
+        _ => fallback.to_string(),
+    }
 }
 
 /// Remember a note the student just opened. Newest first, duplicates
@@ -265,7 +326,7 @@ pub fn retarget_recent(settings_path: &Path, root: &Path, from: &str, to: &str) 
     save_file(settings_path, &file)
 }
 
-/// The one loader for language, recents, and later font writes.
+/// The one loader for language, appearance, recents, and later font writes.
 fn load_file(path: &Path) -> AppResult<SettingsFile> {
     match std::fs::read_to_string(path) {
         Ok(text) => parse_settings(&text),
@@ -628,6 +689,8 @@ mod tests {
         assert!(load_settings(&path).is_err());
         assert!(list_recent(&path, root.path()).is_err());
         assert!(set_locale(&path, "en").is_err());
+        assert!(set_theme(&path, "dark").is_err());
+        assert!(set_page_color(&path, "beige").is_err());
         assert!(record_recent(&path, root.path(), "a.typ").is_err());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), broken);
     }
@@ -1320,5 +1383,209 @@ mod tests {
         assert_eq!(saved["locale"], "en");
         assert_eq!(saved["display_name"], 12);
         assert_eq!(saved["render_font"], "Inter");
+    }
+
+    #[test]
+    fn default_appearance_follows_windows_and_a_white_page() {
+        let settings = Settings::default();
+        assert_eq!(settings.theme, "system");
+        assert_eq!(settings.page_color, "white");
+    }
+
+    #[test]
+    fn a_new_settings_file_does_not_store_appearance_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let loaded = load_settings(&path).unwrap();
+        assert_eq!(loaded.theme, "system");
+        assert_eq!(loaded.page_color, "white");
+        let saved = read_settings(&path);
+        assert!(saved.get("theme").is_none());
+        assert!(saved.get("page_color").is_none());
+    }
+
+    #[test]
+    fn a_missing_or_illegal_appearance_is_resolved_and_not_written() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let original =
+            "{\"locale\":\"en\",\"theme\":true,\"page_color\":\"navy\",\"display_name\":\"Ada\"}\n";
+        std::fs::write(&path, original).unwrap();
+        let loaded = load_settings(&path).unwrap();
+        assert_eq!(loaded.locale, "en");
+        assert_eq!(loaded.theme, "system");
+        assert_eq!(loaded.page_color, "white");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+
+        let missing = "{\"locale\":\"pl\"}\n";
+        std::fs::write(&path, missing).unwrap();
+        let loaded = load_settings(&path).unwrap();
+        assert_eq!(loaded.theme, "system");
+        assert_eq!(loaded.page_color, "white");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), missing);
+    }
+
+    #[test]
+    fn theme_and_page_colour_round_trip_without_writing_each_other() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(
+            &path,
+            "{\"locale\":\"pl\",\"display_name\":\"Ada Lovelace\",\"source_font\":\"Kept Font\"}\n",
+        )
+        .unwrap();
+        let themed = set_theme(&path, "dark").unwrap();
+        assert_eq!(themed.theme, "dark");
+        assert_eq!(themed.page_color, "white");
+        assert_eq!(themed.locale, "pl");
+        let paged = set_page_color(&path, "graphite").unwrap();
+        assert_eq!(paged.page_color, "graphite");
+        assert_eq!(paged.theme, "dark");
+        let saved = read_settings(&path);
+        assert_eq!(saved["theme"], "dark");
+        assert_eq!(saved["page_color"], "graphite");
+        assert_eq!(saved["locale"], "pl");
+        assert_eq!(saved["display_name"], "Ada Lovelace");
+        assert_eq!(saved["source_font"], "Kept Font");
+        set_theme(&path, "system").unwrap();
+        let saved = read_settings(&path);
+        assert_eq!(saved["theme"], "system");
+        assert_eq!(saved["page_color"], "graphite");
+        assert_eq!(load_settings(&path).unwrap().page_color, "graphite");
+    }
+
+    #[test]
+    fn an_unknown_theme_or_page_colour_is_refused_and_the_file_stays() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        assert_eq!(
+            set_theme(&path, "blue").unwrap_err().to_string(),
+            "unknown theme: blue"
+        );
+        assert!(!path.exists());
+        let original = "{\"locale\":\"en\",\"theme\":\"light\",\"page_color\":\"beige\",\"render_font\":\"Inter\"}\n";
+        std::fs::write(&path, original).unwrap();
+        assert_eq!(
+            set_page_color(&path, "navy").unwrap_err().to_string(),
+            "unknown page colour: navy"
+        );
+        assert_eq!(
+            set_theme(&path, "blue").unwrap_err().to_string(),
+            "unknown theme: blue"
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+        let loaded = load_settings(&path).unwrap();
+        assert_eq!(loaded.theme, "light");
+        assert_eq!(loaded.page_color, "beige");
+        assert_eq!(loaded.locale, "en");
+    }
+
+    #[test]
+    fn export_pdf_does_not_read_page_colour() {
+        let engine = include_str!("typst_engine.rs");
+        assert!(
+            !engine.contains("page_color"),
+            "pdf export must not read the page colour"
+        );
+        assert!(engine.contains("PdfOptions::default()"));
+        let commands = include_str!("commands.rs");
+        let start = commands
+            .find("pub async fn export_pdf")
+            .expect("export_pdf");
+        let rest = &commands[start..];
+        let end = rest.find("\n#[tauri::command]").unwrap_or(rest.len());
+        let body = &rest[..end];
+        assert!(!body.contains("page_color"));
+        assert!(!body.contains("load_settings"));
+        assert!(!body.contains("set_page_color"));
+    }
+
+    // covers: AC-8, AC-9, AC-12, an empty word or the wrong case is refused
+    #[test]
+    fn an_empty_or_wrong_case_appearance_is_refused_and_the_file_stays() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        assert_eq!(
+            set_theme(&path, "").unwrap_err().to_string(),
+            "unknown theme: "
+        );
+        assert_eq!(
+            set_page_color(&path, "").unwrap_err().to_string(),
+            "unknown page colour: "
+        );
+        assert_eq!(
+            set_page_color(&path, "navy").unwrap_err().to_string(),
+            "unknown page colour: navy"
+        );
+        assert!(!path.exists());
+
+        let original = "{\"locale\":\"pl\",\"theme\":\"dark\",\"page_color\":\"graphite\"}\n";
+        std::fs::write(&path, original).unwrap();
+        assert_eq!(
+            set_theme(&path, "Dark").unwrap_err().to_string(),
+            "unknown theme: Dark"
+        );
+        assert_eq!(
+            set_page_color(&path, "OLED").unwrap_err().to_string(),
+            "unknown page colour: OLED"
+        );
+        assert_eq!(
+            set_theme(&path, " dark").unwrap_err().to_string(),
+            "unknown theme:  dark"
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+        let loaded = load_settings(&path).unwrap();
+        assert_eq!(loaded.theme, "dark");
+        assert_eq!(loaded.page_color, "graphite");
+        assert_eq!(loaded.locale, "pl");
+    }
+
+    // covers: AC-8, AC-9, AC-11, each legal word writes only its own key
+    #[test]
+    fn each_legal_theme_and_page_colour_writes_only_its_own_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(
+            &path,
+            "{\"locale\":\"en\",\"recent_notes\":{\"workspaces\":{}}}\n",
+        )
+        .unwrap();
+        for theme in ["system", "light", "dark"] {
+            let saved = set_theme(&path, theme).unwrap();
+            assert_eq!(saved.theme, theme);
+            assert_eq!(saved.page_color, "white");
+            assert_eq!(saved.locale, "en");
+            let file = read_settings(&path);
+            assert_eq!(file["theme"], theme);
+            assert!(file.get("page_color").is_none());
+            assert_eq!(file["locale"], "en");
+            assert!(file["recent_notes"].is_object());
+        }
+        set_theme(&path, "light").unwrap();
+        for page_color in ["white", "beige", "graphite", "oled"] {
+            let saved = set_page_color(&path, page_color).unwrap();
+            assert_eq!(saved.page_color, page_color);
+            assert_eq!(saved.theme, "light");
+            assert_eq!(saved.locale, "en");
+            let file = read_settings(&path);
+            assert_eq!(file["page_color"], page_color);
+            assert_eq!(file["theme"], "light");
+            assert_eq!(file["locale"], "en");
+            assert!(file["recent_notes"].is_object());
+        }
+    }
+
+    // covers: AC-8, AC-9, AC-12, an empty or non string value is not repaired
+    #[test]
+    fn an_empty_appearance_string_on_disk_resolves_and_is_not_rewritten() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let original = "{\"locale\":\"pl\",\"theme\":\"\",\"page_color\":12}\n";
+        std::fs::write(&path, original).unwrap();
+        let loaded = load_settings(&path).unwrap();
+        assert_eq!(loaded.theme, "system");
+        assert_eq!(loaded.page_color, "white");
+        assert_eq!(loaded.locale, "pl");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
     }
 }

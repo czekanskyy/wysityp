@@ -24,6 +24,8 @@ export const commands = {
 	exportPdf: (path: string, source: string) => typedError<string, string>(__TAURI_INVOKE("export_pdf", { path, source })),
 	getSettings: () => typedError<Settings, string>(__TAURI_INVOKE("get_settings")),
 	setLocale: (locale: string) => typedError<Settings, string>(__TAURI_INVOKE("set_locale", { locale })),
+	setTheme: (theme: string) => typedError<Settings, string>(__TAURI_INVOKE("set_theme", { theme })),
+	setPageColor: (pageColor: string) => typedError<Settings, string>(__TAURI_INVOKE("set_page_color", { pageColor })),
 	/**
 	 *  The spoken greeting word, or an empty string. Never an error on the page.
 	 * 
@@ -73,12 +75,14 @@ export type SearchHit = {
 };
 
 /**
- *  What the page is allowed to see. Language lives only in `locale`.
- *  Recent notes are a separate command so the workspace identity never
- *  travels to the page.
+ *  What the page is allowed to see: `locale`, `theme`, and `page_color`.
+ *  Recent notes stay on their own command so the workspace identity
+ *  never travels to the page.
  */
 export type Settings = {
 	locale: string,
+	theme: string,
+	page_color: string,
 };
 
 /**  One folder or note in the open workspace, as it sits on disk. */

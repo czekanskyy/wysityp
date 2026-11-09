@@ -21,6 +21,8 @@ vi.mock("../bindings", () => ({
     exportPdf: vi.fn(),
     getSettings: vi.fn(),
     setLocale: vi.fn(),
+    setTheme: vi.fn(),
+    setPageColor: vi.fn(),
     greetingName: vi.fn(),
   },
 }));
@@ -196,5 +198,68 @@ describe("workspace api", () => {
     await expect(api.renameEntry("old.typ", "new.typ")).resolves.toBe(
       "new.typ",
     );
+  });
+});
+
+describe("appearance api", () => {
+  const settings = {
+    locale: "pl",
+    theme: "dark",
+    page_color: "graphite",
+  };
+
+  // covers: AC-8, AC-9
+  it("sends the theme and does not send the page colour", async () => {
+    mocked.setTheme.mockResolvedValue(settings as never);
+
+    await expect(api.setTheme("dark")).resolves.toEqual(settings);
+    expect(mocked.setTheme).toHaveBeenCalledTimes(1);
+    expect(mocked.setTheme).toHaveBeenCalledWith("dark");
+    expect(mocked.setPageColor).not.toHaveBeenCalled();
+  });
+
+  // covers: AC-9
+  it("sends the page colour and does not send the theme", async () => {
+    const next = { locale: "pl", theme: "light", page_color: "oled" };
+    mocked.setPageColor.mockResolvedValue(next as never);
+
+    await expect(api.setPageColor("oled")).resolves.toEqual(next);
+    expect(mocked.setPageColor).toHaveBeenCalledTimes(1);
+    expect(mocked.setPageColor).toHaveBeenCalledWith("oled");
+    expect(mocked.setTheme).not.toHaveBeenCalled();
+  });
+
+  // covers: AC-11
+  it("returns locale, theme, and page colour from settings", async () => {
+    mocked.getSettings.mockResolvedValue(settings as never);
+
+    await expect(api.getSettings()).resolves.toEqual(settings);
+    expect(mocked.getSettings).toHaveBeenCalledTimes(1);
+    expect(mocked.setTheme).not.toHaveBeenCalled();
+    expect(mocked.setPageColor).not.toHaveBeenCalled();
+  });
+
+  // covers: AC-12
+  it("throws the Rust words when the theme is refused", async () => {
+    mocked.setTheme.mockResolvedValue({
+      status: "error",
+      error: "unknown theme: blue",
+    } as never);
+
+    await expect(api.setTheme("blue")).rejects.toThrow("unknown theme: blue");
+    expect(mocked.setPageColor).not.toHaveBeenCalled();
+  });
+
+  // covers: AC-12
+  it("throws the Rust words when the page colour is refused", async () => {
+    mocked.setPageColor.mockResolvedValue({
+      status: "error",
+      error: "unknown page colour: navy",
+    } as never);
+
+    await expect(api.setPageColor("navy")).rejects.toThrow(
+      "unknown page colour: navy",
+    );
+    expect(mocked.setTheme).not.toHaveBeenCalled();
   });
 });

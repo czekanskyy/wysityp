@@ -52,6 +52,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::export_pdf,
         commands::get_settings,
         commands::set_locale,
+        commands::set_theme,
+        commands::set_page_color,
         commands::greeting_name
     ])
 }

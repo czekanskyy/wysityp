@@ -1,7 +1,7 @@
 # 0005. App shell and start surface
 
 **Date**: 2026-11-09
-**Status**: In Progress
+**Status**: Accepted
 
 ## Summary
 

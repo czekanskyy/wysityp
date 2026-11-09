@@ -76,6 +76,12 @@ export const api = {
   async setLocale(locale: string) {
     return unwrap(await commands.setLocale(locale));
   },
+  async setTheme(theme: string) {
+    return unwrap(await commands.setTheme(theme));
+  },
+  async setPageColor(pageColor: string) {
+    return unwrap(await commands.setPageColor(pageColor));
+  },
   async greetingName() {
     return unwrap(await commands.greetingName());
   },

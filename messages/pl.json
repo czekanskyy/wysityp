@@ -89,5 +89,19 @@
   "greeting_3": "Zaczynamy",
   "greeting_4": "Miło cię widzieć",
   "greeting_5": "Notatki czekają",
-  "greeting_6": "Wchodzisz w to"
+  "greeting_6": "Wchodzisz w to",
+  "appearance_label": "Wygląd",
+  "theme_label": "Motyw interfejsu",
+  "theme_system": "Systemowy",
+  "theme_light": "Jasny",
+  "theme_dark": "Ciemny",
+  "theme_hint": "Pasek boczny, pasek narzędzi, menu i okna dialogowe.",
+  "page_color_label": "Kolor strony",
+  "page_white": "Biały",
+  "page_beige": "Beżowy",
+  "page_graphite": "Grafitowy",
+  "page_oled": "Czarny (OLED)",
+  "page_color_hint": "Strona zostaje w tym kolorze także przy ciemnym oknie.",
+  "appearance_preview": "Krótka próbka na stronie.",
+  "appearance_close": "Zamknij"
 }

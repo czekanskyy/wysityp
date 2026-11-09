@@ -310,6 +310,20 @@ pub fn set_locale(state: State<'_, AppState>, locale: String) -> Result<Settings
     settings::set_locale(&path, &locale).map_err(String::from)
 }
 
+#[tauri::command]
+#[specta::specta]
+pub fn set_theme(state: State<'_, AppState>, theme: String) -> Result<Settings, String> {
+    let path = settings_file(&state)?;
+    settings::set_theme(&path, &theme).map_err(String::from)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_page_color(state: State<'_, AppState>, page_color: String) -> Result<Settings, String> {
+    let path = settings_file(&state)?;
+    settings::set_page_color(&path, &page_color).map_err(String::from)
+}
+
 /// The spoken greeting word, or an empty string. Never an error on the page.
 ///
 /// A saved `display_name` wins. Otherwise the account display name is

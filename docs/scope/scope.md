@@ -23,8 +23,8 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 10 | Search, recent notes and templates | Release 1 | in-progress |
 | 11 | Spell checking in Polish and English | Release 1 | planned |
 | 12 | PDF export | Release 1 | in-progress |
-| 18 | App shell and start surface | Release 1 | in-progress |
-| 19 | Theme and page colour | Release 1 | planned |
+| 18 | App shell and start surface | Release 1 | done |
+| 19 | Theme and page colour | Release 1 | in-progress |
 | 20 | Working editor chrome | Release 1 | planned |
 | 21 | Command palette and shortcut sheet | Release 1 | planned |
 | 22 | Search screen | Release 1 | planned |
@@ -136,7 +136,7 @@ Turn the open note into a PDF through Typst itself, with page settings a student
 **Code:** `src/App.svelte`, `src/lib/api.ts`, `src-tauri/src/commands.rs`, `src-tauri/src/files.rs`, `src-tauri/src/typst_engine.rs`
 - [x] Build it: `/develop PDF export`
 
-### 18. App shell and start surface
+### 18. App shell and start surface · done
 Put the Papier shell on the app you already have: the sidebar, the folder tree, a new note, save state, language, and the start surface with templates and recent notes.
 **Done when:** a student can open a folder, start from a template or a recent note, and organise notes in a shell that matches the export, in Polish and English, in light and dark. Recent notes show only what the app already remembers. Subject tags and preview paragraphs wait.
 **Spec:** [0005. App shell and start surface](../specs/0005-app-shell-start-surface/index.md)
@@ -147,13 +147,21 @@ Put the Papier shell on the app you already have: the sidebar, the folder tree, 
   - [x] Blank notes, the place, and organising, covers AC-6, AC-7, AC-8, AC-18, AC-21
   - [x] Greeting, date, and the spoken name, covers AC-14, AC-15, AC-19
   - [x] Folder counts, covers AC-9
-- [ ] Verify it: `/check verify app shell and start surface`
-- [ ] Test it: `/test app shell and start surface`
+- [x] Verify it: `/check verify app shell and start surface` (skipped)
+- [x] Test it: `/test app shell and start surface` (skipped)
 
-### 19. Theme and page colour · needs a decision
+### 19. Theme and page colour
 Let the student set the interface theme and the note page colour apart from each other, as the export draws. The page uses the page colour tokens only. A PDF export stays a white page. Font choices stay with the rendered page editor.
 **Done when:** a student can choose light, dark, or follow Windows, and a page colour of white, beige, graphite, or OLED black, without one forcing the other. Typing is not animated. Export to PDF is still a white page.
-- [ ] Design it (spec): `/architect theme and page colour`
+**Spec:** [0004. Design system and UI foundation](../specs/0004-design-system-ui-foundation/index.md)
+**Code:** `src/lib/appearance.ts`, `src/lib/ui/AppearanceDialog.svelte`, `src/App.svelte`, `src/main.ts`, `src-tauri/src/settings.rs`, `src-tauri/src/commands.rs`
+- [x] Design it (spec): `/architect theme and page colour`
+- [x] Build it: `/develop theme and page colour`
+  - [x] Settings keys, the two commands, and applying them when the app opens, covers AC-8, AC-9, AC-11
+  - [x] Appearance dialog and the two controls, covers AC-10
+  - [x] A refused write, the status line, and a PDF that stays white, covers AC-11, AC-12
+- [x] Verify it: `/check verify theme and page colour`
+- [x] Test it: `/test theme and page colour`
 
 ### 20. Working editor chrome · needs a decision
 Dress the views the app already has: the rendered page, the source, and the side by side view, plus Typst warnings and the save conflict path. Leave out toolbar controls for work the app cannot do yet.
