@@ -33,6 +33,15 @@ pub enum AppError {
     /// The page matches this prefix. The words after it are for logs.
     #[error("external-change: the note on disk was changed by another tool")]
     ExternalChange,
+    /// Every `unsaved` name through `unsaved-99` is taken.
+    #[error("note-names-exhausted: every unsaved name is taken")]
+    NoteNamesExhausted,
+    /// Every copy name from `{stem}.typ` through `{stem}-100.typ` is taken.
+    #[error("template-names-exhausted: every template copy name is taken")]
+    TemplateNamesExhausted,
+    /// The page matches this prefix and shows `image_refused`.
+    #[error("image-refused: {0}")]
+    ImageRefused(String),
     #[error("{0}")]
     Message(String),
 }

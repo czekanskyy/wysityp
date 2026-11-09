@@ -1,0 +1,6 @@
+= Tytuł przykładu
+
+== Zadanie
+
+== Rozwiązanie
+

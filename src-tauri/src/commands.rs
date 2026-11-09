@@ -27,6 +27,23 @@ fn baselines(state: &AppState) -> Result<std::sync::MutexGuard<'_, files::NoteBa
         .map_err(|_| "note baseline lock was poisoned".to_string())
 }
 
+fn template_baselines(
+    state: &AppState,
+) -> Result<std::sync::MutexGuard<'_, templates::TemplateBaselines>, String> {
+    state
+        .template_baselines
+        .lock()
+        .map_err(|_| "template baseline lock was poisoned".to_string())
+}
+
+/// A new note needs a settings file that can be read. This does not create one.
+fn locale_for_create(state: &AppState) -> Result<String, String> {
+    let path = settings_file(state)?;
+    Ok(settings::load_settings_for_create(&path)
+        .map_err(String::from)?
+        .locale)
+}
+
 fn remember_note(state: &AppState, note: &Note) -> Result<(), String> {
     baselines(state)?.remember(&note.path, note.fingerprint.clone());
     Ok(())
@@ -105,7 +122,8 @@ pub fn create_note(
 #[specta::specta]
 pub fn create_blank_note(state: State<'_, AppState>, parent: String) -> Result<Note, String> {
     let root = root_or_err(&state)?;
-    let note = templates::create_blank_note(&root, &parent).map_err(String::from)?;
+    let locale = locale_for_create(&state)?;
+    let note = templates::create_blank_note(&root, &parent, &locale).map_err(String::from)?;
     remember_note(&state, &note)?;
     remember_opened(&state, &root, &note.path);
     Ok(note)
@@ -131,7 +149,12 @@ pub fn rename_entry(
 ) -> Result<String, String> {
     let root = root_or_err(&state)?;
     let next = files::rename_entry(&root, &from, &to).map_err(String::from)?;
-    baselines(&state)?.retarget(&from, &next);
+    let mut baselines = baselines(&state)?;
+    baselines.retarget(&from, &next);
+    // A rewritten picture path changes the bytes, so the stored fingerprint follows.
+    if let Ok(note) = files::read_note(&root, &next) {
+        baselines.remember(&note.path, note.fingerprint);
+    }
     // Recent notes follow the rename too, best effort like recording.
     if let Ok(path) = settings_file(&state) {
         let _ = settings::retarget_recent(&path, &root, &from, &next);
@@ -193,18 +216,100 @@ pub fn open_note(state: State<'_, AppState>, path: String) -> Result<Note, Strin
 pub fn create_from_template(
     state: State<'_, AppState>,
     parent: String,
-    template: String,
+    kind: String,
+    name: String,
 ) -> Result<Note, String> {
     let root = root_or_err(&state)?;
+    let locale = locale_for_create(&state)?;
+    let settings_path = settings_file(&state)?;
+    let templates_dir = templates::templates_dir(&settings_path);
+    let note =
+        templates::create_from_template(&root, &parent, &kind, &name, &locale, &templates_dir)
+            .map_err(String::from)?;
+    remember_note(&state, &note)?;
+    remember_opened(&state, &root, &note.path);
+    Ok(note)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn list_templates(state: State<'_, AppState>) -> Result<templates::TemplateList, String> {
     let settings_path = settings_file(&state)?;
     let locale = settings::load_settings(&settings_path)
         .map_err(String::from)?
         .locale;
-    let note = templates::create_from_template(&root, &parent, &template, &locale)
+    let dir = templates::templates_dir(&settings_path);
+    Ok(templates::list_templates(&dir, &locale))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn copy_shipped_template(
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<templates::TemplateDoc, String> {
+    let settings_path = settings_file(&state)?;
+    let locale = settings::load_settings(&settings_path)
+        .map_err(String::from)?
+        .locale;
+    let dir = templates::templates_dir(&settings_path);
+    let doc = templates::copy_shipped_template(&dir, &name, &locale).map_err(String::from)?;
+    let path = dir.join(&doc.name);
+    template_baselines(&state)?
+        .remember(&path, doc.fingerprint.clone())
         .map_err(String::from)?;
-    remember_note(&state, &note)?;
-    remember_opened(&state, &root, &note.path);
-    Ok(note)
+    Ok(doc)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn open_template(
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<templates::TemplateDoc, String> {
+    let settings_path = settings_file(&state)?;
+    let dir = templates::templates_dir(&settings_path);
+    let doc = templates::open_template(&dir, &name).map_err(String::from)?;
+    let path = dir.join(&doc.name);
+    template_baselines(&state)?
+        .remember(&path, doc.fingerprint.clone())
+        .map_err(String::from)?;
+    Ok(doc)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn save_template(
+    state: State<'_, AppState>,
+    name: String,
+    text: String,
+    force: bool,
+) -> Result<templates::TemplateDoc, String> {
+    let settings_path = settings_file(&state)?;
+    let dir = templates::templates_dir(&settings_path);
+    let mut baselines = template_baselines(&state)?;
+    templates::save_template(&mut baselines, &dir, &name, &text, force).map_err(String::from)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn template_changed_on_disk(state: State<'_, AppState>, name: String) -> Result<bool, String> {
+    let settings_path = settings_file(&state)?;
+    let dir = templates::templates_dir(&settings_path);
+    let baselines = template_baselines(&state)?;
+    templates::template_changed_on_disk(&baselines, &dir, &name).map_err(String::from)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn save_note_image(
+    state: State<'_, AppState>,
+    path: String,
+    file_name: String,
+    bytes: Vec<u8>,
+) -> Result<String, String> {
+    let root = root_or_err(&state)?;
+    files::save_note_image(&root, &path, &file_name, &bytes).map_err(String::from)
 }
 
 #[tauri::command]
@@ -254,9 +359,11 @@ pub async fn render_note(
     revision: u32,
 ) -> Result<RenderResult, String> {
     let root = root_or_err(&state)?;
-    // The path is checked again here, so a render can never read
-    // included files from outside the open folder through its main path.
-    files::resolve_inside_root(&root, &path).map_err(String::from)?;
+    // An empty path is the buffer while a template is open. It is not a
+    // file, and includes still resolve inside the open folder.
+    if !path.trim().is_empty() {
+        files::resolve_inside_root(&root, &path).map_err(String::from)?;
+    }
     let engine: Arc<crate::typst_engine::Engine> = state.engine.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         engine.render(&root, &path, &source, revision)

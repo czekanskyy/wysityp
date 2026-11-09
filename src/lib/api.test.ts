@@ -14,6 +14,12 @@ vi.mock("../bindings", () => ({
     listRecentNotes: vi.fn(),
     openNote: vi.fn(),
     createFromTemplate: vi.fn(),
+    listTemplates: vi.fn(),
+    copyShippedTemplate: vi.fn(),
+    openTemplate: vi.fn(),
+    saveTemplate: vi.fn(),
+    templateChangedOnDisk: vi.fn(),
+    saveNoteImage: vi.fn(),
     createSampleNote: vi.fn(),
     saveNote: vi.fn(),
     noteChangedOnDisk: vi.fn(),
@@ -29,6 +35,7 @@ vi.mock("../bindings", () => ({
 
 import { commands } from "../bindings";
 import { api } from "./api";
+import { isExternalChange } from "./noteSafety";
 
 const mocked = vi.mocked(commands);
 
@@ -120,15 +127,21 @@ describe("workspace api", () => {
 
   it("creates a note from a template in the chosen folder", async () => {
     mocked.createFromTemplate.mockResolvedValue({
-      path: "lab/lecture-2.typ",
+      path: "lab/unsaved.typ",
       text: "= Lecture title\n",
     } as never);
 
-    await expect(api.createFromTemplate("lab", "lecture")).resolves.toEqual({
-      path: "lab/lecture-2.typ",
+    await expect(
+      api.createFromTemplate("lab", "shipped", "lecture"),
+    ).resolves.toEqual({
+      path: "lab/unsaved.typ",
       text: "= Lecture title\n",
     });
-    expect(mocked.createFromTemplate).toHaveBeenCalledWith("lab", "lecture");
+    expect(mocked.createFromTemplate).toHaveBeenCalledWith(
+      "lab",
+      "shipped",
+      "lecture",
+    );
   });
 
   it("deletes the entry at the given path", async () => {
@@ -198,6 +211,123 @@ describe("workspace api", () => {
     await expect(api.renameEntry("old.typ", "new.typ")).resolves.toBe(
       "new.typ",
     );
+  });
+});
+
+describe("template and image api", () => {
+  const doc = {
+    name: "lecture.typ",
+    text: "= Lecture title\n",
+    fingerprint: { hash: "abc", byte_len: 16 },
+  };
+
+  // covers: spec 0006 AC-4, the page gets stems, your names and the folder flag
+  it("lists the shipped stems, your names and whether the folder is ready", async () => {
+    const list = {
+      shipped: ["lecture", "lab"],
+      yours: ["mine.typ"],
+      folder_ready: true,
+    };
+    mocked.listTemplates.mockResolvedValue(list as never);
+
+    await expect(api.listTemplates()).resolves.toEqual(list);
+    expect(mocked.listTemplates).toHaveBeenCalledWith();
+  });
+
+  // covers: spec 0006 AC-7, a copy sends only the stem
+  it("copies a shipped template by stem and returns the new file", async () => {
+    mocked.copyShippedTemplate.mockResolvedValue(doc as never);
+
+    await expect(api.copyShippedTemplate("lecture")).resolves.toEqual(doc);
+    expect(mocked.copyShippedTemplate).toHaveBeenCalledWith("lecture");
+  });
+
+  // covers: spec 0006 AC-7, the page sees the exhausted prefix and the Rust words
+  it("throws the Rust words when every copy name is taken", async () => {
+    mocked.copyShippedTemplate.mockResolvedValue({
+      status: "error",
+      error: "template-names-exhausted: every copy name is taken",
+    } as never);
+
+    await expect(api.copyShippedTemplate("lecture")).rejects.toThrow(
+      /^template-names-exhausted:/,
+    );
+  });
+
+  it("opens one of your templates by file name", async () => {
+    mocked.openTemplate.mockResolvedValue(doc as never);
+
+    await expect(api.openTemplate("lecture.typ")).resolves.toEqual(doc);
+    expect(mocked.openTemplate).toHaveBeenCalledWith("lecture.typ");
+  });
+
+  // covers: spec 0006 AC-8, a template save can be forced and a refusal reads as a conflict
+  it("saves a template and can force the write", async () => {
+    mocked.saveTemplate.mockResolvedValue(doc as never);
+
+    await expect(
+      api.saveTemplate("lecture.typ", "= A\n", false),
+    ).resolves.toEqual(doc);
+    await api.saveTemplate("lecture.typ", "= B\n", true);
+
+    expect(mocked.saveTemplate).toHaveBeenNthCalledWith(
+      1,
+      "lecture.typ",
+      "= A\n",
+      false,
+    );
+    expect(mocked.saveTemplate).toHaveBeenNthCalledWith(
+      2,
+      "lecture.typ",
+      "= B\n",
+      true,
+    );
+  });
+
+  it("turns the external change refusal of a template save into a thrown error", async () => {
+    mocked.saveTemplate.mockResolvedValue({
+      status: "error",
+      error: "external-change: the note on disk was changed by another tool",
+    } as never);
+
+    const error = await api
+      .saveTemplate("lecture.typ", "= A\n", false)
+      .catch((caught: unknown) => caught);
+
+    expect(isExternalChange(error)).toBe(true);
+  });
+
+  // covers: spec 0006 AC-8, focus asks about the template by file name
+  it("asks Rust whether the open template changed on disk", async () => {
+    mocked.templateChangedOnDisk.mockResolvedValue(true as never);
+
+    await expect(api.templateChangedOnDisk("lecture.typ")).resolves.toBe(true);
+    expect(mocked.templateChangedOnDisk).toHaveBeenCalledWith("lecture.typ");
+  });
+
+  // covers: spec 0006 AC-10, the path comes back relative and a refusal keeps its prefix
+  it("saves a note image and returns the relative path", async () => {
+    mocked.saveNoteImage.mockResolvedValue("unsaved.assets/image.png" as never);
+
+    await expect(api.saveNoteImage("unsaved.typ", "", [1, 2, 3])).resolves.toBe(
+      "unsaved.assets/image.png",
+    );
+    expect(mocked.saveNoteImage).toHaveBeenCalledWith(
+      "unsaved.typ",
+      "",
+      [1, 2, 3],
+    );
+  });
+
+  it("throws an image refusal with its prefix", async () => {
+    mocked.saveNoteImage.mockResolvedValue({
+      status: "error",
+      error: "image-refused: that image type is not allowed",
+    } as never);
+
+    await expect(
+      api.saveNoteImage("unsaved.typ", "draw.svg", [1]),
+    ).rejects.toThrow(/^image-refused:/);
   });
 });
 

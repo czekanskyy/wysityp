@@ -120,7 +120,7 @@ fn is_same_or_inside(parent: &str, child: &str) -> bool {
     child == parent || child.starts_with(&format!("{parent}/"))
 }
 
-fn is_reserved_device_name(name: &str) -> bool {
+pub(crate) fn is_reserved_device_name(name: &str) -> bool {
     let stem = name.split('.').next().unwrap_or(name);
     matches!(
         stem.to_ascii_uppercase().as_str(),
@@ -193,6 +193,73 @@ fn folder_name(name: &str) -> AppResult<String> {
     Ok(name.to_string())
 }
 
+pub(crate) fn entry_names(dir: &Path) -> AppResult<Vec<String>> {
+    let mut names = Vec::new();
+    let entries = std::fs::read_dir(dir).map_err(|err| AppError::io(dir, err))?;
+    for entry in entries {
+        let entry = entry.map_err(|err| AppError::io(dir, err))?;
+        names.push(entry.file_name().to_string_lossy().to_string());
+    }
+    Ok(names)
+}
+
+/// A name is taken when the folder already has that file or folder, compared
+/// without regard to case. When `block_assets` is set, `{stem}.assets` counts too.
+pub(crate) fn name_is_taken(names: &[String], file_name: &str, block_assets: bool) -> bool {
+    let want = file_name.to_lowercase();
+    if names.iter().any(|name| name.to_lowercase() == want) {
+        return true;
+    }
+    if !block_assets {
+        return false;
+    }
+    let stem = Path::new(file_name)
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    let assets = format!("{stem}.assets");
+    names.iter().any(|name| name.to_lowercase() == assets)
+}
+
+fn find_dir_child(dir: &Path, name: &str) -> AppResult<Option<PathBuf>> {
+    let want = name.to_lowercase();
+    let entries = std::fs::read_dir(dir).map_err(|err| AppError::io(dir, err))?;
+    for entry in entries {
+        let entry = entry.map_err(|err| AppError::io(dir, err))?;
+        let found = entry.file_name().to_string_lossy().to_string();
+        if found.to_lowercase() == want {
+            return Ok(Some(entry.path()));
+        }
+    }
+    Ok(None)
+}
+
+fn paths_same(left: &Path, right: &Path) -> bool {
+    match (canonical_root(left), canonical_root(right)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
+
+fn file_stem_string(path: &Path) -> AppResult<String> {
+    path.file_stem()
+        .map(|stem| stem.to_string_lossy().to_string())
+        .filter(|stem| !stem.is_empty())
+        .ok_or_else(|| AppError::InvalidName(path.to_string_lossy().to_string()))
+}
+
+fn is_typ_file(path: &Path) -> bool {
+    path.is_file()
+        && path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("typ"))
+}
+
+fn is_assets_dir_name(name: &str) -> bool {
+    name.to_lowercase().ends_with(".assets")
+}
+
 fn join_relative(parent: &str, name: &str) -> String {
     let parent = display_relative(parent.trim());
     if parent.is_empty() {
@@ -236,6 +303,10 @@ fn read_tree(root: &Path, dir: &Path) -> AppResult<Vec<TreeNode>> {
         let name = entry.file_name().to_string_lossy().to_string();
         // Hidden names stay out of the tree. The flat note list still sees them.
         if name.starts_with('.') {
+            continue;
+        }
+        // Picture folders stay on disk and stay out of the tree.
+        if file_type.is_dir() && is_assets_dir_name(&name) {
             continue;
         }
         if file_type.is_dir() {
@@ -322,6 +393,150 @@ pub fn create_folder(root: &Path, parent: &str, name: &str) -> AppResult<String>
     Ok(relative)
 }
 
+const IMAGE_CAP: usize = 20 * 1024 * 1024;
+
+/// Write picture bytes into `{note stem}.assets` beside an existing note.
+///
+/// The note text is left alone. A refusal writes nothing.
+pub fn save_note_image(
+    root: &Path,
+    note_path: &str,
+    file_name: &str,
+    bytes: &[u8],
+) -> AppResult<String> {
+    if bytes.len() > IMAGE_CAP {
+        return Err(AppError::ImageRefused(
+            "file is larger than 20 MB".to_string(),
+        ));
+    }
+    let note_rel = display_relative(note_path);
+    let note_abs = resolve_inside_root(root, &note_rel)?;
+    if !is_typ_file(&note_abs) {
+        return Err(AppError::ImageRefused("the note is not there".to_string()));
+    }
+    let stem = file_stem_string(&note_abs)?;
+    let parent = note_abs
+        .parent()
+        .ok_or_else(|| AppError::ImageRefused("the note is not there".to_string()))?;
+    let assets_label = format!("{stem}.assets");
+    let existing = find_dir_child(parent, &assets_label)?;
+    if let Some(found) = &existing
+        && !found.is_dir()
+    {
+        return Err(AppError::ImageRefused(
+            "assets path is not a folder".to_string(),
+        ));
+    }
+    if !file_name.is_empty() {
+        validate_image_name(file_name)?;
+    }
+    let assets_dir = existing.unwrap_or_else(|| parent.join(&assets_label));
+    if !assets_dir.exists() {
+        std::fs::create_dir(&assets_dir).map_err(|err| AppError::io(&assets_dir, err))?;
+    }
+    let chosen = pick_image_name(&assets_dir, file_name)?;
+    let target = assets_dir.join(&chosen);
+    write_new_bytes(&target, bytes).map_err(|err| match err {
+        AppError::Io { source, .. } if source.kind() == std::io::ErrorKind::AlreadyExists => {
+            AppError::ImageRefused("that image name is taken".to_string())
+        }
+        other => other,
+    })?;
+    let folder = match note_rel.rsplit_once('/') {
+        Some((dir, _)) => format!("{dir}/{assets_label}"),
+        None => assets_label,
+    };
+    Ok(format!("{folder}/{chosen}"))
+}
+
+fn pick_image_name(dir: &Path, file_name: &str) -> AppResult<String> {
+    let candidates = image_candidates(file_name)?;
+    let names = entry_names(dir)?;
+    for candidate in candidates {
+        if !name_is_taken(&names, &candidate, true) {
+            return Ok(candidate);
+        }
+    }
+    Err(AppError::ImageRefused(
+        "every image name is taken".to_string(),
+    ))
+}
+
+fn image_candidates(file_name: &str) -> AppResult<Vec<String>> {
+    if file_name.is_empty() {
+        let mut names = Vec::with_capacity(100);
+        names.push("image.png".to_string());
+        for number in 1..=99 {
+            names.push(format!("image-{number}.png"));
+        }
+        return Ok(names);
+    }
+    validate_image_name(file_name)?;
+    let path = Path::new(file_name);
+    let stem = path
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let ext = path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or_default();
+    let mut names = Vec::with_capacity(100);
+    names.push(file_name.to_string());
+    for number in 1..=99 {
+        names.push(format!("{stem}-{number}.{ext}"));
+    }
+    Ok(names)
+}
+
+fn validate_image_name(name: &str) -> AppResult<()> {
+    let refused = |reason: &str| AppError::ImageRefused(reason.to_string());
+    if name.contains('/')
+        || name.contains('\\')
+        || name.contains('"')
+        || name.contains('\'')
+        || name.split(['/', '\\']).any(|part| part == "..")
+    {
+        return Err(refused("name leaves the folder"));
+    }
+    if name.ends_with('.') || name.ends_with(' ') {
+        return Err(refused("name ends with a dot or a space"));
+    }
+    if name
+        .chars()
+        .any(|ch| matches!(ch, ':' | '*' | '?' | '<' | '>' | '|'))
+    {
+        return Err(refused("name has a character that is not allowed"));
+    }
+    let ext = Path::new(name)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("");
+    if ext.is_empty() {
+        return Err(refused("name has no extension"));
+    }
+    if !matches!(
+        ext.to_ascii_lowercase().as_str(),
+        "png" | "jpg" | "jpeg" | "gif" | "webp"
+    ) {
+        return Err(refused("that image type is not allowed"));
+    }
+    if is_reserved_device_name(name) {
+        return Err(refused("that name is reserved"));
+    }
+    Ok(())
+}
+
+fn write_new_bytes(path: &Path, bytes: &[u8]) -> AppResult<()> {
+    use std::io::Write;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map_err(|err| AppError::io(path, err))?;
+    file.write_all(bytes).map_err(|err| AppError::io(path, err))
+}
+
 pub fn rename_entry(root: &Path, from: &str, to: &str) -> AppResult<String> {
     let from_display = display_relative(from.trim());
     let to_display = display_relative(to.trim());
@@ -348,6 +563,16 @@ pub fn rename_entry(root: &Path, from: &str, to: &str) -> AppResult<String> {
     if from_display == to_display {
         return Ok(from_display);
     }
+    if source_is_dir
+        && is_assets_dir_name(
+            from_display
+                .rsplit(['/', '\\'])
+                .next()
+                .unwrap_or(&from_display),
+        )
+    {
+        return Err(AppError::InvalidName(from_display));
+    }
     if source_is_dir && is_same_or_inside(&from_display, &to_display) {
         return Err(AppError::MoveIntoSelf(to_display));
     }
@@ -372,8 +597,126 @@ pub fn rename_entry(root: &Path, from: &str, to: &str) -> AppResult<String> {
             }
         }
     }
+    if !source_is_dir && is_typ_file(&source) {
+        rename_note_file(&source, &destination, &to_display)?;
+        return Ok(to_display);
+    }
     std::fs::rename(&source, &destination).map_err(|err| AppError::io(&destination, err))?;
     Ok(to_display)
+}
+
+/// Move `{oldStem}.assets` with the note, then the note, then rewrite quoted paths.
+///
+/// The assets folder moves first. A failed note rename puts it back. A failed
+/// text write puts both back. A failed rollback is the error the caller sees.
+fn rename_note_file(source: &Path, destination: &Path, to_display: &str) -> AppResult<()> {
+    let old_stem = file_stem_string(source)?;
+    let new_stem = file_stem_string(destination)?;
+    let old_parent = source
+        .parent()
+        .ok_or_else(|| AppError::InvalidName(source.to_string_lossy().to_string()))?;
+    let new_parent = destination
+        .parent()
+        .ok_or_else(|| AppError::InvalidName(destination.to_string_lossy().to_string()))?;
+    let old_assets = find_dir_child(old_parent, &format!("{old_stem}.assets"))?;
+    let new_assets_name = format!("{new_stem}.assets");
+    let new_assets_existing = find_dir_child(new_parent, &new_assets_name)?;
+    let new_assets_path = new_parent.join(&new_assets_name);
+    let same_assets = match (&old_assets, &new_assets_existing) {
+        (Some(old), Some(new_path)) => paths_same(old, new_path),
+        _ => false,
+    };
+    // A leftover assets folder blocks the rename even when this note has none.
+    if new_assets_existing.is_some() && !same_assets {
+        return Err(AppError::AlreadyExists(to_display.to_string()));
+    }
+    let move_assets = match &old_assets {
+        Some(old) if old.is_dir() && !same_assets => Some(old.clone()),
+        _ => None,
+    };
+    if let Some(old) = &move_assets {
+        std::fs::rename(old, &new_assets_path)
+            .map_err(|err| AppError::io(&new_assets_path, err))?;
+    }
+    if let Err(err) = std::fs::rename(source, destination) {
+        if let Some(old) = &move_assets
+            && let Err(back) = std::fs::rename(&new_assets_path, old)
+        {
+            return Err(AppError::io(old, back));
+        }
+        return Err(AppError::io(destination, err));
+    }
+    if old_stem == new_stem {
+        return Ok(());
+    }
+    let bytes = match std::fs::read(destination) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            rollback_note_rename(
+                destination,
+                source,
+                move_assets.as_deref(),
+                &new_assets_path,
+            )?;
+            return Err(AppError::io(destination, err));
+        }
+    };
+    let Ok(text) = String::from_utf8(bytes) else {
+        return Ok(());
+    };
+    let rewritten = rewrite_assets_prefix(&text, &old_stem, &new_stem);
+    if rewritten == text {
+        return Ok(());
+    }
+    if let Err(err) = write_atomically(destination, rewritten.as_bytes()) {
+        rollback_note_rename(
+            destination,
+            source,
+            move_assets.as_deref(),
+            &new_assets_path,
+        )?;
+        return Err(err);
+    }
+    Ok(())
+}
+
+fn rollback_note_rename(
+    note_now: &Path,
+    note_was: &Path,
+    assets_was: Option<&Path>,
+    assets_now: &Path,
+) -> AppResult<()> {
+    if let Err(err) = std::fs::rename(note_now, note_was) {
+        return Err(AppError::io(note_was, err));
+    }
+    if let Some(assets_was) = assets_was
+        && let Err(err) = std::fs::rename(assets_now, assets_was)
+    {
+        return Err(AppError::io(assets_was, err));
+    }
+    Ok(())
+}
+
+/// Replace `{old}.assets/` with `{new}.assets/` only at the start of the file
+/// or when the character just before the prefix is a quote.
+fn rewrite_assets_prefix(text: &str, old_stem: &str, new_stem: &str) -> String {
+    let needle = format!("{old_stem}.assets/");
+    let replacement = format!("{new_stem}.assets/");
+    let mut out = String::with_capacity(text.len());
+    let mut cursor = 0;
+    while let Some(found) = text[cursor..].find(&needle) {
+        let index = cursor + found;
+        let allowed = index == 0 || matches!(text[..index].chars().next_back(), Some('"' | '\''));
+        out.push_str(&text[cursor..index]);
+        if allowed {
+            out.push_str(&replacement);
+        } else {
+            out.push_str(&needle);
+        }
+        cursor = index + needle.len();
+    }
+    out.push_str(&text[cursor..]);
+    out
 }
 
 fn validate_destination(relative: &str, source_is_dir: bool) -> AppResult<()> {
@@ -428,6 +771,12 @@ pub fn delete_entry(root: &Path, relative: &str) -> AppResult<()> {
         return Err(AppError::OutsideRoot(relative.to_string()));
     }
     if meta.is_dir() {
+        if path
+            .file_name()
+            .is_some_and(|name| is_assets_dir_name(&name.to_string_lossy()))
+        {
+            return Err(AppError::InvalidName(relative.to_string()));
+        }
         std::fs::remove_dir_all(&path).map_err(|err| AppError::io(&path, err))?;
     } else {
         std::fs::remove_file(&path).map_err(|err| AppError::io(&path, err))?;
@@ -667,6 +1016,15 @@ pub fn write_atomically(path: &Path, bytes: &[u8]) -> AppResult<()> {
             }
         }
     }
+}
+
+pub fn fingerprint_of(bytes: &[u8]) -> NoteFingerprint {
+    fingerprint_bytes(bytes)
+}
+
+pub fn canonical_key(path: &Path) -> AppResult<String> {
+    let canonical = canonical_root(path)?;
+    Ok(canonical.to_string_lossy().replace('\\', "/"))
 }
 
 fn fingerprint_bytes(bytes: &[u8]) -> NoteFingerprint {
@@ -1351,5 +1709,228 @@ mod tests {
         assert!(write_pdf_export(dir.path(), "notes/lecture.typ", b"not a pdf").is_err());
         assert!(write_pdf_export(dir.path(), "notes/lecture.typ", b"").is_err());
         assert!(!dir.path().join("notes").join("lecture.pdf").exists());
+    }
+
+    #[test]
+    fn rename_moves_the_assets_folder_and_rewrites_a_quoted_path() {
+        let dir = tempfile::tempdir().unwrap();
+        create_note(dir.path(), "", "unsaved.typ").unwrap();
+        let assets = dir.path().join("unsaved.assets");
+        std::fs::create_dir(&assets).unwrap();
+        std::fs::write(assets.join("image.png"), b"png").unwrap();
+        write_note(
+            dir.path(),
+            "unsaved.typ",
+            "#image(\"unsaved.assets/image.png\")\nsee /unsaved.assets/image.png\n",
+        )
+        .unwrap();
+        rename_entry(dir.path(), "unsaved.typ", "lecture.typ").unwrap();
+        assert!(
+            dir.path()
+                .join("lecture.assets")
+                .join("image.png")
+                .is_file()
+        );
+        assert!(!dir.path().join("unsaved.assets").exists());
+        let text = read_note(dir.path(), "lecture.typ").unwrap().text;
+        assert!(text.contains("#image(\"lecture.assets/image.png\")"));
+        assert!(text.contains("see /unsaved.assets/image.png"));
+    }
+
+    #[test]
+    fn a_leftover_assets_folder_blocks_the_rename() {
+        let dir = tempfile::tempdir().unwrap();
+        create_note(dir.path(), "", "unsaved.typ").unwrap();
+        std::fs::create_dir(dir.path().join("lecture.assets")).unwrap();
+        let err = rename_entry(dir.path(), "unsaved.typ", "lecture.typ").unwrap_err();
+        assert!(matches!(err, AppError::AlreadyExists(_)));
+        assert!(dir.path().join("unsaved.typ").is_file());
+        assert!(dir.path().join("lecture.assets").is_dir());
+    }
+
+    #[test]
+    fn deleting_a_note_leaves_its_assets_folder_and_the_tree_hides_it() {
+        let dir = tempfile::tempdir().unwrap();
+        create_note(dir.path(), "", "lecture.typ").unwrap();
+        std::fs::create_dir(dir.path().join("lecture.assets")).unwrap();
+        std::fs::write(dir.path().join("lecture.pdf"), b"%PDF").unwrap();
+        delete_entry(dir.path(), "lecture.typ").unwrap();
+        assert!(!dir.path().join("lecture.typ").exists());
+        assert!(dir.path().join("lecture.assets").is_dir());
+        assert!(dir.path().join("lecture.pdf").is_file());
+        assert!(delete_entry(dir.path(), "lecture.assets").is_err());
+        assert!(rename_entry(dir.path(), "lecture.assets", "other.assets").is_err());
+        let tree = list_tree(dir.path()).unwrap();
+        assert!(
+            tree.iter()
+                .all(|node| !node.name.to_lowercase().ends_with(".assets"))
+        );
+        create_folder(dir.path(), "", "week").unwrap();
+        std::fs::create_dir(dir.path().join("week").join("lecture.assets")).unwrap();
+        delete_entry(dir.path(), "week").unwrap();
+        assert!(!dir.path().join("week").exists());
+    }
+
+    #[test]
+    fn save_note_image_writes_beside_the_note_and_refuses_a_bad_file() {
+        let dir = tempfile::tempdir().unwrap();
+        create_note(dir.path(), "", "unsaved.typ").unwrap();
+        let before = std::fs::read(dir.path().join("unsaved.typ")).unwrap();
+        let written = save_note_image(dir.path(), "unsaved.typ", "", b"png").unwrap();
+        assert_eq!(written, "unsaved.assets/image.png");
+        assert_eq!(
+            std::fs::read(dir.path().join("unsaved.typ")).unwrap(),
+            before
+        );
+        let gif = save_note_image(dir.path(), "unsaved.typ", "slide.gif", b"gif").unwrap();
+        assert_eq!(gif, "unsaved.assets/slide.gif");
+        let clash = save_note_image(dir.path(), "unsaved.typ", "slide.gif", b"gif2").unwrap();
+        assert_eq!(clash, "unsaved.assets/slide-1.gif");
+        assert!(save_note_image(dir.path(), "unsaved.typ", "../x.png", b"no").is_err());
+        assert!(save_note_image(dir.path(), "unsaved.typ", "draw.svg", b"no").is_err());
+        let huge = vec![0_u8; 20 * 1024 * 1024 + 1];
+        let err = save_note_image(dir.path(), "unsaved.typ", "big.png", &huge).unwrap_err();
+        assert!(err.to_string().starts_with("image-refused:"));
+        assert!(!dir.path().join("x.png").exists());
+        assert!(!dir.path().join("unsaved.assets").join("draw.svg").exists());
+        assert!(!dir.path().join("unsaved.assets").join("big.png").exists());
+    }
+
+    #[test]
+    fn an_assets_path_that_is_a_file_blocks_the_image_write() {
+        let dir = tempfile::tempdir().unwrap();
+        create_note(dir.path(), "", "unsaved.typ").unwrap();
+        std::fs::write(dir.path().join("unsaved.assets"), b"not a folder").unwrap();
+        let err = save_note_image(dir.path(), "unsaved.typ", "", b"png").unwrap_err();
+        assert!(err.to_string().starts_with("image-refused:"));
+        assert!(dir.path().join("unsaved.assets").is_file());
+    }
+
+    // covers: spec 0006 AC-10, every allowed type in any case, and nothing else
+    #[test]
+    fn image_types_are_allowed_in_any_case_and_the_rest_leave_no_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        create_note(dir.path(), "", "unsaved.typ").unwrap();
+        for name in ["a.PNG", "b.Jpg", "c.jpeg", "d.GIF", "e.webp"] {
+            let written = save_note_image(dir.path(), "unsaved.typ", name, b"x").unwrap();
+            assert_eq!(written, format!("unsaved.assets/{name}"));
+        }
+
+        let other = tempfile::tempdir().unwrap();
+        create_note(other.path(), "", "unsaved.typ").unwrap();
+        for name in [
+            "x.svg",
+            "x.bmp",
+            "noext",
+            "x.png.",
+            "x.png ",
+            "a/b.png",
+            "..\\b.png",
+            "a\"b.png",
+            "a'b.png",
+            "a:b.png",
+            "a*b.png",
+            "a?b.png",
+            "a<b.png",
+            "a>b.png",
+            "a|b.png",
+            "CON.png",
+            "nul.png",
+        ] {
+            let err = save_note_image(other.path(), "unsaved.typ", name, b"x").unwrap_err();
+            assert!(
+                err.to_string().starts_with("image-refused:"),
+                "{name} gave {err}"
+            );
+        }
+        assert!(!other.path().join("unsaved.assets").exists());
+    }
+
+    // covers: spec 0006 AC-10, an empty name runs image.png then image-1 to image-99, the 101st is refused
+    #[test]
+    fn the_image_sequence_ends_after_one_hundred_names() {
+        let dir = tempfile::tempdir().unwrap();
+        create_note(dir.path(), "", "unsaved.typ").unwrap();
+        let first = save_note_image(dir.path(), "unsaved.typ", "", b"x").unwrap();
+        assert_eq!(first, "unsaved.assets/image.png");
+        for number in 1..=99 {
+            let written = save_note_image(dir.path(), "unsaved.typ", "", b"x").unwrap();
+            assert_eq!(written, format!("unsaved.assets/image-{number}.png"));
+        }
+        let err = save_note_image(dir.path(), "unsaved.typ", "", b"x").unwrap_err();
+        assert!(err.to_string().starts_with("image-refused:"));
+        let count = std::fs::read_dir(dir.path().join("unsaved.assets"))
+            .unwrap()
+            .count();
+        assert_eq!(count, 100);
+    }
+
+    // covers: spec 0006 AC-10, 20 MB exactly is allowed and a non Typst note is refused
+    #[test]
+    fn the_image_size_cap_is_inclusive_and_only_a_typ_note_takes_pictures() {
+        let dir = tempfile::tempdir().unwrap();
+        create_note(dir.path(), "", "unsaved.typ").unwrap();
+        let exact = vec![0_u8; 20 * 1024 * 1024];
+        save_note_image(dir.path(), "unsaved.typ", "edge.png", &exact).unwrap();
+        std::fs::write(dir.path().join("readme.txt"), b"hi").unwrap();
+        let err = save_note_image(dir.path(), "readme.txt", "a.png", b"x").unwrap_err();
+        assert!(err.to_string().starts_with("image-refused:"));
+        assert!(!dir.path().join("readme.assets").exists());
+        let missing = save_note_image(dir.path(), "gone.typ", "a.png", b"x").unwrap_err();
+        assert!(missing.to_string().starts_with("image-refused:"));
+    }
+
+    // covers: spec 0006 AC-11, only a quote or the start of the file lets the prefix move
+    #[test]
+    fn rewrite_changes_a_prefix_only_after_a_quote_or_at_the_start() {
+        let text = "old.assets/a.png\n\"old.assets/b.png\"\n'old.assets/c.png'\n/old.assets/d.png\nsub/old.assets/e.png\nxold.assets/f.png\n";
+        let out = rewrite_assets_prefix(text, "old", "new");
+        assert_eq!(
+            out,
+            "new.assets/a.png\n\"new.assets/b.png\"\n'new.assets/c.png'\n/old.assets/d.png\nsub/old.assets/e.png\nxold.assets/f.png\n"
+        );
+    }
+
+    // covers: spec 0006 AC-11, bytes that are not UTF-8 still rename and are left as they were
+    #[test]
+    fn a_note_that_is_not_utf8_still_renames_with_its_assets() {
+        let dir = tempfile::tempdir().unwrap();
+        create_note(dir.path(), "", "draft.typ").unwrap();
+        let bytes = [0xff_u8, 0xfe, b'"', b'd', b'r', b'a', b'f', b't'];
+        std::fs::write(dir.path().join("draft.typ"), bytes).unwrap();
+        std::fs::create_dir(dir.path().join("draft.assets")).unwrap();
+        rename_entry(dir.path(), "draft.typ", "final.typ").unwrap();
+        assert_eq!(std::fs::read(dir.path().join("final.typ")).unwrap(), bytes);
+        assert!(dir.path().join("final.assets").is_dir());
+        assert!(!dir.path().join("draft.assets").exists());
+    }
+
+    // covers: spec 0006 AC-11, a taken new note name moves nothing
+    #[test]
+    fn a_taken_new_note_name_leaves_the_assets_where_they_were() {
+        let dir = tempfile::tempdir().unwrap();
+        create_note(dir.path(), "", "draft.typ").unwrap();
+        create_note(dir.path(), "", "final.typ").unwrap();
+        std::fs::create_dir(dir.path().join("draft.assets")).unwrap();
+        let err = rename_entry(dir.path(), "draft.typ", "final.typ").unwrap_err();
+        assert!(matches!(err, AppError::AlreadyExists(_)));
+        assert!(dir.path().join("draft.typ").is_file());
+        assert!(dir.path().join("draft.assets").is_dir());
+        assert!(!dir.path().join("final.assets").exists());
+    }
+
+    // covers: spec 0006 AC-11, renaming a folder does not rewrite note text
+    #[test]
+    fn renaming_a_folder_does_not_rewrite_the_notes_inside() {
+        let dir = tempfile::tempdir().unwrap();
+        create_folder(dir.path(), "", "week").unwrap();
+        create_note(dir.path(), "week", "lecture.typ").unwrap();
+        let text = "#image(\"lecture.assets/a.png\")\n";
+        write_note(dir.path(), "week/lecture.typ", text).unwrap();
+        rename_entry(dir.path(), "week", "term").unwrap();
+        assert_eq!(
+            read_note(dir.path(), "term/lecture.typ").unwrap().text,
+            text
+        );
     }
 }

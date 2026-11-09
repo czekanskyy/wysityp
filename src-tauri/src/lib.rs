@@ -18,6 +18,8 @@ pub struct AppState {
     /// What this process last read or wrote, per note path, so a save can
     /// refuse a file another tool changed.
     pub note_baselines: Mutex<files::NoteBaselines>,
+    /// Separate from note baselines so a template and a note can share a file name.
+    pub template_baselines: Mutex<templates::TemplateBaselines>,
 }
 
 impl AppState {
@@ -27,6 +29,7 @@ impl AppState {
             settings_file: Mutex::new(None),
             engine: Arc::new(Engine::new()),
             note_baselines: Mutex::new(files::NoteBaselines::default()),
+            template_baselines: Mutex::new(templates::TemplateBaselines::default()),
         }
     }
 }
@@ -45,6 +48,12 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::list_recent_notes,
         commands::open_note,
         commands::create_from_template,
+        commands::list_templates,
+        commands::copy_shipped_template,
+        commands::open_template,
+        commands::save_template,
+        commands::template_changed_on_disk,
+        commands::save_note_image,
         commands::create_sample_note,
         commands::save_note,
         commands::note_changed_on_disk,

@@ -82,7 +82,14 @@ struct NoteWorld {
 
 impl NoteWorld {
     fn new(fonts: Arc<FontStore>, root: &Path, note_path: &str, source: &str) -> AppResult<Self> {
-        let vpath = VirtualPath::new(format!("/{note_path}"))
+        // An empty path is the editor buffer while a template is open.
+        // It is not a file in the notes folder. Includes still resolve there.
+        let virtual_name = if note_path.is_empty() {
+            "/.wysityp-buffer.typ".to_string()
+        } else {
+            format!("/{note_path}")
+        };
+        let vpath = VirtualPath::new(virtual_name)
             .map_err(|err| AppError::Message(format!("bad note path: {err}")))?;
         let main_id = FileId::new(RootedPath::new(VirtualRoot::Project, vpath));
         let packages = SystemPackages::new(SystemDownloader::new("WYSITyp"));
@@ -420,6 +427,26 @@ mod tests {
             "message was: {}",
             diag.message
         );
+    }
+
+    #[test]
+    fn an_empty_path_compiles_the_buffer_and_includes_from_the_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("included.typ"), "= Included\n").unwrap();
+        let engine = Engine::new();
+        let result = engine
+            .render(dir.path(), "", "#include \"included.typ\"\n", 1)
+            .unwrap();
+        assert!(
+            result
+                .diagnostics
+                .iter()
+                .all(|diag| diag.severity != "error"),
+            "diagnostics: {:?}",
+            result.diagnostics
+        );
+        assert_eq!(result.pages.len(), 1);
+        assert!(!dir.path().join(".wysityp-buffer.typ").exists());
     }
 
     // covers: proof 4, included files come from disk inside the folder
