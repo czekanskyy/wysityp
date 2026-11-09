@@ -6,10 +6,19 @@
     label: string;
     options: SegmentOptions;
     value?: string;
-    onchange?: (value: string) => void;
+    onchange?: (value: string) => void | false;
+    busy?: boolean;
+    describedBy?: string;
   };
 
-  let { label, options, value = $bindable(""), onchange }: Props = $props();
+  let {
+    label,
+    options,
+    value = $bindable(""),
+    onchange,
+    busy = false,
+    describedBy,
+  }: Props = $props();
 
   const selectedIndex = $derived(
     Math.max(
@@ -19,9 +28,9 @@
   );
 
   function choose(next: string) {
-    if (next === value) return;
+    if (busy || next === value) return;
+    if (onchange?.(next) === false) return;
     value = next;
-    onchange?.(next);
   }
 
   function onKey(event: KeyboardEvent) {
@@ -35,6 +44,7 @@
     }
     event.preventDefault();
     event.stopPropagation();
+    if (busy) return;
     const values = options.map((option) => option.value);
     let index = values.indexOf(value);
     if (index < 0) index = 0;
@@ -51,6 +61,8 @@
   class="seg"
   role="radiogroup"
   aria-label={label}
+  aria-describedby={describedBy}
+  aria-busy={busy ? "true" : undefined}
   tabindex="-1"
   onkeydown={onKey}
 >

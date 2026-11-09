@@ -24,6 +24,10 @@ pub enum AppError {
     MissingParent(String),
     #[error("unknown language: {0}")]
     BadLocale(String),
+    #[error("unknown theme: {0}")]
+    BadTheme(String),
+    #[error("unknown page colour: {0}")]
+    BadPageColor(String),
     #[error("settings are not ready yet")]
     SettingsNotReady,
     /// The page matches this prefix. The words after it are for logs.

@@ -89,5 +89,19 @@
   "greeting_3": "Let us write",
   "greeting_4": "Good to see you",
   "greeting_5": "Your notes are waiting",
-  "greeting_6": "Shall we begin"
+  "greeting_6": "Shall we begin",
+  "appearance_label": "Appearance",
+  "theme_label": "Interface theme",
+  "theme_system": "Follow Windows",
+  "theme_light": "Light",
+  "theme_dark": "Dark",
+  "theme_hint": "Sidebar, toolbar, menus, and dialogs.",
+  "page_color_label": "Page colour",
+  "page_white": "White",
+  "page_beige": "Beige",
+  "page_graphite": "Graphite",
+  "page_oled": "OLED black",
+  "page_color_hint": "The page keeps this colour inside a dark window.",
+  "appearance_preview": "A short sample on the page.",
+  "appearance_close": "Close"
 }

@@ -1,6 +1,13 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { api } from "./lib/api";
+  import {
+    applyDocumentTheme,
+    asPageColor,
+    asTheme,
+    type StartupAppearance,
+  } from "./lib/appearance";
   import {
     createEditor,
     type EditorHandle,
@@ -30,15 +37,36 @@
     localDateStamp,
   } from "./lib/greeting";
   import { m } from "./paraglide/messages.js";
+  import AppearanceDialog from "./lib/ui/AppearanceDialog.svelte";
   import Button from "./lib/ui/Button.svelte";
   import Card from "./lib/ui/Card.svelte";
   import SegmentedControl from "./lib/ui/SegmentedControl.svelte";
   import Sidebar from "./lib/ui/Sidebar.svelte";
   import TextField from "./lib/ui/TextField.svelte";
   import type { SegmentOptions, SidebarItem, SidebarSection } from "./lib/ui";
-  import type { RenderDiagnostic, SearchHit, TreeNode } from "./bindings";
+  import type {
+    Settings,
+    RenderDiagnostic,
+    SearchHit,
+    TreeNode,
+  } from "./bindings";
+
+  let {
+    startup = {
+      theme: "system",
+      pageColor: "white",
+      error: "",
+    },
+  }: {
+    startup?: StartupAppearance;
+  } = $props();
 
   let locale = $state<AppLocale>(currentLocale());
+  let theme = $state(untrack(() => startup.theme));
+  let pageColor = $state(untrack(() => startup.pageColor));
+  let pendingStartupError = $state(untrack(() => startup.error));
+  let appearanceOpen = $state(false);
+  let appearanceTrigger = $state<HTMLElement | null>(null);
   let rootName = $state("");
   let tree = $state.raw<TreeNode[]>([]);
   let openFolders = $state<string[]>([]);
@@ -184,7 +212,27 @@
         m.greeting_5(),
         m.greeting_6(),
       ],
+      appearanceLabel: m.appearance_label(),
+      themeLabel: m.theme_label(),
+      themeHint: m.theme_hint(),
+      themeSystem: m.theme_system(),
+      themeLight: m.theme_light(),
+      themeDark: m.theme_dark(),
+      pageColorLabel: m.page_color_label(),
+      pageColorHint: m.page_color_hint(),
+      pageWhite: m.page_white(),
+      pageBeige: m.page_beige(),
+      pageGraphite: m.page_graphite(),
+      pageOled: m.page_oled(),
+      appearancePreview: m.appearance_preview(),
+      appearanceClose: m.appearance_close(),
     };
+  });
+
+  $effect(() => {
+    if (pendingStartupError === "") return;
+    status = `${labels.openFailed}: ${pendingStartupError}`;
+    pendingStartupError = "";
   });
 
   const templateChoices = $derived([
@@ -891,6 +939,26 @@
     }
   }
 
+  function openAppearance() {
+    const active = document.activeElement;
+    appearanceTrigger = active instanceof HTMLElement ? active : null;
+    appearanceOpen = true;
+  }
+
+  function closeAppearance() {
+    appearanceOpen = false;
+  }
+
+  function applyAppearance(saved: Settings) {
+    theme = asTheme(saved.theme);
+    pageColor = asPageColor(saved.page_color);
+    applyDocumentTheme(theme);
+  }
+
+  function appearanceFailed(error: unknown) {
+    status = `${labels.saveFailed}: ${String(error)}`;
+  }
+
   async function changeLocale(next: AppLocale) {
     try {
       const saved = await api.setLocale(next);
@@ -1011,6 +1079,10 @@
         onclick: () => void createSample(),
       });
     }
+    entries.push({
+      label: labels.appearanceLabel,
+      onclick: openAppearance,
+    });
     return entries;
   });
 
@@ -1418,4 +1490,27 @@
       {/if}
     </main>
   </div>
+  <AppearanceDialog
+    open={appearanceOpen}
+    restore={appearanceTrigger}
+    {theme}
+    {pageColor}
+    title={labels.appearanceLabel}
+    themeLabel={labels.themeLabel}
+    themeHint={labels.themeHint}
+    systemLabel={labels.themeSystem}
+    lightLabel={labels.themeLight}
+    darkLabel={labels.themeDark}
+    pageColorLabel={labels.pageColorLabel}
+    pageColorHint={labels.pageColorHint}
+    whiteLabel={labels.pageWhite}
+    beigeLabel={labels.pageBeige}
+    graphiteLabel={labels.pageGraphite}
+    oledLabel={labels.pageOled}
+    preview={labels.appearancePreview}
+    closeLabel={labels.appearanceClose}
+    onClose={closeAppearance}
+    onSaved={applyAppearance}
+    onFailed={appearanceFailed}
+  />
 </div>

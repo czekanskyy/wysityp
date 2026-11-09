@@ -271,7 +271,8 @@ button.seg-option[aria-checked="true"] {
 
 @media (prefers-reduced-motion: no-preference) {
   .menu,
-  dialog.palette[open] {
+  dialog.palette[open],
+  dialog.appearance[open] {
     animation: pop-in var(--motion-pop) linear;
   }
 }
@@ -1100,12 +1101,151 @@ input.palette-input::placeholder {
   border-top: 1px solid var(--color-border);
 }
 
+dialog.appearance {
+  z-index: var(--z-palette);
+  width: min(
+    calc(var(--sidebar-width) + var(--space-16)),
+    calc(100vw - var(--space-8))
+  );
+  max-width: calc(100vw - var(--space-8));
+  max-height: calc(100vh - var(--space-8));
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+dialog.appearance::backdrop {
+  background: var(--color-overlay);
+}
+
+.appearance-body {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.appearance-body h2 {
+  margin: 0;
+}
+
+.appearance-theme,
+.appearance-pages {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.appearance-theme .seg {
+  display: flex;
+  width: 100%;
+}
+
+.appearance-theme button.seg-option {
+  flex: 1 1 0;
+}
+
+.appearance-kicker,
+.appearance-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+button.swatch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: calc(var(--control-lg) + var(--space-1));
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: start;
+}
+
+button.swatch[aria-checked="true"] {
+  border-color: var(--color-accent);
+}
+
+.swatch-sheet {
+  width: var(--control-md);
+  height: var(--control-md);
+  flex: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.sheet-white {
+  background: var(--page-white-bg);
+}
+
+.sheet-beige {
+  background: var(--page-beige-bg);
+}
+
+.sheet-graphite {
+  background: var(--page-graphite-bg);
+}
+
+.sheet-oled {
+  background: var(--page-oled-bg);
+}
+
+.appearance-preview {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--page-bg);
+  color: var(--page-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.appearance-sample,
+.appearance-muted,
+.appearance-math,
+.appearance-code {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.appearance-muted {
+  color: var(--page-muted);
+}
+
+.appearance-math {
+  color: var(--page-math);
+}
+
+.appearance-code {
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--space-1) var(--space-2);
+  color: var(--page-text);
+  background: var(--page-code-bg);
+  border-radius: var(--radius-sm);
+}
+
+.appearance-actions {
+  display: flex;
+  justify-content: end;
+}
+
 @media (prefers-reduced-motion: reduce) {
   button.btn,
   button.ibtn,
   .card,
   .menu,
-  dialog.palette {
+  dialog.palette,
+  dialog.appearance {
     transition: none;
     animation: none;
   }
