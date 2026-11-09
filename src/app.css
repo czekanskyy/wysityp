@@ -1,46 +1,48 @@
+/*
+ * Screen styles for the current app shell. Colours, type, radius and
+ * spacing come from src/styles/tokens.css (the "Papier" design system,
+ * docs/design.md). The short names below are kept so existing rules read
+ * the same; new code should use the --color-* tokens directly and the
+ * components in src/lib/ui/.
+ */
 :root {
-  --bg: #f4f2ec;
-  --surface: #fffdf8;
-  --surface-strong: #ffffff;
-  --ink: #1d2733;
-  --ink-soft: #5a6875;
-  --line: #d8d2c4;
-  --accent: #2456a6;
-  --accent-soft: #e8effc;
-  --accent-ink: #ffffff;
-  --danger: #a61e2e;
-  --danger-bg: #fbeaec;
-  --warn-bg: #fff4d6;
-  --radius: 12px;
-  color: var(--ink);
-  background: var(--bg);
-  font-family: "Segoe UI", system-ui, sans-serif;
-}
-
-* {
-  box-sizing: border-box;
+  --bg: var(--color-bg);
+  --surface: var(--color-surface);
+  --surface-strong: var(--color-surface-raised);
+  --ink: var(--color-text);
+  --ink-soft: var(--color-text-muted);
+  --line: var(--color-border);
+  --accent: var(--color-accent);
+  --accent-soft: var(--color-accent-soft);
+  --accent-ink: var(--color-on-accent);
+  --danger: var(--color-danger);
+  --danger-bg: var(--color-danger-soft);
+  --warn-bg: var(--color-warning-soft);
+  --radius: var(--radius-lg);
 }
 
 body {
-  margin: 0;
-}
-
-button,
-select {
-  font: inherit;
+  font-size: var(--text-md);
 }
 
 button {
+  height: var(--control-md);
   border: 1px solid var(--line);
   background: var(--surface-strong);
   color: var(--ink);
-  border-radius: 8px;
-  padding: 0.45rem 0.8rem;
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
 }
 
 button:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: var(--color-border-strong);
 }
 
 button:disabled {
@@ -54,20 +56,25 @@ button.primary {
   border-color: var(--accent);
 }
 
+button.primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
 input {
-  font: inherit;
   color: var(--ink);
   background: var(--surface-strong);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius-md);
+  height: var(--control-md);
+  padding: 0 var(--space-2-5);
   width: 100%;
 }
 
 button:focus-visible,
 select:focus-visible,
 input:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -90,6 +97,7 @@ input:focus-visible {
 
 .brand-name {
   margin: 0;
+  font-family: var(--font-prose);
   font-size: 1.35rem;
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -116,8 +124,9 @@ input:focus-visible {
 }
 
 .locale-picker select {
+  height: var(--control-md);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 0.4rem 0.55rem;
   background: var(--surface-strong);
   color: var(--ink);
@@ -226,6 +235,8 @@ input:focus-visible {
 
 .folder-name,
 .note-name {
+  height: auto;
+  min-height: var(--control-md);
   flex: 1;
   text-align: left;
   overflow-wrap: anywhere;
@@ -257,8 +268,8 @@ input:focus-visible {
 }
 
 .twist {
-  width: 2.4rem;
-  min-height: 2.4rem;
+  width: var(--control-md);
+  height: var(--control-md);
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -286,7 +297,7 @@ input:focus-visible {
 .confirm {
   padding: 0.7rem;
   border: 1px solid var(--danger);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--danger-bg);
 }
 
@@ -301,7 +312,7 @@ button.danger {
   margin-top: 1rem;
   padding: 0.6rem;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--surface-strong);
   overflow-wrap: anywhere;
 }
@@ -455,6 +466,8 @@ button.danger {
 
 .search-hit,
 .recent-hit {
+  height: auto;
+  padding-block: var(--space-1-5);
   width: 100%;
   text-align: left;
   display: grid;
@@ -474,6 +487,8 @@ button.danger {
 }
 
 .diagnostic {
+  height: auto;
+  padding-block: var(--space-1-5);
   width: 100%;
   text-align: left;
   display: grid;
