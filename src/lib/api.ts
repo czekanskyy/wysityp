@@ -28,6 +28,9 @@ export const api = {
   async createNote(parent: string, name: string) {
     return unwrap(await commands.createNote(parent, name));
   },
+  async createBlankNote(parent: string) {
+    return unwrap(await commands.createBlankNote(parent));
+  },
   async createFolder(parent: string, name: string) {
     return unwrap(await commands.createFolder(parent, name));
   },
@@ -72,5 +75,8 @@ export const api = {
   },
   async setLocale(locale: string) {
     return unwrap(await commands.setLocale(locale));
+  },
+  async greetingName() {
+    return unwrap(await commands.greetingName());
   },
 };

@@ -23,7 +23,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 10 | Search, recent notes and templates | Release 1 | in-progress |
 | 11 | Spell checking in Polish and English | Release 1 | planned |
 | 12 | PDF export | Release 1 | in-progress |
-| 18 | App shell and start surface | Release 1 | planned |
+| 18 | App shell and start surface | Release 1 | in-progress |
 | 19 | Theme and page colour | Release 1 | planned |
 | 20 | Working editor chrome | Release 1 | planned |
 | 21 | Command palette and shortcut sheet | Release 1 | planned |
@@ -136,10 +136,19 @@ Turn the open note into a PDF through Typst itself, with page settings a student
 **Code:** `src/App.svelte`, `src/lib/api.ts`, `src-tauri/src/commands.rs`, `src-tauri/src/files.rs`, `src-tauri/src/typst_engine.rs`
 - [x] Build it: `/develop PDF export`
 
-### 18. App shell and start surface · needs a decision
+### 18. App shell and start surface
 Put the Papier shell on the app you already have: the sidebar, the folder tree, a new note, save state, language, and the start surface with templates and recent notes.
 **Done when:** a student can open a folder, start from a template or a recent note, and organise notes in a shell that matches the export, in Polish and English, in light and dark. Recent notes show only what the app already remembers. Subject tags and preview paragraphs wait.
-- [ ] Design it (spec): `/architect app shell and start surface`
+**Spec:** [0005. App shell and start surface](../specs/0005-app-shell-start-surface/index.md)
+**Code:** `src/App.svelte`, `src/lib/ui/Sidebar.svelte`, `src/lib/greeting.ts`, `src/lib/api.ts`, `src-tauri/src/commands.rs`, `src-tauri/src/templates.rs`, `src-tauri/src/settings.rs`
+- [x] Design it (spec): `/architect app shell and start surface`
+- [x] Build it: `/develop app shell and start surface`
+  - [x] Shell, start surface, and the actions you already have, covers AC-1, AC-2, AC-3, AC-4, AC-5, AC-10, AC-11, AC-12, AC-13, AC-16, AC-17, AC-18, AC-20, AC-21
+  - [x] Blank notes, the place, and organising, covers AC-6, AC-7, AC-8, AC-18, AC-21
+  - [x] Greeting, date, and the spoken name, covers AC-14, AC-15, AC-19
+  - [x] Folder counts, covers AC-9
+- [ ] Verify it: `/check verify app shell and start surface`
+- [ ] Test it: `/test app shell and start surface`
 
 ### 19. Theme and page colour · needs a decision
 Let the student set the interface theme and the note page colour apart from each other, as the export draws. The page uses the page colour tokens only. A PDF export stays a white page. Font choices stay with the rendered page editor.
@@ -211,6 +220,7 @@ Kept on purpose, so the plan stays honest about what waits.
 - **Search replace, and search by folder name or file name**, drawn on the search screen.
 - **Symbol picker, table grid, and shapes**: they wait with math editing, tables, and visual geometry.
 - **Longer settings screens**: backups, packages, shortcut editing, privacy, and about. Language stays where it is. Theme and page colour belong to feature 19.
+- **Saved greeting name** (from spec 0005): one word the student can set. The shell already reads `display_name`. The editor waits, and it does not block the shell.
 
 ## Legend
 

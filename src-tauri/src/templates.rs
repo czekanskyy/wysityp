@@ -31,6 +31,24 @@ pub fn create_from_template(
     ))
 }
 
+/// A blank note named `note.typ`, then `note-2.typ`, through `note-100.typ`.
+///
+/// The heading is the same starter `create_note` writes. An existing file
+/// is never overwritten. When every name is taken, nothing is written.
+pub fn create_blank_note(root: &Path, parent: &str) -> AppResult<Note> {
+    let mut last_taken = None;
+    for file_name in candidate_names("note") {
+        match files::create_note(root, parent, &file_name) {
+            Ok(note) => return Ok(note),
+            Err(AppError::AlreadyExists(path)) => last_taken = Some(path),
+            Err(err) => return Err(err),
+        }
+    }
+    Err(AppError::AlreadyExists(
+        last_taken.unwrap_or_else(|| "note.typ".to_string()),
+    ))
+}
+
 fn stem_for(kind: &str) -> AppResult<&'static str> {
     match kind {
         "lecture" => Ok("lecture"),
@@ -160,5 +178,41 @@ mod tests {
         assert_eq!(note.path, "lab/lab.typ");
         assert!(note.text.contains("= Lab note title"));
         assert!(root.path().join("lab").join("lab.typ").is_file());
+    }
+
+    // covers: AC-6, note.typ then note-2.typ, and a full set writes nothing
+    #[test]
+    fn a_blank_note_uses_note_then_a_number_and_stops_after_100() {
+        let root = tempfile::tempdir().unwrap();
+        let first = create_blank_note(root.path(), "").unwrap();
+        assert_eq!(first.path, "note.typ");
+        assert_eq!(first.text, "= note\n");
+        let second = create_blank_note(root.path(), "").unwrap();
+        assert_eq!(second.path, "note-2.typ");
+        assert_eq!(second.text, "= note-2\n");
+        assert_eq!(
+            std::fs::read_to_string(root.path().join("note.typ")).unwrap(),
+            "= note\n"
+        );
+
+        for _ in 2..100 {
+            create_blank_note(root.path(), "").unwrap();
+        }
+        let before = std::fs::read_dir(root.path()).unwrap().count();
+        let err = create_blank_note(root.path(), "").unwrap_err();
+        assert!(matches!(err, AppError::AlreadyExists(_)));
+        assert!(err.to_string().contains("already has that name"));
+        assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), before);
+        assert_eq!(before, 100);
+    }
+
+    #[test]
+    fn a_blank_note_can_land_in_the_selected_folder() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir(root.path().join("week")).unwrap();
+        let note = create_blank_note(root.path(), "week").unwrap();
+        assert_eq!(note.path, "week/note.typ");
+        assert_eq!(note.text, "= note\n");
+        assert!(root.path().join("week").join("note.typ").is_file());
     }
 }

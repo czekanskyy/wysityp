@@ -74,9 +74,11 @@ input:focus-visible {
 }
 
 .shell {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .topbar {
@@ -128,27 +130,86 @@ input:focus-visible {
 .workarea {
   flex: 1;
   display: grid;
-  grid-template-columns: 19rem 1fr;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-height: 0;
 }
 
-.sidebar {
-  padding: 1rem;
-  border-right: 1px solid var(--line);
-  background: var(--surface);
-  overflow: auto;
+.nav-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--color-bg);
+  border-inline-end: 1px solid var(--color-border);
 }
 
-.sidebar h2,
+.nav-column > nav.sidebar {
+  flex: 1;
+  border-inline-end: 0;
+}
+
+.nav-follow {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  max-height: 42%;
+  overflow: auto;
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.nav-follow:empty {
+  display: none;
+}
+
+.start {
+  height: 100%;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: var(--space-5);
+  padding: var(--space-8) var(--space-6) var(--space-10);
+  background: var(--color-bg);
+}
+
+.start-date {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.start-greeting {
+  margin: 0;
+  max-width: 16em;
+  color: var(--color-text);
+}
+
+.start-actions,
+.card-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+}
+
+.start-block {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.start-block h2 {
+  margin: 0;
+}
+
 .pane h2 {
   margin: 0 0 0.7rem;
   font-size: 0.95rem;
 }
 
-.sidebar h3 {
-  margin: 0;
-  font-size: 0.9rem;
-}
+
 
 .pane h2 .path {
   margin-left: 0.6rem;
@@ -495,6 +556,11 @@ button.danger {
 @media (max-width: 900px) {
   .workarea {
     grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .nav-column {
+    max-height: none;
   }
 
   .panes,
@@ -504,8 +570,8 @@ button.danger {
     grid-template-columns: 1fr;
   }
 
-  .sidebar {
-    border-right: none;
-    border-bottom: 1px solid var(--line);
+  .nav-column {
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--color-border);
   }
 }

@@ -36,6 +36,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::open_workspace,
         commands::list_tree,
         commands::create_note,
+        commands::create_blank_note,
         commands::create_folder,
         commands::rename_entry,
         commands::delete_entry,
@@ -50,7 +51,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::render_note,
         commands::export_pdf,
         commands::get_settings,
-        commands::set_locale
+        commands::set_locale,
+        commands::greeting_name
     ])
 }
 

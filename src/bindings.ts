@@ -7,6 +7,7 @@ export const commands = {
 	openWorkspace: () => typedError<WorkspaceInfo | null, string>(__TAURI_INVOKE("open_workspace")),
 	listTree: () => typedError<TreeNode[], string>(__TAURI_INVOKE("list_tree")),
 	createNote: (parent: string, name: string) => typedError<Note, string>(__TAURI_INVOKE("create_note", { parent, name })),
+	createBlankNote: (parent: string) => typedError<Note, string>(__TAURI_INVOKE("create_blank_note", { parent })),
 	createFolder: (parent: string, name: string) => typedError<string, string>(__TAURI_INVOKE("create_folder", { parent, name })),
 	renameEntry: (from: string, to: string) => typedError<string, string>(__TAURI_INVOKE("rename_entry", { from, to })),
 	deleteEntry: (path: string) => typedError<null, string>(__TAURI_INVOKE("delete_entry", { path })),
@@ -23,6 +24,13 @@ export const commands = {
 	exportPdf: (path: string, source: string) => typedError<string, string>(__TAURI_INVOKE("export_pdf", { path, source })),
 	getSettings: () => typedError<Settings, string>(__TAURI_INVOKE("get_settings")),
 	setLocale: (locale: string) => typedError<Settings, string>(__TAURI_INVOKE("set_locale", { locale })),
+	/**
+	 *  The spoken greeting word, or an empty string. Never an error on the page.
+	 * 
+	 *  A saved `display_name` wins. Otherwise the account display name is
+	 *  read. The raw strings stay here. Nothing is written and nothing is logged.
+	 */
+	greetingName: () => typedError<string, string>(__TAURI_INVOKE("greeting_name")),
 };
 
 /* Types */

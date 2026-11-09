@@ -24,7 +24,18 @@
     type SaveTicket,
   } from "./lib/noteSafety";
   import { byteOffsetToUtf16, debounce, RenderGuard } from "./lib/render";
+  import { formatNoteDate, greetingIndex, localDateStamp } from "./lib/greeting";
   import { m } from "./paraglide/messages.js";
+  import Button from "./lib/ui/Button.svelte";
+  import Card from "./lib/ui/Card.svelte";
+  import SegmentedControl from "./lib/ui/SegmentedControl.svelte";
+  import Sidebar from "./lib/ui/Sidebar.svelte";
+  import TextField from "./lib/ui/TextField.svelte";
+  import type {
+    SegmentOptions,
+    SidebarItem,
+    SidebarSection,
+  } from "./lib/ui";
   import type { RenderDiagnostic, SearchHit, TreeNode } from "./bindings";
 
   let locale = $state<AppLocale>(currentLocale());
@@ -56,9 +67,12 @@
   let reloadArmed = $state(false);
   let saveFailed = $state(false);
   let leaveApproved = $state(false);
+  let spokenName = $state("");
+  let recentExpanded = $state(true);
+  let notesExpanded = $state(true);
+  let namingFolder = $state(false);
 
   let editor: EditorHandle | undefined;
-  let nameInput: HTMLInputElement | undefined = $state();
   let sourceText = "";
   let noteEpoch = 0;
   let noteRevision = 0;
@@ -155,15 +169,71 @@
       templateLab: m.template_lab(),
       templateCreated: m.template_created(),
       templateFailed: m.template_failed(),
+      closeNote: m.close_note(),
+      notesHeading: m.notes_heading(),
+      rowMenu: m.row_menu(),
+      templateLectureBody: m.template_lecture_body(),
+      templateProblemBody: m.template_problem_set_body(),
+      templateLabBody: m.template_lab_body(),
+      phrases: [
+        m.greeting_0(),
+        m.greeting_1(),
+        m.greeting_2(),
+        m.greeting_3(),
+        m.greeting_4(),
+        m.greeting_5(),
+        m.greeting_6(),
+      ],
     };
   });
 
   const templateChoices = $derived([
-    { id: "lecture", label: labels.templateLecture },
-    { id: "problem-set", label: labels.templateProblemSet },
-    { id: "lab", label: labels.templateLab },
+    {
+      id: "lecture",
+      label: labels.templateLecture,
+      file: "lecture.typ",
+      description: labels.templateLectureBody,
+    },
+    {
+      id: "problem-set",
+      label: labels.templateProblemSet,
+      file: "problem-set.typ",
+      description: labels.templateProblemBody,
+    },
+    {
+      id: "lab",
+      label: labels.templateLab,
+      file: "lab.typ",
+      description: labels.templateLabBody,
+    },
   ]);
 
+  const viewOptions = $derived([
+    { value: "source", label: labels.viewSource },
+    { value: "split", label: labels.viewSplit },
+    { value: "rendered", label: labels.viewRendered },
+  ] as SegmentOptions);
+
+  const today = $derived.by(() => {
+    void locale;
+    return new Date();
+  });
+
+  const dateLine = $derived(formatNoteDate(today, locale));
+  const dateStamp = $derived(localDateStamp(today));
+  const greetingSentence = $derived.by(() => {
+    const phrase = labels.phrases[greetingIndex(today)] ?? labels.phrases[0];
+    return spokenName ? `${phrase}, ${spokenName}.` : `${phrase}.`;
+  });
+  const workspaceMark = $derived(
+    rootName
+      ? (Array.from(rootName)[0] ?? "")
+      : (Array.from(labels.appName)[0] ?? ""),
+  );
+  const noteDirty = $derived(
+    currentPath !== "" &&
+      (conflict || savePhase === "saving" || savePhase === "unsaved"),
+  );
   const saveStateLabel = $derived(
     conflict
       ? labels.saveStateConflict
@@ -172,6 +242,9 @@
         : savePhase === "unsaved"
           ? labels.saveStateUnsaved
           : labels.saveStateSaved,
+  );
+  const footerSave = $derived(
+    currentPath ? saveStateLabel : labels.saveStateSaved,
   );
 
   const hasError = $derived(diagnostics.some((d) => d.severity === "error"));
@@ -380,6 +453,12 @@
   }
 
   async function refreshRecent() {
+    if (!rootName) {
+      recentNotes = [];
+      recentPending = false;
+      recentError = "";
+      return;
+    }
     recentPending = true;
     recentError = "";
     try {
@@ -415,6 +494,8 @@
       openFolders = [];
       renamingPath = "";
       pendingDelete = "";
+      namingFolder = false;
+      entryName = "";
       clearOpenNote();
       await refreshTree();
       status = tree.length === 0 ? labels.clickNote : labels.workspaceReady;
@@ -447,6 +528,7 @@
   }, 200);
 
   function onSearchInput(value: string) {
+    if (!rootName) return;
     searchQuery = value;
     if (!value.trim()) {
       searchHits = [];
@@ -509,43 +591,70 @@
     }
   }
 
-  async function createEntry(kind: "note" | "folder") {
-    const name = entryName.trim();
-    if (!name || !rootName) return;
-    if (kind === "note") {
-      const left = await settleBeforeLeave();
-      if (!left) return;
-    }
+  async function createBlankNote() {
+    if (!rootName) return;
+    const left = await settleBeforeLeave();
+    if (!left) return;
     try {
-      if (kind === "note") {
-        const note = await api.createNote(selectedFolder, name);
-        if (!(await settleBeforeLeave())) return;
-        entryName = "";
-        await refreshTree();
-        if (selectedFolder && !openFolders.includes(selectedFolder)) {
-          openFolders = [...openFolders, selectedFolder];
-        }
-        setPages([]);
-        diagnostics = [];
-        applyLoadedNote(note);
-        await runRender();
-      } else {
-        const created = await api.createFolder(selectedFolder, name);
-        entryName = "";
-        selectedFolder = created;
-        if (!openFolders.includes(created))
-          openFolders = [...openFolders, created];
-        await refreshTree();
+      const note = await api.createBlankNote(selectedFolder);
+      if (!(await settleBeforeLeave())) return;
+      await refreshTree();
+      if (selectedFolder && !openFolders.includes(selectedFolder)) {
+        openFolders = [...openFolders, selectedFolder];
       }
+      setPages([]);
+      diagnostics = [];
+      applyLoadedNote(note);
+      await runRender();
     } catch (error) {
       status = `${labels.actionFailed}: ${String(error)}`;
     }
+  }
+
+  function openNameField() {
+    if (!rootName) return;
+    namingFolder = true;
+    entryName = "";
+    renamingPath = "";
+    pendingDelete = "";
+  }
+
+  function cancelNewFolder() {
+    namingFolder = false;
+    entryName = "";
+  }
+
+  async function submitNewFolder() {
+    const name = entryName.trim();
+    if (!name || !rootName) return;
+    const left = await settleBeforeLeave();
+    if (!left) return;
+    try {
+      const created = await api.createFolder(selectedFolder, name);
+      entryName = "";
+      namingFolder = false;
+      selectedFolder = created;
+      if (!openFolders.includes(created)) {
+        openFolders = [...openFolders, created];
+      }
+      await refreshTree();
+    } catch (error) {
+      status = `${labels.actionFailed}: ${String(error)}`;
+    }
+  }
+
+  async function closeNote() {
+    if (!currentPath) return;
+    const left = await settleBeforeLeave();
+    if (!left) return;
+    clearOpenNote();
   }
 
   function startRename(path: string) {
     renamingPath = path;
     renameValue = path;
     pendingDelete = "";
+    namingFolder = false;
   }
 
   async function applyRename() {
@@ -582,12 +691,12 @@
 
   function closeDelete() {
     pendingDelete = "";
-    queueMicrotask(() => nameInput?.focus());
   }
 
   function askDelete(path: string) {
     pendingDelete = path;
     renamingPath = "";
+    namingFolder = false;
   }
 
   function onConfirmKey(event: KeyboardEvent) {
@@ -598,14 +707,42 @@
   }
 
   function focusOnMount(node: HTMLElement) {
-    node.focus();
+    const target = node.matches("input, button, select, textarea")
+      ? node
+      : node.querySelector<HTMLElement>("input, button, select, textarea");
+    (target ?? node).focus();
   }
 
-  function rememberNameInput(node: HTMLInputElement) {
-    nameInput = node;
-    return () => {
-      nameInput = undefined;
+  function lastSegment(path: string): string {
+    const cut = path.lastIndexOf("/");
+    return cut === -1 ? path : path.slice(cut + 1);
+  }
+
+  function entryMenu(path: string, name: string): Pick<SidebarItem, "menu" | "menuLabel"> {
+    return {
+      menuLabel: `${labels.rowMenu} ${name}`,
+      menu: [
+        {
+          label: labels.renameOrMove,
+          icon: "rename",
+          onclick: () => startRename(path),
+        },
+        {
+          label: labels.delete,
+          icon: "delete",
+          danger: true,
+          onclick: () => askDelete(path),
+        },
+      ],
     };
+  }
+
+  async function loadGreeting() {
+    try {
+      spokenName = await api.greetingName();
+    } catch {
+      spokenName = "";
+    }
   }
 
   async function confirmDelete() {
@@ -782,6 +919,110 @@
     scheduleRender();
   }
 
+  const sidebarModel = $derived.by(() => {
+    const notes: SidebarItem[] = [];
+    const walk = (nodes: TreeNode[], level: number) => {
+      for (const node of nodes) {
+        const isFolder = node.kind === "folder";
+        const expanded = isFolder && openFolders.includes(node.path);
+        notes.push({
+          id: node.path,
+          sectionId: "notes",
+          label: node.name,
+          title: node.path,
+          level,
+          kind: isFolder ? "folder" : "note",
+          expanded: isFolder ? expanded : undefined,
+          selected: isFolder && selectedFolder === node.path,
+          current: !isFolder && currentPath === node.path,
+          unsaved: currentPath === node.path && noteDirty,
+          count: isFolder ? node.children.length : undefined,
+          ...entryMenu(node.path, node.name),
+        });
+        if (isFolder && expanded) walk(node.children, level + 1);
+      }
+    };
+    if (rootName) walk(tree, 1);
+
+    const recentReady = rootName !== "" && !recentPending && recentError === "";
+    const recent: SidebarItem[] = recentReady
+      ? recentNotes.map((path) => ({
+          id: path,
+          sectionId: "recent",
+          label: lastSegment(path),
+          title: path,
+          level: 1,
+          kind: "note" as const,
+          current: currentPath === path,
+          unsaved: currentPath === path && noteDirty,
+        }))
+      : [];
+
+    let notice: string | undefined;
+    if (!rootName) notice = labels.recentEmpty;
+    else if (recentError) notice = recentError;
+    else if (recentPending) notice = labels.recentLoading;
+    else if (recentNotes.length === 0) notice = labels.recentEmpty;
+
+    const sections: SidebarSection[] = [
+      {
+        id: "recent",
+        title: labels.recentNotes,
+        expanded: recentExpanded,
+        onToggle: () => {
+          recentExpanded = !recentExpanded;
+        },
+        notice,
+        busy: recentPending,
+      },
+      {
+        id: "notes",
+        title: labels.notesHeading,
+        expanded: notesExpanded,
+        onToggle: () => {
+          notesExpanded = !notesExpanded;
+        },
+        action: {
+          label: labels.newFolder,
+          disabled: rootName === "",
+          onclick: openNameField,
+        },
+      },
+    ];
+    return { sections, items: [...recent, ...notes] };
+  });
+
+  const footerEntries = $derived.by(() => {
+    const entries: { label: string; onclick: () => void }[] = [
+      { label: labels.openFolder, onclick: () => void openFolder() },
+    ];
+    if (currentPath) {
+      entries.push({
+        label: labels.closeNote,
+        onclick: () => void closeNote(),
+      });
+    }
+    if (rootName) {
+      entries.push({
+        label: labels.createSample,
+        onclick: () => void createSample(),
+      });
+    }
+    return entries;
+  });
+
+  const showFollow = $derived(
+    (rootName !== "" && (searchPending || searchTouched)) ||
+      namingFolder ||
+      renamingPath !== "" ||
+      pendingDelete !== "" ||
+      status !== "",
+  );
+
+  $effect(() => {
+    void loadGreeting();
+  });
+
   function editorAttachment(node: HTMLDivElement) {
     editor = createEditor(node, sourceText, onEditorChange);
     editor.restorePlace(heldPlace);
@@ -798,454 +1039,376 @@
 
 <svelte:window onkeydown={onConfirmKey} onfocus={onWindowFocus} />
 
-{#snippet renameForm()}
-  <form
-    class="rename-form"
-    onsubmit={(event) => {
-      event.preventDefault();
-      applyRename();
-    }}
-  >
-    <label>
-      <span>{labels.newPath}</span>
-      <input bind:value={renameValue} autocomplete="off" spellcheck="false" />
-    </label>
-    <p class="muted">{labels.moveHint}</p>
-    <div class="row-actions">
-      <button type="submit">{labels.applyPath}</button>
-      <button type="button" onclick={() => (renamingPath = "")}
-        >{labels.cancel}</button
-      >
-    </div>
-  </form>
-{/snippet}
-
-{#snippet treeNodes(nodes: TreeNode[])}
-  <ul class="tree">
-    {#each nodes as node (node.path)}
-      <li class={node.kind === "folder" ? "tree-folder" : "tree-note"}>
-        {#if node.kind === "folder"}
-          <div class="tree-row">
-            <button
-              type="button"
-              class="twist"
-              aria-expanded={openFolders.includes(node.path)}
-              aria-label={openFolders.includes(node.path)
-                ? labels.collapseFolder
-                : labels.expandFolder}
-              onclick={() => toggleFolder(node.path)}
-            >
-              <span
-                class={["chevron", { open: openFolders.includes(node.path) }]}
-                aria-hidden="true"
-              ></span>
-            </button>
-            <button
-              type="button"
-              class={["folder-name", { chosen: selectedFolder === node.path }]}
-              aria-pressed={selectedFolder === node.path}
-              aria-label={`${labels.useAsPlace} ${node.name}`}
-              onclick={() => chooseFolder(node.path)}
-            >
-              {node.name}
-            </button>
-          </div>
-          <div class="tree-actions">
-            <button type="button" onclick={() => startRename(node.path)}>
-              {labels.renameOrMove}
-            </button>
-            <button type="button" onclick={() => askDelete(node.path)}
-              >{labels.delete}</button
-            >
-          </div>
-          {#if renamingPath === node.path}
-            {@render renameForm()}
-          {/if}
-          {#if openFolders.includes(node.path)}
-            {#if node.children.length === 0}
-              <p class="muted nested-empty">{labels.emptyTree}</p>
-            {:else}
-              {@render treeNodes(node.children)}
-            {/if}
-          {/if}
-        {:else}
-          <div class="tree-row">
-            <button
-              type="button"
-              class={["note-name", { active: currentPath === node.path }]}
-              aria-current={currentPath === node.path ? "true" : undefined}
-              onclick={() => openNote(node.path)}
-            >
-              {node.name}
-            </button>
-          </div>
-          <div class="tree-actions">
-            <button type="button" onclick={() => startRename(node.path)}>
-              {labels.renameOrMove}
-            </button>
-            <button type="button" onclick={() => askDelete(node.path)}
-              >{labels.delete}</button
-            >
-          </div>
-          {#if renamingPath === node.path}
-            {@render renameForm()}
-          {/if}
-        {/if}
-      </li>
-    {/each}
-  </ul>
-{/snippet}
-
 <div class="shell">
-  <header class="topbar">
-    <div class="brand">
-      <p class="brand-name">{labels.appName}</p>
-      <p class="brand-tag">{labels.tagline}</p>
-    </div>
-    <div class="actions">
-      <button type="button" onclick={openFolder}>{labels.openFolder}</button>
-      <button type="button" onclick={createSample} disabled={!rootName}>
-        {labels.createSample}
-      </button>
-      <button
-        type="button"
-        class="primary"
-        onclick={saveNote}
-        disabled={!currentPath}
-      >
-        {labels.saveNote}
-      </button>
-      <button
-        type="button"
-        onclick={exportPdf}
-        disabled={!currentPath || exporting}
-      >
-        {labels.exportPdf}
-      </button>
-      <label class="locale-picker">
-        <span>{labels.language}</span>
-        <select
-          aria-label={labels.language}
-          value={locale}
-          onchange={(event) =>
-            changeLocale(event.currentTarget.value as AppLocale)}
-        >
-          <option value="pl">Polski</option>
-          <option value="en">English</option>
-        </select>
-      </label>
-    </div>
-  </header>
-
   <div class="workarea">
-    <aside class="sidebar" aria-label={labels.notesInFolder}>
-      <h2>{labels.notesInFolder}</h2>
-      {#if !rootName}
-        <p class="muted">{labels.noFolder}</p>
-      {:else}
-        <p class="root-name">{rootName}</p>
-        <form
-          class="search-form"
-          role="search"
-          aria-busy={searchPending}
-          onsubmit={(event) => event.preventDefault()}
-        >
-          <label>
-            <span>{labels.searchLabel}</span>
-            <input
-              type="search"
-              value={searchQuery}
-              placeholder={labels.searchPlaceholder}
-              autocomplete="off"
-              spellcheck="false"
-              oninput={(event) => onSearchInput(event.currentTarget.value)}
-            />
-          </label>
-          <div aria-live="polite">
-            {#if searchPending}
-              <p class="muted">{labels.searchSearching}</p>
-            {:else if searchTouched && searchHits.length === 0}
-              <p class="muted">{labels.searchEmpty}</p>
-            {/if}
-          </div>
-          {#if searchTouched && searchHits.length > 0}
-            <ul class="search-results">
-              {#each searchHits as hit (`${hit.path}:${hit.line}`)}
-                <li>
-                  <button
-                    type="button"
-                    class="search-hit"
-                    onclick={() => openNote(hit.path)}
-                  >
-                    <span class="path-line">{hit.path}:{hit.line}</span>
-                    <span class="search-snippet">{hit.snippet}</span>
-                  </button>
-                </li>
-              {/each}
-            </ul>
+    <div class="nav-column">
+      <Sidebar
+        navLabel={labels.appName}
+        workspaceName={rootName || labels.noFolder}
+        mark={workspaceMark}
+        onWorkspace={() => {
+          selectedFolder = "";
+        }}
+        newLabel={labels.newNote}
+        newDisabled={!rootName}
+        onNew={() => void createBlankNote()}
+        searchLabel={labels.searchLabel}
+        searchDisabled={!rootName}
+        searchValue={searchQuery}
+        onSearch={onSearchInput}
+        sections={sidebarModel.sections}
+        items={sidebarModel.items}
+        onOpen={(id) => void openNote(id)}
+        onToggle={toggleFolder}
+        onChoose={chooseFolder}
+        expandLabel={labels.expandFolder}
+        collapseLabel={labels.collapseFolder}
+        saveStatus={footerSave}
+        footer={footerEntries}
+        language={{
+          label: labels.language,
+          value: locale,
+          options: [
+            { value: "pl", label: "Polski" },
+            { value: "en", label: "English" },
+          ],
+          onChange: (value) => {
+            if (value === "pl" || value === "en") void changeLocale(value);
+          },
+        }}
+      />
+      {#if showFollow}
+        <div class="nav-follow">
+          {#if rootName && (searchPending || searchTouched)}
+            <div aria-busy={searchPending ? "true" : undefined}>
+              <div aria-live="polite">
+                {#if searchPending}
+                  <p class="muted">{labels.searchSearching}</p>
+                {:else if searchHits.length === 0}
+                  <p class="muted">{labels.searchEmpty}</p>
+                {/if}
+              </div>
+              {#if searchHits.length > 0}
+                <ul class="search-results">
+                  {#each searchHits as hit (`${hit.path}:${hit.line}`)}
+                    <li>
+                      <button
+                        type="button"
+                        class="search-hit"
+                        onclick={() => openNote(hit.path)}
+                      >
+                        <span class="path-line">{hit.path}</span>
+                        <span>{hit.line}</span>
+                        <span class="search-snippet">{hit.snippet}</span>
+                      </button>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </div>
           {/if}
-        </form>
-        <section
-          class="recent-block"
-          aria-labelledby="recent-heading"
-          aria-busy={recentPending}
-        >
-          <h3 id="recent-heading">{labels.recentNotes}</h3>
-          {#if recentError}
-            <p class="muted">{recentError}</p>
-          {:else if recentPending}
-            <p class="muted">{labels.recentLoading}</p>
-          {:else if recentNotes.length === 0}
-            <p class="muted">{labels.recentEmpty}</p>
-          {:else}
-            <ul class="recent-list">
-              {#each recentNotes as path (path)}
-                <li>
-                  <button
-                    type="button"
-                    class="recent-hit"
-                    onclick={() => openNote(path)}
-                  >
-                    {path}
-                  </button>
-                </li>
-              {/each}
-            </ul>
+
+          {#if namingFolder}
+            <form
+              class="rename-form"
+              {@attach focusOnMount}
+              onsubmit={(event) => {
+                event.preventDefault();
+                void submitNewFolder();
+              }}
+            >
+              <TextField label={labels.nameLabel} bind:value={entryName} />
+              <div class="row-actions">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  label={labels.createHere}
+                  disabled={!entryName.trim()}
+                  onclick={() => void submitNewFolder()}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  label={labels.cancel}
+                  onclick={cancelNewFolder}
+                />
+              </div>
+            </form>
           {/if}
-        </section>
-        <section class="template-block" aria-labelledby="templates-heading">
-          <h3 id="templates-heading">{labels.templatesLabel}</h3>
-          <div class="row-actions">
-            {#each templateChoices as template (template.id)}
-              <button
-                type="button"
-                disabled={templatePending}
-                onclick={() => createFromTemplate(template.id)}
-              >
-                {template.label}
-              </button>
-            {/each}
-          </div>
-        </section>
-        <form
-          class="entry-form"
-          onsubmit={(event) => {
-            event.preventDefault();
-            createEntry("note");
-          }}
-        >
-          <p class="form-title">{labels.createHere}</p>
-          <label>
-            <span>{labels.nameLabel}</span>
-            <input
-              {@attach rememberNameInput}
-              bind:value={entryName}
-              autocomplete="off"
-              spellcheck="false"
-            />
-          </label>
-          <p class="muted place-line">
-            {#if selectedFolder}
-              {labels.placeIsFolder} <strong>{selectedFolder}</strong>
-            {:else}
-              {labels.placeIsRoot}
-            {/if}
+
+          {#if renamingPath}
+            <form
+              class="rename-form"
+              {@attach focusOnMount}
+              onsubmit={(event) => {
+                event.preventDefault();
+                void applyRename();
+              }}
+            >
+              <TextField
+                label={labels.newPath}
+                hint={labels.moveHint}
+                bind:value={renameValue}
+              />
+              <div class="row-actions">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  label={labels.applyPath}
+                  onclick={() => void applyRename()}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  label={labels.cancel}
+                  onclick={() => (renamingPath = "")}
+                />
+              </div>
+            </form>
+          {/if}
+
+          {#if pendingDelete}
+            <section
+              class="confirm"
+              aria-labelledby="confirm-title"
+              {@attach focusOnMount}
+            >
+              <p id="confirm-title">{labels.confirmDelete}</p>
+              <p class="path-line">{pendingDelete}</p>
+              <div class="row-actions">
+                <Button
+                  variant="danger"
+                  size="sm"
+                  label={labels.delete}
+                  onclick={() => void confirmDelete()}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  label={labels.cancel}
+                  onclick={closeDelete}
+                />
+              </div>
+            </section>
+          {/if}
+
+          {#if status}
+            <p class="status" role="status">{status}</p>
+          {/if}
+        </div>
+      {/if}
+    </div>
+
+    <main class="stage">
+      {#if !currentPath}
+        <div class="start">
+          <p class="start-date text-md">
+            <time datetime={dateStamp}>{dateLine}</time>
           </p>
-          <div class="row-actions">
-            <button
-              type="button"
-              onclick={() => createEntry("note")}
-              disabled={!entryName.trim()}
-            >
-              {labels.newNote}
-            </button>
-            <button
-              type="button"
-              onclick={() => createEntry("folder")}
-              disabled={!entryName.trim()}
-            >
-              {labels.newFolder}
-            </button>
+          <h1 class="start-greeting note-h1">{greetingSentence}</h1>
+          <div class="start-actions">
+            <Button
+              variant="primary"
+              label={labels.newNote}
+              icon="plus"
+              disabled={!rootName}
+              onclick={() => void createBlankNote()}
+            />
+            <Button
+              variant="secondary"
+              label={labels.openFolder}
+              icon="folder"
+              onclick={() => void openFolder()}
+            />
           </div>
-          {#if selectedFolder}
-            <button type="button" onclick={() => (selectedFolder = "")}>
-              {labels.clearPlace}
-            </button>
-          {/if}
-        </form>
-        {#if tree.length === 0}
-          <p class="muted">{labels.emptyTree}</p>
-        {:else}
-          {@render treeNodes(tree)}
+          <section class="start-block" aria-labelledby="templates-heading">
+            <h2 id="templates-heading" class="text-lg">{labels.templatesLabel}</h2>
+            <div class="card-grid">
+              {#each templateChoices as template (template.id)}
+                <Card
+                  title={template.label}
+                  meta={template.file}
+                  description={template.description}
+                  onclick={rootName && !templatePending
+                    ? () => void createFromTemplate(template.id)
+                    : undefined}
+                />
+              {/each}
+            </div>
+          </section>
+          <section class="start-block" aria-labelledby="recent-cards-heading">
+            <h2 id="recent-cards-heading" class="text-lg">{labels.recentNotes}</h2>
+            {#if !rootName}
+              <p class="muted">{labels.recentEmpty}</p>
+            {:else if recentError}
+              <p class="muted">{recentError}</p>
+            {:else if recentPending}
+              <p class="muted">{labels.recentLoading}</p>
+            {:else if recentNotes.length === 0}
+              <p class="muted">{labels.recentEmpty}</p>
+            {:else}
+              <div class="card-grid">
+                {#each recentNotes as path (path)}
+                  <Card
+                    title={lastSegment(path)}
+                    meta={path}
+                    onclick={() => void openNote(path)}
+                  />
+                {/each}
+              </div>
+            {/if}
+          </section>
+        </div>
+      {:else}
+        <div class="stage-bar">
+          <div class="view-cluster">
+            <SegmentedControl
+              label={labels.viewSwitch}
+              options={viewOptions}
+              value={viewMode}
+              onchange={(value) => setView(value as NoteView)}
+            />
+            <h1 class="path-line text-lg">{currentPath}</h1>
+          </div>
+          <div class="start-actions">
+            <p class={["save-state", savePhase, { conflict }]} role="status">
+              {saveStateLabel}
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              label={labels.saveNote}
+              onclick={() => void saveNote()}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              label={labels.exportPdf}
+              busy={exporting}
+              onclick={() => void exportPdf()}
+            />
+          </div>
+        </div>
+
+        {#if rendering}
+          <p class="muted pad" role="status">{labels.rendering}</p>
         {/if}
-        {#if pendingDelete}
-          <section class="confirm" aria-labelledby="confirm-title">
-            <p id="confirm-title">{labels.confirmDelete}</p>
-            <p class="path-line">{pendingDelete}</p>
+
+        {#if conflict}
+          <section class="conflict-banner" role="alert">
+            <h2>{labels.saveStateConflict}</h2>
+            <p>{labels.conflictBody}</p>
+            {#if reloadArmed}
+              <p>{labels.reloadWarning}</p>
+            {/if}
             <div class="row-actions">
-              <button
-                type="button"
-                class="danger"
-                {@attach focusOnMount}
-                onclick={confirmDelete}
-              >
-                {labels.delete}
-              </button>
-              <button type="button" onclick={closeDelete}
-                >{labels.cancel}</button
-              >
+              {#if reloadArmed}
+                <Button
+                  variant="danger"
+                  size="sm"
+                  label={labels.reloadConfirm}
+                  onclick={() => void reloadFromDisk()}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  label={labels.cancel}
+                  onclick={() => (reloadArmed = false)}
+                />
+              {:else}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  label={labels.reloadDisk}
+                  onclick={requestReload}
+                />
+                <Button
+                  variant="primary"
+                  size="sm"
+                  label={labels.overwriteDisk}
+                  onclick={() => void overwriteFromEditor()}
+                />
+              {/if}
             </div>
           </section>
         {/if}
-      {/if}
-      {#if status}
-        <p class="status" role="status">{status}</p>
-      {/if}
-      {#if rendering}
-        <p class="muted" role="status">{labels.rendering}</p>
-      {/if}
-    </aside>
 
-    <main class="stage">
-      <div class="stage-bar">
-        <div class="view-cluster">
-          <div class="view-switch" role="group" aria-label={labels.viewSwitch}>
-            <button
-              type="button"
-              aria-pressed={viewMode === "source"}
-              onclick={() => setView("source")}
-            >
-              {labels.viewSource}
-            </button>
-            <button
-              type="button"
-              aria-pressed={viewMode === "split"}
-              onclick={() => setView("split")}
-            >
-              {labels.viewSplit}
-            </button>
-            <button
-              type="button"
-              aria-pressed={viewMode === "rendered"}
-              onclick={() => setView("rendered")}
-            >
-              {labels.viewRendered}
-            </button>
-          </div>
-          {#if currentPath}
-            <p class="path-line">{currentPath}</p>
-          {/if}
-        </div>
-        {#if currentPath}
-          <p class={["save-state", savePhase, { conflict }]} role="status">
-            {saveStateLabel}
-          </p>
+        {#if saveFailed && !conflict}
+          <section class="conflict-banner" role="alert">
+            <h2>{labels.saveFailed}</h2>
+            <p>{labels.saveFailedBody}</p>
+            <div class="row-actions">
+              <Button
+                variant="primary"
+                size="sm"
+                label={labels.retrySave}
+                onclick={() => void saveNote()}
+              />
+              <Button
+                variant="danger"
+                size="sm"
+                label={labels.leaveWithoutSaving}
+                onclick={leaveWithoutSaving}
+              />
+            </div>
+          </section>
         {/if}
-      </div>
 
-      {#if conflict}
-        <section class="conflict-banner" role="alert">
-          <h2>{labels.saveStateConflict}</h2>
-          <p>{labels.conflictBody}</p>
-          {#if reloadArmed}
-            <p>{labels.reloadWarning}</p>
-          {/if}
-          <div class="row-actions">
-            {#if reloadArmed}
-              <button type="button" class="danger" onclick={reloadFromDisk}>
-                {labels.reloadConfirm}
-              </button>
-              <button type="button" onclick={() => (reloadArmed = false)}>
-                {labels.cancel}
-              </button>
-            {:else}
-              <button type="button" onclick={requestReload}
-                >{labels.reloadDisk}</button
-              >
-              <button
-                type="button"
-                class="primary"
-                onclick={overwriteFromEditor}
-              >
-                {labels.overwriteDisk}
-              </button>
-            {/if}
-          </div>
-        </section>
-      {/if}
+        <div class={["panes", viewMode]}>
+          <section
+            class="pane editor-pane"
+            aria-label={labels.editor}
+            hidden={!showsSource(viewMode)}
+          >
+            <h2>{labels.editor}</h2>
+            <div class="editor-host" {@attach editorAttachment}></div>
+          </section>
 
-      {#if saveFailed && !conflict}
-        <section class="conflict-banner" role="alert">
-          <h2>{labels.saveFailed}</h2>
-          <p>{labels.saveFailedBody}</p>
-          <div class="row-actions">
-            <button type="button" class="primary" onclick={saveNote}>
-              {labels.retrySave}
-            </button>
-            <button type="button" class="danger" onclick={leaveWithoutSaving}>
-              {labels.leaveWithoutSaving}
-            </button>
-          </div>
-        </section>
-      {/if}
-
-      <div class={["panes", viewMode]}>
-        <section
-          class="pane editor-pane"
-          aria-label={labels.editor}
-          hidden={!showsSource(viewMode)}
-        >
-          <h2>{labels.editor}</h2>
-          {#if !currentPath}
-            <p class="muted pad">{labels.noNote}</p>
-          {/if}
-          <div class="editor-host" {@attach editorAttachment}></div>
-        </section>
-
-        <section
-          class="pane preview-pane"
-          aria-label={labels.preview}
-          hidden={!showsRendered(viewMode)}
-        >
-          <h2>{labels.preview}</h2>
-          <div class="pages">
-            {#each pageUrls as pageUrl, index (index)}
-              <div class="page"><img src={pageUrl} alt="" /></div>
-            {/each}
-          </div>
-          <div class="diagnostics" aria-label={labels.diagnostics}>
-            <h3>{labels.diagnostics}</h3>
-            {#if diagnostics.length === 0}
-              <p class="muted">{labels.noDiagnostics}</p>
-            {:else}
-              <ul>
-                {#each diagnostics as diagnostic, index (index)}
-                  <li>
-                    <button
-                      type="button"
-                      class={[
-                        "diagnostic",
-                        { error: diagnostic.severity === "error" },
-                      ]}
-                      onclick={() => jumpToDiagnostic(diagnostic)}
-                    >
-                      <strong>{diagnostic.severity}</strong>
-                      <span>{diagnostic.file}:{diagnostic.start}</span>
-                      <span>{diagnostic.message}</span>
-                      {#each diagnostic.hints as hint (hint)}
-                        <span class="hint">{hint}</span>
-                      {/each}
-                    </button>
-                  </li>
-                {/each}
-              </ul>
-              {#if hasError && pageUrls.length > 0}
-                <p class="muted">{labels.lastGoodKept}</p>
+          <section
+            class="pane preview-pane"
+            aria-label={labels.preview}
+            hidden={!showsRendered(viewMode)}
+          >
+            <h2>{labels.preview}</h2>
+            <div class="pages">
+              {#each pageUrls as pageUrl, index (index)}
+                <div class="page"><img src={pageUrl} alt="" /></div>
+              {/each}
+            </div>
+            <div class="diagnostics" aria-label={labels.diagnostics}>
+              <h3>{labels.diagnostics}</h3>
+              {#if diagnostics.length === 0}
+                <p class="muted">{labels.noDiagnostics}</p>
+              {:else}
+                <ul>
+                  {#each diagnostics as diagnostic, index (index)}
+                    <li>
+                      <button
+                        type="button"
+                        class={[
+                          "diagnostic",
+                          { error: diagnostic.severity === "error" },
+                        ]}
+                        onclick={() => jumpToDiagnostic(diagnostic)}
+                      >
+                        <strong>{diagnostic.severity}</strong>
+                        <span>{diagnostic.file}:{diagnostic.start}</span>
+                        <span>{diagnostic.message}</span>
+                        {#each diagnostic.hints as hint (hint)}
+                          <span class="hint">{hint}</span>
+                        {/each}
+                      </button>
+                    </li>
+                  {/each}
+                </ul>
+                {#if hasError && pageUrls.length > 0}
+                  <p class="muted">{labels.lastGoodKept}</p>
+                {/if}
               {/if}
-            {/if}
-          </div>
-        </section>
-      </div>
+            </div>
+          </section>
+        </div>
+      {/if}
     </main>
   </div>
 </div>

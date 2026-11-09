@@ -76,5 +76,18 @@
   "template_problem_set": "Problem set",
   "template_lab": "Lab note",
   "template_created": "Created",
-  "template_failed": "The template did not create a note"
+  "template_failed": "The template did not create a note",
+  "close_note": "Close note",
+  "notes_heading": "Notes",
+  "row_menu": "Actions",
+  "template_lecture_body": "A title, a date, the lecturer, and room for definitions and theorems.",
+  "template_problem_set_body": "Numbered problems with room for a solution and an answer.",
+  "template_lab_body": "The aim, the equipment, a measurements table, uncertainty, and conclusions.",
+  "greeting_0": "Howdy",
+  "greeting_1": "Hello there",
+  "greeting_2": "Ready when you are",
+  "greeting_3": "Let us write",
+  "greeting_4": "Good to see you",
+  "greeting_5": "Your notes are waiting",
+  "greeting_6": "Shall we begin"
 }

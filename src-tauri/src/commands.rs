@@ -103,6 +103,16 @@ pub fn create_note(
 
 #[tauri::command]
 #[specta::specta]
+pub fn create_blank_note(state: State<'_, AppState>, parent: String) -> Result<Note, String> {
+    let root = root_or_err(&state)?;
+    let note = templates::create_blank_note(&root, &parent).map_err(String::from)?;
+    remember_note(&state, &note)?;
+    remember_opened(&state, &root, &note.path);
+    Ok(note)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn create_folder(
     state: State<'_, AppState>,
     parent: String,
@@ -298,6 +308,26 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<Settings, String> {
 pub fn set_locale(state: State<'_, AppState>, locale: String) -> Result<Settings, String> {
     let path = settings_file(&state)?;
     settings::set_locale(&path, &locale).map_err(String::from)
+}
+
+/// The spoken greeting word, or an empty string. Never an error on the page.
+///
+/// A saved `display_name` wins. Otherwise the account display name is
+/// read. The raw strings stay here. Nothing is written and nothing is logged.
+#[tauri::command]
+#[specta::specta]
+pub fn greeting_name(state: State<'_, AppState>) -> Result<String, String> {
+    let saved = settings_file(&state)
+        .ok()
+        .and_then(|path| settings::saved_display_name(&path))
+        .and_then(|raw| settings::spoken_word(&raw));
+    if let Some(word) = saved {
+        return Ok(word);
+    }
+    Ok(match whoami::realname() {
+        Ok(name) => settings::spoken_word(&name).unwrap_or_default(),
+        Err(_) => String::new(),
+    })
 }
 
 #[cfg(test)]

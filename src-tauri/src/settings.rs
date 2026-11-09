@@ -131,6 +131,35 @@ pub fn settings_path(config_dir: &Path) -> PathBuf {
     config_dir.join("settings.json")
 }
 
+/// The saved name as it sits in the file, when that field is a string.
+///
+/// A missing file is left missing. A broken file, a missing field, a
+/// blank field, and a value that is not a string all count as no saved
+/// name. This read never writes the file.
+pub fn saved_display_name(path: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let value: Value = serde_json::from_str(&text).ok()?;
+    let object = value.as_object()?;
+    match object.get("display_name") {
+        Some(Value::String(name)) => Some(name.clone()),
+        _ => None,
+    }
+}
+
+/// One word, at most 40 Unicode scalar values, or nothing.
+pub fn spoken_word(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let first = trimmed.split_whitespace().next().unwrap_or("");
+    if first.is_empty() {
+        return None;
+    }
+    let word: String = first.chars().take(40).collect();
+    if word.is_empty() { None } else { Some(word) }
+}
+
 pub fn load_settings(path: &Path) -> AppResult<Settings> {
     Ok(Settings {
         locale: load_file(path)?.locale,
@@ -1208,5 +1237,88 @@ mod tests {
         let refused = std::fs::rename(&probe, path).is_err();
         let _ = std::fs::remove_file(&probe);
         refused
+    }
+
+    #[test]
+    fn a_missing_settings_file_is_not_created_when_the_name_is_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        assert!(saved_display_name(&path).is_none());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn a_broken_settings_file_counts_as_no_saved_name_and_stays_broken() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, "{ broken").unwrap();
+        assert!(saved_display_name(&path).is_none());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "{ broken");
+    }
+
+    #[test]
+    fn a_display_name_that_is_not_a_string_is_no_saved_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, "{\"locale\":\"pl\",\"display_name\":12}\n").unwrap();
+        assert!(saved_display_name(&path).is_none());
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "{\"locale\":\"pl\",\"display_name\":12}\n"
+        );
+    }
+
+    #[test]
+    fn the_spoken_word_is_the_first_word_and_at_most_40_scalars() {
+        assert_eq!(spoken_word("  Ada Lovelace\t"), Some("Ada".to_string()));
+        assert_eq!(spoken_word("Łukasz Nowak"), Some("Łukasz".to_string()));
+        assert_eq!(spoken_word("Ada\nLovelace"), Some("Ada".to_string()));
+        assert_eq!(spoken_word(""), None);
+        assert_eq!(spoken_word("   "), None);
+        let long: String = "ą".repeat(45);
+        let word = spoken_word(&long).unwrap();
+        assert_eq!(word.chars().count(), 40);
+        assert_eq!(spoken_word(&"é".repeat(40)).unwrap().chars().count(), 40);
+    }
+
+    // covers: AC-19, locale and recent notes keep a hand written display name
+    #[test]
+    fn saving_locale_or_recent_notes_keeps_display_name() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        write_note(root.path(), "a.typ");
+        std::fs::write(
+            &path,
+            "{\"locale\":\"pl\",\"display_name\":\"Ada Lovelace\",\"source_font\":\"Kept Font\"}\n",
+        )
+        .unwrap();
+        set_locale(&path, "en").unwrap();
+        let saved = read_settings(&path);
+        assert_eq!(saved["locale"], "en");
+        assert_eq!(saved["display_name"], "Ada Lovelace");
+        assert_eq!(saved["source_font"], "Kept Font");
+
+        record_recent(&path, root.path(), "a.typ").unwrap();
+        let saved = read_settings(&path);
+        assert_eq!(saved["display_name"], "Ada Lovelace");
+        assert_eq!(saved["source_font"], "Kept Font");
+        assert_eq!(saved["locale"], "en");
+    }
+
+    #[test]
+    fn saving_locale_keeps_a_display_name_that_is_not_a_string() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(
+            &path,
+            "{\"locale\":\"pl\",\"display_name\":12,\"render_font\":\"Inter\"}\n",
+        )
+        .unwrap();
+        set_locale(&path, "en").unwrap();
+        let saved = read_settings(&path);
+        assert_eq!(saved["locale"], "en");
+        assert_eq!(saved["display_name"], 12);
+        assert_eq!(saved["render_font"], "Inter");
     }
 }

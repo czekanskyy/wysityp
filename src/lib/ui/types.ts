@@ -41,11 +41,27 @@ export type CommandItem = {
   group?: string;
 };
 
+export type SidebarSectionAction = {
+  label: string;
+  disabled?: boolean;
+  onclick: () => void;
+};
+
+export type SidebarLanguage = {
+  label: string;
+  value: string;
+  options: readonly { value: string; label: string }[];
+  onChange: (value: string) => void;
+};
+
 export type SidebarSection = {
   id: string;
   title: string;
   expanded: boolean;
   onToggle: () => void;
+  action?: SidebarSectionAction;
+  notice?: string;
+  busy?: boolean;
 };
 
 export type SidebarItem = {
@@ -57,6 +73,11 @@ export type SidebarItem = {
   expanded?: boolean;
   selected?: boolean;
   unsaved?: boolean;
+  title?: string;
+  count?: number;
+  current?: boolean;
+  menu?: readonly MenuEntry[];
+  menuLabel?: string;
 };
 
 export type SidebarFooterEntry = {

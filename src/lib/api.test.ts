@@ -5,6 +5,7 @@ vi.mock("../bindings", () => ({
     openWorkspace: vi.fn(),
     listTree: vi.fn(),
     createNote: vi.fn(),
+    createBlankNote: vi.fn(),
     createFolder: vi.fn(),
     renameEntry: vi.fn(),
     deleteEntry: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock("../bindings", () => ({
     exportPdf: vi.fn(),
     getSettings: vi.fn(),
     setLocale: vi.fn(),
+    greetingName: vi.fn(),
   },
 }));
 
@@ -61,6 +63,26 @@ describe("workspace api", () => {
       text: "= one\n",
     });
     expect(mocked.createNote).toHaveBeenCalledWith("lab", "one");
+  });
+
+  it("creates a blank note in the chosen folder and hands back its words", async () => {
+    mocked.createBlankNote.mockResolvedValue({
+      path: "lab/note.typ",
+      text: "= note\n",
+    } as never);
+
+    await expect(api.createBlankNote("lab")).resolves.toEqual({
+      path: "lab/note.typ",
+      text: "= note\n",
+    });
+    expect(mocked.createBlankNote).toHaveBeenCalledWith("lab");
+  });
+
+  it("asks Rust for the greeting name and hands the word back", async () => {
+    mocked.greetingName.mockResolvedValue("Ada" as never);
+
+    await expect(api.greetingName()).resolves.toBe("Ada");
+    expect(mocked.greetingName).toHaveBeenCalledTimes(1);
   });
 
   it("creates a folder and returns its path from the root", async () => {
