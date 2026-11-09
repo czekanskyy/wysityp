@@ -16,6 +16,7 @@ Settings are one JSON file in the app config folder, written by Rust. The chosen
 - `src-tauri/` is the Rust crate.
 - `messages/pl.json` and `messages/en.json` hold every app string. Paraglide checks both at build time and writes `src/paraglide/`.
 - `docs/scope/` is the feature list. `docs/specs/` holds decisions. Stack and architecture is spec 0001.
+- `docs/design.md` is the design system. Tokens are in `src/styles/`, base components in `src/lib/ui/`. New UI uses them and never hard codes a colour, size, or font.
 - `CONTRIBUTING.md` is the source for how work is committed and reviewed.
 
 ## Commands

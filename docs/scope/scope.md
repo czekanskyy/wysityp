@@ -14,7 +14,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 1 | Stack and architecture | Foundation | in-progress |
 | 2 | Coding standards and tooling | Foundation | in-progress |
 | 3 | Data model | Foundation | planned |
-| 4 | Design system and UI foundation | Foundation | planned |
+| 4 | Design system and UI foundation | Foundation | in-progress |
 | 5 | Workspace and note files | Release 1 | in-progress |
 | 6 | Rendered page editor | Release 1 | in-progress |
 | 7 | Math editing | Release 1 | planned |
@@ -56,7 +56,12 @@ Decide where things live on disk: the folder a student picks, notes as plain Typ
 ### 4. Design system and UI foundation · needs a decision
 Set the visual language and the base building blocks for screens, in Polish and English, with keyboard use and focus states treated as part of the design rather than an afterthought for a shortcut driven app.
 **Done when:** `design.md` covers type, colour, spacing and base components in both app languages, and base components handle focus and keyboard use well.
-- [ ] Design it (spec): `/architect design system and UI foundation`
+**Spec:** [0004. Design system and UI foundation](../specs/0004-design-system/index.md)
+**Docs:** [design.md](../design.md)
+**Code:** `src/styles/`, `src/lib/ui/`, `design.html`, `src/design/`
+- [x] Design it (spec): `/architect design system and UI foundation`
+- [x] Tokens, base layer and base components
+- [ ] Move `App.svelte` onto the components
 
 ## Release 1: The thinnest usable whole
 
