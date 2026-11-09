@@ -16,7 +16,6 @@ Settings are one JSON file in the app config folder, written by Rust. The chosen
 - `src-tauri/` is the Rust crate.
 - `messages/pl.json` and `messages/en.json` hold every app string. Paraglide checks both at build time and writes `src/paraglide/`.
 - `docs/scope/` is the feature list. `docs/specs/` holds decisions. Stack and architecture is spec 0001.
-- `docs/design.md` is the design system. Tokens are in `src/styles/`, base components in `src/lib/ui/`. New UI uses them and never hard codes a colour, size, or font.
 - `CONTRIBUTING.md` is the source for how work is committed and reviewed.
 
 ## Commands
@@ -41,7 +40,7 @@ bun run rust:test
 
 Rust is not formatted or linted by those page tools. `bun run rust:fmt` applies `cargo fmt --manifest-path src-tauri/Cargo.toml`. `bun run rust:fmt:check` is that command plus `-- --check`. `bun run rust:clippy` is `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`. `bun run rust:test` is `cargo test --manifest-path src-tauri/Cargo.toml`. Install the `rustfmt` and `clippy` components before those Rust checks (`rustup component add rustfmt clippy`). GitHub Actions runs the page checks and these Rust checks on `windows-latest` (`.github/workflows/ci.yml`).
 
-`src/paraglide/`, `src/bindings.ts`, `dist/`, and `node_modules/` are generated or installed. Do not hand edit them, and do not lint or reformat them. Prettier also skips `docs/` and Markdown, so scope and spec files stay hand formatted.
+`src/paraglide/`, `src/bindings.ts`, `dist/`, and `node_modules/` are generated or installed. Do not hand edit them, and do not lint or reformat them. Prettier also skips `docs/`, `design/`, and Markdown. Scope, spec, and the Claude Design export stay hand formatted. The export under `design/claude-design/` is a reference snapshot, not app code.
 
 ## Invariants
 

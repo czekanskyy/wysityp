@@ -6,5 +6,5 @@ src-tauri
 bun.lock
 project.inlang/cache
 docs
+design
 **/*.md
-design/claude-design

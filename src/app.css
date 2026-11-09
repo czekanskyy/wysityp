@@ -1,10 +1,3 @@
-/*
- * Screen styles for the current app shell. Colours, type, radius and
- * spacing come from src/styles/tokens.css (the "Papier" design system,
- * docs/design.md). The short names below are kept so existing rules read
- * the same; new code should use the --color-* tokens directly and the
- * components in src/lib/ui/.
- */
 :root {
   --bg: var(--color-bg);
   --surface: var(--color-surface);
@@ -18,31 +11,36 @@
   --danger: var(--color-danger);
   --danger-bg: var(--color-danger-soft);
   --warn-bg: var(--color-warning-soft);
-  --radius: var(--radius-lg);
+  --radius: 12px;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
-  font-size: var(--text-md);
+  margin: 0;
+}
+
+button,
+select {
+  font: inherit;
 }
 
 button {
-  height: var(--control-md);
   border: 1px solid var(--line);
   background: var(--surface-strong);
   color: var(--ink);
-  border-radius: var(--radius-md);
-  padding: 0 var(--space-3);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
   cursor: pointer;
-  box-shadow: var(--shadow-xs);
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard);
 }
 
 button:hover:not(:disabled) {
-  border-color: var(--color-border-strong);
+  border-color: var(--accent);
 }
 
 button:disabled {
@@ -56,26 +54,23 @@ button.primary {
   border-color: var(--accent);
 }
 
-button.primary:hover:not(:disabled) {
-  background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
-}
-
 input {
+  font: inherit;
   color: var(--ink);
   background: var(--surface-strong);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  height: var(--control-md);
-  padding: 0 var(--space-2-5);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
   width: 100%;
 }
 
 button:focus-visible,
 select:focus-visible,
 input:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--color-surface),
+    0 0 0 4px var(--color-focus-ring);
 }
 
 .shell {
@@ -97,7 +92,6 @@ input:focus-visible {
 
 .brand-name {
   margin: 0;
-  font-family: var(--font-prose);
   font-size: 1.35rem;
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -124,9 +118,8 @@ input:focus-visible {
 }
 
 .locale-picker select {
-  height: var(--control-md);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   padding: 0.4rem 0.55rem;
   background: var(--surface-strong);
   color: var(--ink);
@@ -235,8 +228,6 @@ input:focus-visible {
 
 .folder-name,
 .note-name {
-  height: auto;
-  min-height: var(--control-md);
   flex: 1;
   text-align: left;
   overflow-wrap: anywhere;
@@ -268,8 +259,8 @@ input:focus-visible {
 }
 
 .twist {
-  width: var(--control-md);
-  height: var(--control-md);
+  width: 2.4rem;
+  min-height: 2.4rem;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -297,7 +288,7 @@ input:focus-visible {
 .confirm {
   padding: 0.7rem;
   border: 1px solid var(--danger);
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   background: var(--danger-bg);
 }
 
@@ -312,7 +303,7 @@ button.danger {
   margin-top: 1rem;
   padding: 0.6rem;
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   background: var(--surface-strong);
   overflow-wrap: anywhere;
 }
@@ -466,8 +457,6 @@ button.danger {
 
 .search-hit,
 .recent-hit {
-  height: auto;
-  padding-block: var(--space-1-5);
   width: 100%;
   text-align: left;
   display: grid;
@@ -487,8 +476,6 @@ button.danger {
 }
 
 .diagnostic {
-  height: auto;
-  padding-block: var(--space-1-5);
   width: 100%;
   text-align: left;
   display: grid;

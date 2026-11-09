@@ -1,9 +1,10 @@
 import { mount } from "svelte";
 
+import App from "./App.svelte";
 import "./styles/tokens.css";
 import "./styles/base.css";
-import App from "./App.svelte";
 import "./app.css";
+import "./styles/ui.css";
 import { api } from "./lib/api";
 import { initLocale } from "./lib/locale";
 

@@ -1,84 +1,47 @@
 <script lang="ts">
-  import type { HTMLButtonAttributes } from "svelte/elements";
   import Icon from "./Icon.svelte";
-  import type { IconName } from "./icons";
+  import type { IconId } from "./icons";
 
-  interface Props extends HTMLButtonAttributes {
-    icon: IconName;
-    /** Required: the accessible name and the hover hint. */
+  type Props = {
     label: string;
-    /** Shortcut shown in the hover hint, e.g. "Ctrl+B". */
-    shortcut?: string;
+    icon: IconId;
     size?: "sm" | "md";
-    /** A toggle (bold on/off). Leave undefined for a plain action. */
     pressed?: boolean;
-  }
+    disabled?: boolean;
+    shortcut?: readonly string[];
+    tabindex?: number;
+    onclick?: () => void;
+  };
 
   let {
-    icon,
     label,
-    shortcut,
+    icon,
     size = "md",
     pressed,
-    type = "button",
-    ...rest
+    disabled = false,
+    shortcut,
+    tabindex = 0,
+    onclick,
   }: Props = $props();
+
+  const keys = $derived(shortcut?.length ? shortcut.join("+") : "");
+  const tip = $derived(keys ? `${label} (${keys})` : label);
 </script>
 
 <button
-  {...rest}
-  {type}
-  class="icon-btn icon-btn-{size} {rest.class ?? ''}"
+  type="button"
+  class="ibtn {size}"
   aria-label={label}
-  aria-pressed={pressed}
-  title={shortcut ? `${label} (${shortcut})` : label}
+  title={tip}
+  aria-keyshortcuts={keys || undefined}
+  aria-pressed={pressed === undefined ? undefined : pressed ? "true" : "false"}
+  aria-disabled={disabled ? "true" : undefined}
+  {disabled}
+  tabindex={disabled ? -1 : tabindex}
+  onclick={() => {
+    if (disabled) return;
+    onclick?.();
+  }}
 >
-  <Icon name={icon} size={size === "sm" ? "sm" : "md"} />
+  <Icon id={icon} size={size === "sm" ? "sm" : "md"} />
 </button>
-
-<style>
-  .icon-btn {
-    display: inline-grid;
-    place-items: center;
-    width: var(--control-md);
-    height: var(--control-md);
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    transition:
-      background-color var(--duration-fast) var(--ease-standard),
-      color var(--duration-fast) var(--ease-standard);
-  }
-
-  .icon-btn-sm {
-    width: var(--control-sm);
-    height: var(--control-sm);
-  }
-
-  .icon-btn:hover:not(:disabled) {
-    background: var(--color-hover);
-    color: var(--color-text);
-  }
-
-  .icon-btn:active:not(:disabled) {
-    background: var(--color-pressed);
-  }
-
-  .icon-btn[aria-pressed="true"] {
-    background: var(--color-accent-soft);
-    color: var(--color-accent-soft-text);
-  }
-
-  .icon-btn:focus-visible {
-    outline: none;
-    box-shadow: var(--shadow-focus);
-  }
-
-  .icon-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-</style>

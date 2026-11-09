@@ -1,285 +1,282 @@
-/*
- * WYSITyp design tokens ("Papier").
- *
- * The single source for colour, type, spacing, radius, shadow, motion and
- * layering. Components and app.css read only these variables, never raw
- * values. See docs/design.md for the reasons behind each group.
- *
- * Theme: every colour is written once with light-dark(). The theme follows
- * the system by default. Setting data-theme="light" or data-theme="dark" on
- * <html> forces one. WebView2 (Chromium) supports light-dark().
- */
-
-:root {
-  color-scheme: light dark;
-
-  /* ---------------------------------------------------------------- */
-  /* Colour: surfaces                                                  */
-  /* ---------------------------------------------------------------- */
-
-  /* App chrome: window, sidebar, toolbars. Warm paper grey. */
-  --color-bg: light-dark(#f6f4ef, #1a1b1e);
-  /* The page you write on. Slightly brighter than the chrome. */
-  --color-surface: light-dark(#fffdf9, #202124);
-  /* Popovers, menus, the command palette, cards on hover. */
-  --color-surface-raised: light-dark(#ffffff, #27292c);
-  /* Code blocks, inputs at rest, wells. */
-  --color-surface-sunken: light-dark(#efece4, #161719);
-  /* Scrim behind modal dialogs. */
-  --color-overlay: light-dark(rgb(31 35 40 / 0.28), rgb(0 0 0 / 0.55));
-
-  /* Row and button states, layered over any surface. */
-  --color-hover: light-dark(rgb(60 50 30 / 0.06), rgb(255 255 255 / 0.06));
-  --color-pressed: light-dark(rgb(60 50 30 / 0.11), rgb(255 255 255 / 0.1));
-
-  /* ---------------------------------------------------------------- */
-  /* Colour: lines and text                                            */
-  /* ---------------------------------------------------------------- */
-
-  --color-border: light-dark(#e3ded3, #2e3034);
-  --color-border-strong: light-dark(#cfc8b9, #3e4146);
-
-  /* Body text. 15.5:1 on surface (light), 12.9:1 (dark). */
-  --color-text: light-dark(#1f2328, #e8e6e1);
-  /* Secondary text, labels, meta. At least 5.1:1 on every surface. */
-  --color-text-muted: light-dark(#5c6370, #a3a39e);
-  /* Placeholders and disabled text only. Never for content. ~3.3:1. */
-  --color-text-faint: light-dark(#878c94, #76777a);
-
-  /* ---------------------------------------------------------------- */
-  /* Colour: accent ("atrament", ink blue)                            */
-  /* ---------------------------------------------------------------- */
-
-  /* Fill for primary buttons, the active tab, the caret. */
-  --color-accent: light-dark(#2a4fbf, #8aa6f2);
-  --color-accent-hover: light-dark(#23439f, #a3b9f5);
-  /* Text and icons placed on --color-accent. */
-  --color-on-accent: light-dark(#ffffff, #0f1530);
-  /* Accent used as text or icon on a normal surface (links, active item). */
-  --color-accent-text: light-dark(#2a4fbf, #8aa6f2);
-  /* Quiet accent background: selected sidebar row, pressed toggle. */
-  --color-accent-soft: light-dark(#e7edfb, #243155);
-  --color-accent-soft-text: light-dark(#1e3f9a, #a9bdf5);
-
-  --color-focus-ring: light-dark(#2a4fbf, #8aa6f2);
-  --color-selection: light-dark(rgb(42 79 191 / 0.18), rgb(138 166 242 / 0.28));
-  /* A marker highlight in a note (Typst #highlight). */
-  --color-highlight: light-dark(#fff1a8, #5a4a12);
-
-  /* ---------------------------------------------------------------- */
-  /* Colour: status                                                    */
-  /* ---------------------------------------------------------------- */
-
-  --color-danger: light-dark(#b42318, #f2877c);
-  --color-danger-fill: light-dark(#b42318, #c4402f);
+/* Papier colour, space, size, radius, shadow, and page colour.
+   Font families stay in the app chrome and in the editor. */
+:root,
+[data-theme="light"] {
+  --color-bg: #f6f4ef;
+  --color-surface: #fffdf9;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #efece4;
+  --color-overlay: #1f232847;
+  --color-hover: #3c321e0f;
+  --color-pressed: #3c321e1c;
+  --color-border: #e3ded3;
+  --color-border-strong: #cfc8b9;
+  --color-text: #1f2328;
+  --color-text-muted: #5c6370;
+  --color-text-faint: #878c94;
+  --color-accent: #2a4fbf;
+  --color-accent-hover: #23439f;
+  --color-on-accent: #ffffff;
+  --color-accent-text: #2a4fbf;
+  --color-accent-soft: #e7edfb;
+  --color-accent-soft-text: #1e3f9a;
+  --color-focus-ring: #2a4fbf;
+  --color-selection: #2a4fbf2e;
+  --color-highlight: #fff1a8;
+  --color-danger: #b42318;
+  --color-danger-fill: #b42318;
   --color-on-danger: #ffffff;
-  --color-danger-soft: light-dark(#fdecea, #3a1f1d);
-
-  --color-warning: light-dark(#8a5c00, #e8b44c);
-  --color-warning-soft: light-dark(#fff5d9, #2e2716);
-
-  --color-success: light-dark(#17703f, #6cc79a);
-  --color-success-soft: light-dark(#e6f4ec, #18301f);
-
-  /* ---------------------------------------------------------------- */
-  /* Colour: content in a note                                         */
-  /* ---------------------------------------------------------------- */
-
-  /* Math gets its own quiet violet so a formula is easy to spot. */
-  --color-math: light-dark(#7c3aad, #c49af0);
-  --color-math-soft: light-dark(#f3ecfa, #2c2138);
-
-  /* Inline code and code blocks. */
-  --color-code-text: light-dark(#3b2f63, #d6d0ee);
+  --color-danger-soft: #fdecea;
+  --color-warning: #8a5c00;
+  --color-warning-soft: #fff5d9;
+  --color-success: #17703f;
+  --color-success-soft: #e6f4ec;
+  --color-math: #7c3aad;
+  --color-math-soft: #f3ecfa;
+  --color-code-text: #3b2f63;
   --color-code-bg: var(--color-surface-sunken);
-
-  /* Typst markup shown as source (markers like = - + $ #). */
-  --color-markup: light-dark(#8a8f98, #6d7078);
-
-  /* Syntax hues for Typst and code, used by a later highlighter. */
-  --syntax-keyword: light-dark(#a1261c, #f4a097);
-  --syntax-function: light-dark(#1e3f9a, #a9bdf5);
-  --syntax-string: light-dark(#17603a, #8fd6ae);
-  --syntax-number: light-dark(#7a4d00, #ecc070);
-  --syntax-comment: light-dark(#6b7280, #8b8f97);
-  --syntax-label: light-dark(#0e6470, #7fd3dd);
-
-  /* ---------------------------------------------------------------- */
-  /* Colour: tags (subjects, courses). fg on bg is at least 5.9:1.    */
-  /* ---------------------------------------------------------------- */
-
-  --tag-gray-fg: light-dark(#4a5260, #c5c8ce);
-  --tag-gray-bg: light-dark(#eceef1, #2c2f34);
-  --tag-blue-fg: light-dark(#1e3f9a, #a9bdf5);
-  --tag-blue-bg: light-dark(#e7edfb, #243155);
-  --tag-green-fg: light-dark(#17603a, #8fd6ae);
-  --tag-green-bg: light-dark(#e3f3e9, #1d3a29);
-  --tag-amber-fg: light-dark(#7a4d00, #ecc070);
-  --tag-amber-bg: light-dark(#fcf0d4, #3d3018);
-  --tag-red-fg: light-dark(#a1261c, #f4a097);
-  --tag-red-bg: light-dark(#fcebe8, #45231f);
-  --tag-violet-fg: light-dark(#6b2fa0, #d0aef5);
-  --tag-violet-bg: light-dark(#f1e9fa, #33264a);
-  --tag-teal-fg: light-dark(#0e6470, #7fd3dd);
-  --tag-teal-bg: light-dark(#e1f3f5, #173b40);
-
-  /* ---------------------------------------------------------------- */
-  /* Typography                                                        */
-  /* ---------------------------------------------------------------- */
-
-  /* Chrome: native Windows UI type. Covers every Polish letter. */
-  --font-ui:
-    "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
-  /* Note prose: the serif Typst itself prints with, then Windows serifs. */
-  --font-prose:
-    "Libertinus Serif", "Iowan Old Style", Cambria, Georgia, "Times New Roman",
-    serif;
-  /* Math: matches Typst's default math font, then Windows' math font. */
-  --font-math:
-    "New Computer Modern Math", "Cambria Math", "STIX Two Math", math, serif;
-  /* Code and Typst source. */
-  --font-mono:
-    "Cascadia Mono", "Cascadia Code", Consolas, "DejaVu Sans Mono", monospace;
-
-  /* UI scale (px based: chrome is dense and does not grow with notes). */
-  --text-2xs: 0.6875rem; /* 11px: kbd hints, counters */
-  --text-xs: 0.75rem; /* 12px: meta, section labels */
-  --text-sm: 0.8125rem; /* 13px: sidebar rows, menus, buttons */
-  --text-md: 0.875rem; /* 14px: inputs, dialogs */
-  --text-lg: 1rem; /* 16px: dialog titles */
-
-  /* Note scale (the writing surface). Base 17px, ratio ~1.25. */
-  --note-text: 1.0625rem; /* 17px */
-  --note-small: 0.9375rem; /* 15px: footnotes, captions */
-  --note-h1: 1.875rem; /* 30px */
-  --note-h2: 1.5rem; /* 24px */
-  --note-h3: 1.25rem; /* 20px */
-  --note-h4: 1.0625rem; /* 17px, bold */
-  --note-measure: 44rem; /* ~75 characters per line */
-
-  /* Inline math and code are tuned so x-heights match the prose. */
-  --math-scale: 1.08em;
-  --code-scale: 0.88em;
-
-  --leading-tight: 1.25;
-  --leading-ui: 1.45;
-  --leading-note: 1.65;
-  --leading-code: 1.55;
-
-  --weight-regular: 400;
-  --weight-medium: 500;
-  --weight-semibold: 600;
-  --weight-bold: 700;
-
-  --tracking-tight: -0.01em;
-  --tracking-caps: 0.06em;
-
-  /* ---------------------------------------------------------------- */
-  /* Space: 4px grid                                                   */
-  /* ---------------------------------------------------------------- */
-
+  --color-markup: #8a8f98;
+  --syntax-keyword: #a1261c;
+  --syntax-function: #1e3f9a;
+  --syntax-string: #17603a;
+  --syntax-number: #7a4d00;
+  --syntax-comment: #6b7280;
+  --syntax-label: #0e6470;
+  --tag-gray-fg: #4a5260;
+  --tag-gray-bg: #eceef1;
+  --tag-blue-fg: #1e3f9a;
+  --tag-blue-bg: #e7edfb;
+  --tag-green-fg: #17603a;
+  --tag-green-bg: #e3f3e9;
+  --tag-amber-fg: #7a4d00;
+  --tag-amber-bg: #fcf0d4;
+  --tag-red-fg: #a1261c;
+  --tag-red-bg: #fcebe8;
+  --tag-violet-fg: #6b2fa0;
+  --tag-violet-bg: #f1e9fa;
+  --tag-teal-fg: #0e6470;
+  --tag-teal-bg: #e1f3f5;
+  --shadow-xs: 0 1px 1px #281e0a0f;
+  --shadow-sm: 0 1px 2px #281e0a12, 0 1px 3px #281e0a0d;
+  --shadow-md: 0 2px 4px #281e0a0f, 0 6px 16px #281e0a14;
+  --shadow-lg: 0 4px 8px #281e0a0f, 0 18px 48px #281e0a29;
+}
+[data-theme="dark"] {
+  --color-bg: #1a1b1e;
+  --color-surface: #202124;
+  --color-surface-raised: #27292c;
+  --color-surface-sunken: #161719;
+  --color-overlay: #0000008c;
+  --color-hover: #ffffff0f;
+  --color-pressed: #ffffff1a;
+  --color-border: #2e3034;
+  --color-border-strong: #3e4146;
+  --color-text: #e8e6e1;
+  --color-text-muted: #a3a39e;
+  --color-text-faint: #76777a;
+  --color-accent: #8aa6f2;
+  --color-accent-hover: #a3b9f5;
+  --color-on-accent: #0f1530;
+  --color-accent-text: #8aa6f2;
+  --color-accent-soft: #243155;
+  --color-accent-soft-text: #a9bdf5;
+  --color-focus-ring: #8aa6f2;
+  --color-selection: #8aa6f247;
+  --color-highlight: #5a4a12;
+  --color-danger: #f2877c;
+  --color-danger-fill: #c4402f;
+  --color-on-danger: #ffffff;
+  --color-danger-soft: #3a1f1d;
+  --color-warning: #e8b44c;
+  --color-warning-soft: #2e2716;
+  --color-success: #6cc79a;
+  --color-success-soft: #18301f;
+  --color-math: #c49af0;
+  --color-math-soft: #2c2138;
+  --color-code-text: #d6d0ee;
+  --color-code-bg: var(--color-surface-sunken);
+  --color-markup: #6d7078;
+  --syntax-keyword: #f4a097;
+  --syntax-function: #a9bdf5;
+  --syntax-string: #8fd6ae;
+  --syntax-number: #ecc070;
+  --syntax-comment: #8b8f97;
+  --syntax-label: #7fd3dd;
+  --tag-gray-fg: #c5c8ce;
+  --tag-gray-bg: #2c2f34;
+  --tag-blue-fg: #a9bdf5;
+  --tag-blue-bg: #243155;
+  --tag-green-fg: #8fd6ae;
+  --tag-green-bg: #1d3a29;
+  --tag-amber-fg: #ecc070;
+  --tag-amber-bg: #3d3018;
+  --tag-red-fg: #f4a097;
+  --tag-red-bg: #45231f;
+  --tag-violet-fg: #d0aef5;
+  --tag-violet-bg: #33264a;
+  --tag-teal-fg: #7fd3dd;
+  --tag-teal-bg: #173b40;
+  --shadow-xs: 0 1px 1px #0000004d;
+  --shadow-sm: 0 1px 2px #00000059, 0 1px 3px #00000040;
+  --shadow-md: 0 2px 4px #0000004d, 0 6px 16px #00000066;
+  --shadow-lg: 0 4px 8px #00000059, 0 18px 48px #0000008c;
+}
+:root {
   --space-0: 0;
   --space-px: 1px;
-  --space-0-5: 0.125rem; /* 2 */
-  --space-1: 0.25rem; /* 4 */
-  --space-1-5: 0.375rem; /* 6 */
-  --space-2: 0.5rem; /* 8 */
-  --space-2-5: 0.625rem; /* 10 */
-  --space-3: 0.75rem; /* 12 */
-  --space-4: 1rem; /* 16 */
-  --space-5: 1.25rem; /* 20 */
-  --space-6: 1.5rem; /* 24 */
-  --space-8: 2rem; /* 32 */
-  --space-10: 2.5rem; /* 40 */
-  --space-12: 3rem; /* 48 */
-  --space-16: 4rem; /* 64 */
-
-  /* ---------------------------------------------------------------- */
-  /* Sizes                                                             */
-  /* ---------------------------------------------------------------- */
-
-  --control-sm: 1.75rem; /* 28px: toolbar, sidebar rows */
-  --control-md: 2rem; /* 32px: buttons, inputs */
-  --control-lg: 2.5rem; /* 40px: palette input */
-  --icon-sm: 0.875rem; /* 14px */
-  --icon-md: 1rem; /* 16px */
-  --icon-lg: 1.25rem; /* 20px */
-
-  --sidebar-width: 16.5rem; /* 264px */
-  --sidebar-min: 13rem;
-  --sidebar-max: 26rem;
+  --space-0-5: 0.125rem;
+  --space-1: 0.25rem;
+  --space-1-5: 0.375rem;
+  --space-2: 0.5rem;
+  --space-2-5: 0.625rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --control-sm: 1.75rem;
+  --control-md: 2rem;
+  --control-lg: 2.5rem;
+  --icon-sm: 0.875rem;
+  --icon-md: 1rem;
+  --icon-lg: 1.25rem;
+  --sidebar-width: 16.5rem;
   --titlebar-height: 2.75rem;
   --palette-width: 38rem;
-
-  /* ---------------------------------------------------------------- */
-  /* Radius                                                            */
-  /* ---------------------------------------------------------------- */
-
-  --radius-xs: 3px; /* kbd, inline code */
-  --radius-sm: 5px; /* sidebar rows, toolbar buttons, tags */
-  --radius-md: 7px; /* buttons, inputs */
-  --radius-lg: 10px; /* cards, menus, code blocks */
-  --radius-xl: 14px; /* dialogs, palette */
+  --note-measure: 44rem;
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
   --radius-full: 999px;
-
-  /* ---------------------------------------------------------------- */
-  /* Elevation. Dark theme leans on borders, so shadows get stronger. */
-  /* ---------------------------------------------------------------- */
-
-  --shadow-xs: 0 1px 1px light-dark(rgb(40 30 10 / 0.06), rgb(0 0 0 / 0.3));
-  --shadow-sm:
-    0 1px 2px light-dark(rgb(40 30 10 / 0.07), rgb(0 0 0 / 0.35)),
-    0 1px 3px light-dark(rgb(40 30 10 / 0.05), rgb(0 0 0 / 0.25));
-  --shadow-md:
-    0 2px 4px light-dark(rgb(40 30 10 / 0.06), rgb(0 0 0 / 0.3)),
-    0 6px 16px light-dark(rgb(40 30 10 / 0.08), rgb(0 0 0 / 0.4));
-  --shadow-lg:
-    0 4px 8px light-dark(rgb(40 30 10 / 0.06), rgb(0 0 0 / 0.35)),
-    0 18px 48px light-dark(rgb(40 30 10 / 0.16), rgb(0 0 0 / 0.55));
-  --shadow-focus:
-    0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-focus-ring);
-
-  /* ---------------------------------------------------------------- */
-  /* Motion. Short and calm. Turned off under prefers-reduced-motion. */
-  /* ---------------------------------------------------------------- */
-
-  --duration-fast: 90ms;
-  --duration-base: 160ms;
-  --duration-slow: 240ms;
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-out: cubic-bezier(0, 0, 0.2, 1);
-
-  /* ---------------------------------------------------------------- */
-  /* Layers                                                            */
-  /* ---------------------------------------------------------------- */
-
-  --z-sticky: 10;
-  --z-dropdown: 100;
-  --z-overlay: 200;
-  --z-dialog: 300;
-  --z-toast: 400;
+}
+.note-h1 {
+  font-size: 30px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.note-h2 {
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.note-h3 {
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+.note-body {
+  font-size: 17px;
+  line-height: 1.65;
+  font-weight: 400;
+}
+.note-small {
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.math-inline {
+  font-size: 18px;
+  line-height: 1.65;
+  font-weight: 400;
+}
+.math-block {
+  font-size: 20px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.code {
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 400;
+}
+.code-inline {
+  font-size: 15px;
+  line-height: 1.65;
+  font-weight: 400;
+}
+.text-lg {
+  font-size: 16px;
+  line-height: 1.45;
+  font-weight: 600;
+}
+.text-md {
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 400;
+}
+.text-sm {
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 400;
+}
+.text-xs {
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 400;
+}
+.text-2xs {
+  font-size: 11px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: 0.06em;
 }
 
-:root[data-theme="light"] {
-  color-scheme: light;
+/* Page colours stay independent of the window theme. data-page lives on the note. */
+:root {
+  --page-white-bg: #ffffff;
+  --page-white-text: #1f1d1a;
+  --page-white-muted: #6b665e;
+  --page-white-math: #2b4c7e;
+  --page-white-code-bg: #f2efe8;
+  --page-beige-bg: #f5eedf;
+  --page-beige-text: #3a2f22;
+  --page-beige-muted: #716150;
+  --page-beige-math: #8a4b1f;
+  --page-beige-code-bg: #ebe0c9;
+  --page-graphite-bg: #2a2c30;
+  --page-graphite-text: #e6e2da;
+  --page-graphite-muted: #a5a199;
+  --page-graphite-math: #9cbde8;
+  --page-graphite-code-bg: #35383d;
+  --page-oled-bg: #000000;
+  --page-oled-text: #d8d4cc;
+  --page-oled-muted: #8d8981;
+  --page-oled-math: #8fb2e4;
+  --page-oled-code-bg: #141414;
 }
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
+[data-page="white"],
+:root {
+  --page-bg: var(--page-white-bg);
+  --page-text: var(--page-white-text);
+  --page-muted: var(--page-white-muted);
+  --page-math: var(--page-white-math);
+  --page-code-bg: var(--page-white-code-bg);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --duration-fast: 0ms;
-    --duration-base: 0ms;
-    --duration-slow: 0ms;
-  }
+[data-page="beige"] {
+  --page-bg: var(--page-beige-bg);
+  --page-text: var(--page-beige-text);
+  --page-muted: var(--page-beige-muted);
+  --page-math: var(--page-beige-math);
+  --page-code-bg: var(--page-beige-code-bg);
 }
-
-@media (prefers-contrast: more) {
-  :root {
-    --color-border: light-dark(#a8a091, #5a5e64);
-    --color-border-strong: light-dark(#7d7666, #80848b);
-    --color-text-muted: light-dark(#40464f, #c4c3be);
-  }
+[data-page="graphite"] {
+  --page-bg: var(--page-graphite-bg);
+  --page-text: var(--page-graphite-text);
+  --page-muted: var(--page-graphite-muted);
+  --page-math: var(--page-graphite-math);
+  --page-code-bg: var(--page-graphite-code-bg);
+}
+[data-page="oled"] {
+  --page-bg: var(--page-oled-bg);
+  --page-text: var(--page-oled-text);
+  --page-muted: var(--page-oled-muted);
+  --page-math: var(--page-oled-math);
+  --page-code-bg: var(--page-oled-code-bg);
 }

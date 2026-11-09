@@ -1,58 +1,91 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
-  import { roving } from "./roving";
+  import { tick } from "svelte";
+  import IconButton from "./IconButton.svelte";
+  import SegmentedControl from "./SegmentedControl.svelte";
+  import type { SegmentOptions, ToolbarItem } from "./types";
 
-  interface Props {
-    /** Accessible name, e.g. "Formatowanie". */
+  type Props = {
     label: string;
-    children: Snippet;
-    /** Pushed to the far end (view switch, save state). */
-    end?: Snippet;
+    items: readonly ToolbarItem[];
+    onAction: (id: string) => void;
+    viewOptions: SegmentOptions;
+    viewValue: string;
+    onViewChange: (value: string) => void;
+  };
+
+  let { label, items, onAction, viewOptions, viewValue, onViewChange }: Props =
+    $props();
+
+  let cursor = $state(0);
+  let rowEl = $state<HTMLDivElement | null>(null);
+
+  const stopIndex = $derived.by(() => {
+    if (items[cursor] && !items[cursor].disabled) return cursor;
+    const enabled = items.findIndex((item) => !item.disabled);
+    return enabled === -1 ? 0 : enabled;
+  });
+
+  async function move(next: number) {
+    cursor = next;
+    await tick();
+    const buttons = rowEl?.querySelectorAll<HTMLButtonElement>("button");
+    buttons?.[next]?.focus();
   }
 
-  let { label, children, end }: Props = $props();
+  function onRowKey(event: KeyboardEvent) {
+    if (!rowEl?.contains(event.target as Node)) return;
+    if (
+      event.key !== "ArrowLeft" &&
+      event.key !== "ArrowRight" &&
+      event.key !== "Home" &&
+      event.key !== "End"
+    ) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const indexes = items.flatMap((item, index) =>
+      item.disabled ? [] : [index],
+    );
+    if (indexes.length === 0) return;
+    const place = Math.max(0, indexes.indexOf(cursor));
+    const last = indexes.length - 1;
+    const next =
+      event.key === "Home"
+        ? indexes[0]
+        : event.key === "End"
+          ? indexes[last]
+          : event.key === "ArrowRight"
+            ? indexes[(place + 1) % indexes.length]
+            : indexes[(place - 1 + indexes.length) % indexes.length];
+    if (next !== undefined) void move(next);
+  }
 </script>
 
 <div
   class="toolbar"
   role="toolbar"
   aria-label={label}
-  aria-orientation="horizontal"
-  use:roving={{ selector: "button", orientation: "horizontal" }}
+  tabindex="-1"
+  onkeydown={onRowKey}
 >
-  <div class="items">{@render children()}</div>
-  {#if end}
-    <div class="end">{@render end()}</div>
-  {/if}
+  <div class="toolbar-items" bind:this={rowEl}>
+    {#each items as item, index (item.id)}
+      <IconButton
+        label={item.label}
+        icon={item.icon}
+        size="sm"
+        pressed={item.pressed}
+        disabled={item.disabled}
+        tabindex={index === stopIndex ? 0 : -1}
+        onclick={() => onAction(item.id)}
+      />
+    {/each}
+  </div>
+  <SegmentedControl
+    {label}
+    options={viewOptions}
+    value={viewValue}
+    onchange={onViewChange}
+  />
 </div>
-
-<style>
-  .toolbar {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: calc(var(--control-sm) + var(--space-2) * 2);
-    padding: var(--space-1-5) var(--space-3);
-    background: var(--color-surface);
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .items,
-  .end {
-    display: flex;
-    align-items: center;
-    gap: var(--space-0-5);
-  }
-
-  .items {
-    flex: 1;
-    min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .end {
-    flex: none;
-    gap: var(--space-2);
-  }
-</style>

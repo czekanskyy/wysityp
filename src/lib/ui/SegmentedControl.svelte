@@ -1,119 +1,76 @@
-<script lang="ts" generics="T extends string">
+<script lang="ts">
   import Icon from "./Icon.svelte";
-  import type { IconName } from "./icons";
+  import type { SegmentOptions } from "./types";
 
-  interface Option {
-    value: T;
+  type Props = {
     label: string;
-    icon?: IconName;
-    /** Show only the icon; the label stays as the accessible name. */
-    iconOnly?: boolean;
-  }
+    options: SegmentOptions;
+    value?: string;
+    onchange?: (value: string) => void;
+  };
 
-  interface Props {
-    label: string;
-    options: Option[];
-    value: T;
-    onchange?: (value: T) => void;
-  }
+  let { label, options, value = $bindable(""), onchange }: Props = $props();
 
-  let { label, options, value = $bindable(), onchange }: Props = $props();
+  const selectedIndex = $derived(
+    Math.max(
+      0,
+      options.findIndex((option) => option.value === value),
+    ),
+  );
 
-  let group: HTMLDivElement | undefined = $state();
-
-  function choose(next: T) {
+  function choose(next: string) {
+    if (next === value) return;
     value = next;
     onchange?.(next);
   }
 
-  function targetIndex(key: string, index: number): number | null {
-    if (key === "ArrowRight" || key === "ArrowDown") return index + 1;
-    if (key === "ArrowLeft" || key === "ArrowUp") return index - 1;
-    if (key === "Home") return 0;
-    if (key === "End") return options.length - 1;
-    return null;
-  }
-
-  function onkeydown(event: KeyboardEvent) {
-    const index = options.findIndex((option) => option.value === value);
-    const target = targetIndex(event.key, index);
-    if (target === null) return;
+  function onKey(event: KeyboardEvent) {
+    if (
+      event.key !== "ArrowLeft" &&
+      event.key !== "ArrowRight" &&
+      event.key !== "Home" &&
+      event.key !== "End"
+    ) {
+      return;
+    }
     event.preventDefault();
-    const next = (target + options.length) % options.length;
-    choose(options[next].value);
-    group?.querySelectorAll<HTMLElement>('[role="radio"]')[next]?.focus();
+    event.stopPropagation();
+    const values = options.map((option) => option.value);
+    let index = values.indexOf(value);
+    if (index < 0) index = 0;
+    if (event.key === "Home") index = 0;
+    else if (event.key === "End") index = values.length - 1;
+    else if (event.key === "ArrowRight") index = (index + 1) % values.length;
+    else index = (index - 1 + values.length) % values.length;
+    const next = values[index];
+    if (next !== undefined) choose(next);
   }
 </script>
 
 <div
-  class="segmented"
+  class="seg"
   role="radiogroup"
   aria-label={label}
-  bind:this={group}
-  {onkeydown}
   tabindex="-1"
+  onkeydown={onKey}
 >
-  {#each options as option (option.value)}
-    {@const checked = option.value === value}
+  {#each options as option, index (option.value)}
     <button
       type="button"
+      class="seg-option"
       role="radio"
-      aria-checked={checked}
+      aria-checked={option.value === value}
       aria-label={option.iconOnly ? option.label : undefined}
-      title={option.iconOnly ? option.label : undefined}
-      tabindex={checked ? 0 : -1}
+      title={option.label}
+      tabindex={index === selectedIndex ? 0 : -1}
       onclick={() => choose(option.value)}
     >
-      {#if option.icon}<Icon name={option.icon} size="sm" />{/if}
-      {#if !option.iconOnly}<span>{option.label}</span>{/if}
+      {#if option.icon}
+        <Icon id={option.icon} size="sm" />
+      {/if}
+      {#if !option.iconOnly}
+        <span class="one-line">{option.label}</span>
+      {/if}
     </button>
   {/each}
 </div>
-
-<style>
-  .segmented {
-    display: inline-flex;
-    padding: 2px;
-    gap: 2px;
-    background: var(--color-surface-sunken);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-  }
-
-  .segmented:focus {
-    outline: none;
-  }
-
-  button {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    height: calc(var(--control-sm) - 6px);
-    padding: 0 var(--space-2);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-medium);
-    color: var(--color-text-muted);
-    background: transparent;
-    border: 0;
-    border-radius: calc(var(--radius-md) - 2px);
-    cursor: pointer;
-    transition:
-      background-color var(--duration-fast) var(--ease-standard),
-      color var(--duration-fast) var(--ease-standard);
-  }
-
-  button:hover {
-    color: var(--color-text);
-  }
-
-  button[aria-checked="true"] {
-    color: var(--color-text);
-    background: var(--color-surface-raised);
-    box-shadow: var(--shadow-sm);
-  }
-
-  button:focus-visible {
-    outline: none;
-    box-shadow: var(--shadow-focus);
-  }
-</style>

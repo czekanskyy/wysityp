@@ -1,148 +1,168 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { tick } from "svelte";
   import Icon from "./Icon.svelte";
-  import type { MenuEntry } from "./menu";
-  import { roving } from "./roving";
+  import Kbd from "./Kbd.svelte";
+  import type { MenuEntry, MenuItem } from "./types";
 
-  interface Props {
-    label: string;
-    entries: MenuEntry[];
-    /** Called after a choice and on Escape. The owner returns focus. */
-    onclose?: () => void;
-    /** Focus the first item on open (true for popups, false when inline). */
-    autofocus?: boolean;
+  let { label, entries }: { label: string; entries: readonly MenuEntry[] } =
+    $props();
+
+  let open = $state(false);
+  let placed = $state(false);
+  let topPx = $state(0);
+  let leftPx = $state(0);
+  let triggerEl = $state<HTMLButtonElement | null>(null);
+  let menuEl = $state<HTMLDivElement | null>(null);
+
+  function isItem(entry: MenuEntry): entry is MenuItem {
+    return entry.separator !== true;
   }
 
-  let { label, entries, onclose, autofocus = true }: Props = $props();
-  let list: HTMLDivElement | undefined = $state();
+  function canOpen(): boolean {
+    return entries.some((entry) => isItem(entry) && !entry.disabled);
+  }
 
-  onMount(() => {
-    if (!autofocus) return;
-    list
-      ?.querySelector<HTMLElement>(
-        '[role="menuitem"]:not([aria-disabled="true"])',
-      )
-      ?.focus();
-  });
+  function place() {
+    if (!triggerEl || !menuEl) return;
+    const trigger = triggerEl.getBoundingClientRect();
+    const menu = menuEl.getBoundingClientRect();
+    const rtl = getComputedStyle(triggerEl).direction === "rtl";
+    let left = rtl ? trigger.right - menu.width : trigger.left;
+    const pastEnd = rtl ? left < 8 : left + menu.width > window.innerWidth - 8;
+    if (pastEnd)
+      left = rtl ? trigger.left : Math.max(8, trigger.right - menu.width);
+    const spaceBelow = window.innerHeight - trigger.bottom;
+    const placeAbove = spaceBelow < menu.height && trigger.top > menu.height;
+    topPx = placeAbove
+      ? Math.max(8, trigger.top - menu.height)
+      : trigger.bottom;
+    leftPx = left;
+    placed = true;
+  }
 
-  function choose(entry: Extract<MenuEntry, { id: string }>) {
+  function close(restore: boolean) {
+    open = false;
+    placed = false;
+    if (restore) triggerEl?.focus();
+  }
+
+  function toggle() {
+    if (open) {
+      close(true);
+      return;
+    }
+    if (!canOpen()) return;
+    open = true;
+  }
+
+  function run(entry: MenuItem) {
     if (entry.disabled) return;
-    entry.onselect();
-    onclose?.();
+    entry.onclick();
+    close(true);
   }
 
-  function onkeydown(event: KeyboardEvent) {
+  function onMenuKey(event: KeyboardEvent) {
+    if (!menuEl) return;
+    const items = [
+      ...menuEl.querySelectorAll<HTMLButtonElement>(
+        "button.menu-item:not(:disabled)",
+      ),
+    ];
+    const index = items.indexOf(document.activeElement as HTMLButtonElement);
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (items.length === 0) return;
+      const next =
+        event.key === "ArrowDown"
+          ? items[(index + 1) % items.length]
+          : items[(index - 1 + items.length) % items.length];
+      next?.focus();
+      return;
+    }
     if (event.key === "Escape" || event.key === "Tab") {
       event.preventDefault();
-      onclose?.();
+      close(true);
     }
   }
+
+  $effect(() => {
+    if (!open || !menuEl || !triggerEl) return;
+    place();
+    // placed flips visibility on the next flush. A hidden item cannot take focus.
+    let alive = true;
+    tick().then(() => {
+      if (!alive || !menuEl?.isConnected) return;
+      const first = menuEl.querySelector<HTMLButtonElement>(
+        "button.menu-item:not(:disabled)",
+      );
+      if (first && !menuEl.contains(document.activeElement)) first.focus();
+    });
+
+    const onPointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (triggerEl?.contains(target) || menuEl?.contains(target)) return;
+      close(false);
+    };
+    const onResize = () => place();
+    document.addEventListener("pointerdown", onPointer, true);
+    window.addEventListener("resize", onResize);
+    return () => {
+      alive = false;
+      document.removeEventListener("pointerdown", onPointer, true);
+      window.removeEventListener("resize", onResize);
+    };
+  });
 </script>
 
-<div
-  class="menu"
-  role="menu"
-  aria-label={label}
-  tabindex="-1"
-  bind:this={list}
-  {onkeydown}
-  use:roving={{ selector: '[role="menuitem"]', orientation: "vertical" }}
->
-  {#each entries as entry, index ("separator" in entry ? `sep-${index}` : entry.id)}
-    {#if "separator" in entry}
-      <div class="separator" role="separator"></div>
-    {:else}
-      <button
-        type="button"
-        role="menuitem"
-        class="item"
-        class:danger={entry.danger}
-        aria-disabled={entry.disabled || undefined}
-        onclick={() => choose(entry)}
-      >
-        <span class="icon">
-          {#if entry.icon}<Icon name={entry.icon} size="sm" />{/if}
-        </span>
-        <span class="label">{entry.label}</span>
-        {#if entry.shortcut}<span class="shortcut">{entry.shortcut}</span>{/if}
-      </button>
-    {/if}
-  {/each}
-</div>
-
-<style>
-  .menu {
-    display: grid;
-    min-width: 12rem;
-    max-width: 20rem;
-    padding: var(--space-1);
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-md);
-  }
-
-  .menu:focus {
-    outline: none;
-  }
-
-  .item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    height: var(--control-sm);
-    padding: 0 var(--space-2);
-    font-size: var(--text-sm);
-    color: var(--color-text);
-    text-align: left;
-    background: none;
-    border: 0;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-  }
-
-  .item:hover,
-  .item:focus-visible {
-    outline: none;
-    background: var(--color-hover);
-  }
-
-  .item:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--color-focus-ring);
-  }
-
-  .item[aria-disabled="true"] {
-    opacity: 0.45;
-    cursor: default;
-  }
-
-  .icon {
-    display: inline-grid;
-    width: var(--icon-sm);
-    color: var(--color-text-muted);
-  }
-
-  .danger,
-  .danger .icon {
-    color: var(--color-danger);
-  }
-
-  .label {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .shortcut {
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
-  }
-
-  .separator {
-    height: 1px;
-    margin: var(--space-1) calc(var(--space-1) * -1);
-    background: var(--color-border);
-  }
-</style>
+<span class="menu-wrap">
+  <button
+    type="button"
+    class="btn ghost"
+    aria-haspopup="menu"
+    aria-expanded={open}
+    title={label}
+    bind:this={triggerEl}
+    onclick={toggle}
+  >
+    <span class="one-line">{label}</span>
+    <Icon id="chevronDown" size="sm" />
+  </button>
+  {#if open}
+    <div
+      class="menu"
+      role="menu"
+      tabindex="-1"
+      style:top="{topPx}px"
+      style:left="{leftPx}px"
+      style:visibility={placed ? "visible" : "hidden"}
+      bind:this={menuEl}
+      onkeydown={onMenuKey}
+    >
+      {#each entries as entry, index (index)}
+        {#if isItem(entry)}
+          <button
+            type="button"
+            class="menu-item"
+            class:danger={entry.danger}
+            role="menuitem"
+            title={entry.label}
+            disabled={entry.disabled}
+            aria-disabled={entry.disabled ? "true" : undefined}
+            onclick={() => run(entry)}
+          >
+            {#if entry.icon}
+              <Icon id={entry.icon} size="sm" />
+            {/if}
+            <span class="one-line">{entry.label}</span>
+            {#if entry.shortcut?.length}
+              <Kbd keys={entry.shortcut} />
+            {/if}
+          </button>
+        {:else}
+          <div class="menu-sep" role="separator"></div>
+        {/if}
+      {/each}
+    </div>
+  {/if}
+</span>
