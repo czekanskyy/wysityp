@@ -9,6 +9,7 @@
 
 <script lang="ts">
   import { tick } from "svelte";
+  import AppIcon from "./AppIcon.svelte";
   import Icon from "./Icon.svelte";
   import IconButton from "./IconButton.svelte";
   import Menu from "./Menu.svelte";
@@ -33,6 +34,7 @@
     saveStatus: string;
     footer: readonly SidebarFooterEntry[];
     mark?: string;
+    brand?: boolean;
     onWorkspace?: () => void;
     newDisabled?: boolean;
     searchDisabled?: boolean;
@@ -57,6 +59,7 @@
     saveStatus,
     footer,
     mark,
+    brand = false,
     onWorkspace,
     newDisabled = false,
     searchDisabled = false,
@@ -177,7 +180,9 @@
 <nav class="sidebar" aria-label={navLabel}>
   <div class="sidebar-head">
     <div class="workspace">
-      {#if shownMark}
+      {#if brand}
+        <AppIcon size={24} />
+      {:else if shownMark}
         <span class="workspace-mark" aria-hidden="true">{shownMark}</span>
       {/if}
       {#if onWorkspace}

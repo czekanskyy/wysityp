@@ -66,6 +66,7 @@
           navLabel={session.labels.appName}
           workspaceName={session.rootName || session.labels.noFolder}
           mark={session.workspaceMark}
+          brand={!session.rootName}
           onWorkspace={() => session.clearPlace()}
           newLabel={session.labels.newNote}
           onNew={() => void session.requestNewNote()}
