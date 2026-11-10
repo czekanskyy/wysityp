@@ -88,6 +88,8 @@
   "template_names_exhausted": "Brak wolnej nazwy na kopię szablonu.",
   "note_names_exhausted": "Brak wolnej nazwy unsaved.",
   "image_refused": "Nie zapisano obrazu.",
+  "image_needs_note": "Zapisz notatkę w folderze, zanim dodasz obraz.",
+  "link_refused": "Nie można otworzyć tego odnośnika.",
   "pdf_needs_note": "Eksport PDF dotyczy notatki, nie szablonu.",
   "template_editing": "Szablon {name}",
   "template_start_note": "Zacznij notatkę",

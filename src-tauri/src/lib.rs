@@ -1,6 +1,8 @@
 mod commands;
 mod error;
 mod files;
+mod math_render;
+mod media;
 mod settings;
 mod templates;
 mod typst_engine;
@@ -59,6 +61,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::note_changed_on_disk,
         commands::render_note,
         commands::export_pdf,
+        math_render::render_math,
+        media::read_note_image,
+        media::open_link,
         commands::get_settings,
         commands::set_locale,
         commands::set_theme,
@@ -82,6 +87,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(AppState::new())
         .setup(|app| {
             let config_dir = app

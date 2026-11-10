@@ -28,6 +28,9 @@ export const commands = {
 	noteChangedOnDisk: (path: string) => typedError<boolean, string>(__TAURI_INVOKE("note_changed_on_disk", { path })),
 	renderNote: (path: string, source: string, revision: number) => typedError<RenderResult, string>(__TAURI_INVOKE("render_note", { path, source, revision })),
 	exportPdf: (path: string, source: string) => typedError<string, string>(__TAURI_INVOKE("export_pdf", { path, source })),
+	renderMath: (path: string, preamble: string, formulas: MathFormula[]) => typedError<MathSvg[], string>(__TAURI_INVOKE("render_math", { path, preamble, formulas })),
+	readNoteImage: (path: string, imagePath: string) => typedError<NoteImageBytes, string>(__TAURI_INVOKE("read_note_image", { path, imagePath })),
+	openLink: (url: string) => typedError<null, string>(__TAURI_INVOKE("open_link", { url })),
 	getSettings: () => typedError<Settings, string>(__TAURI_INVOKE("get_settings")),
 	setLocale: (locale: string) => typedError<Settings, string>(__TAURI_INVOKE("set_locale", { locale })),
 	setTheme: (theme: string) => typedError<Settings, string>(__TAURI_INVOKE("set_theme", { theme })),
@@ -44,6 +47,23 @@ export const commands = {
 };
 
 /* Types */
+export type MathFormula = {
+	id: string,
+	source: string,
+	block: boolean,
+	color: string,
+	size_pt: number | null,
+};
+
+export type MathSvg = {
+	id: string,
+	svg: string,
+	width_px: number | null,
+	height_px: number | null,
+	baseline_px: number | null,
+	error: string,
+};
+
 export type Note = {
 	path: string,
 	text: string,
@@ -58,6 +78,11 @@ export type Note = {
 export type NoteFingerprint = {
 	hash: string,
 	byte_len: number,
+};
+
+export type NoteImageBytes = {
+	bytes: number[],
+	mime: string,
 };
 
 export type RenderDiagnostic = {

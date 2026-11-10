@@ -15,13 +15,47 @@ import type { DecorationSet } from "@codemirror/view";
 import { basicSetup } from "codemirror";
 import { DEFAULT_EDITOR_FONTS, fontFamilyStack } from "./fonts";
 import type { EditorFonts } from "./fonts";
+import {
+  codeBlockSkeleton,
+  dollarEdit,
+  linkSkeleton,
+  mathSkeleton,
+  tableSkeleton,
+} from "./insert";
+import {
+  MATH_SIZE_PT,
+  MathBatcher,
+  PAGE_TEXT,
+  emptyMathSnapshot,
+  extractMathPreamble,
+  mathCacheKey,
+  sizeKey,
+} from "./math";
+import type {
+  FormulaJob,
+  FormulaPaint,
+  MathFormula,
+  MathSnapshot,
+  MathSvg,
+} from "./math";
 import type { EditorPlace } from "./noteSafety";
+import {
+  extensionForMime,
+  extensionForName,
+  imageFileName,
+  imageInsertion,
+  imageMarkup,
+  noteRelativeImagePath,
+  ImageLoader,
+} from "./paste";
+import type { ImageBytes, ImageRecord } from "./paste";
 import {
   caretMoveReplacesRanges,
   classifySpans,
   editorDiagnostics,
   flattenRanges,
   integrateSpans,
+  linkAt,
   mathArrowTarget,
   planDecorations,
   structureKey,
@@ -33,6 +67,7 @@ import type {
   Span,
   StructureEdit,
 } from "./spans";
+import type { NotePageColor } from "./ui/types";
 
 export type { EditorFonts } from "./fonts";
 export type { EditorPlace } from "./noteSafety";
@@ -60,19 +95,51 @@ export interface EditorHandle {
   wrapSelection(before: string, after: string): void;
   toggleLinePrefix(prefix: string): void;
   insertText(text: string): void;
+  insertTable(rows: number, cols: number): void;
+  insertCodeBlock(lang?: string): void;
+  insertMath(block: boolean): void;
+  insertImageFromDialog(): void;
+  insertLink(): void;
+  setNotePath(path: string): void;
+  setPageColor(pageColor: NotePageColor): void;
   undo(): void;
   redo(): void;
 }
+
+export type EditorServices = {
+  renderMath: (
+    notePath: string,
+    preamble: string,
+    formulas: MathFormula[],
+  ) => Promise<MathSvg[]>;
+  saveImage: (
+    notePath: string,
+    fileName: string,
+    bytes: Uint8Array,
+  ) => Promise<{ path: string } | { error: string }>;
+  loadImage: (
+    notePath: string,
+    imagePath: string,
+  ) => Promise<ImageBytes | { error: string }>;
+  openLink: (url: string) => Promise<void>;
+};
 
 export type EditorOptions = {
   /** Decorations on. Source view passes false and keeps the same buffer. */
   rendered?: boolean;
   fonts?: EditorFonts;
+  notePath?: string;
+  pageColor?: NotePageColor;
+  services?: EditorServices;
+  onNotice?: (message: string) => void;
 };
 
 type PageState = {
   rendered: boolean;
   fonts: EditorFonts;
+  notePath: string;
+  math: MathSnapshot;
+  images: ReadonlyMap<string, ImageRecord>;
   spans: Span[];
   diagnostics: PlanDiagnostic[];
   inline: DecorationSet;
@@ -81,14 +148,15 @@ type PageState = {
 };
 
 const pageConfig = Facet.define<
-  { rendered: boolean; fonts: EditorFonts },
-  { rendered: boolean; fonts: EditorFonts }
+  { rendered: boolean; fonts: EditorFonts; notePath: string },
+  { rendered: boolean; fonts: EditorFonts; notePath: string }
 >({
   combine(values) {
     return (
       values[values.length - 1] ?? {
         rendered: true,
         fonts: DEFAULT_EDITOR_FONTS,
+        notePath: "",
       }
     );
   },
@@ -97,6 +165,9 @@ const pageConfig = Facet.define<
 const setRenderedEffect = StateEffect.define<boolean>();
 const setFontsEffect = StateEffect.define<EditorFonts>();
 const setDiagnosticsEffect = StateEffect.define<PlanDiagnostic[]>();
+const setMathEffect = StateEffect.define<MathSnapshot>();
+const setImagesEffect = StateEffect.define<ReadonlyMap<string, ImageRecord>>();
+const setNotePathEffect = StateEffect.define<string>();
 
 const emptyDecorations = {
   inline: Decoration.none,
@@ -109,6 +180,8 @@ class TextChip extends WidgetType {
     readonly text: string,
     readonly className: string,
     readonly openAt: number,
+    readonly title = "",
+    readonly box: { width: number; height: number } | null = null,
   ) {
     super();
   }
@@ -118,7 +191,10 @@ class TextChip extends WidgetType {
       other instanceof TextChip &&
       other.text === this.text &&
       other.className === this.className &&
-      other.openAt === this.openAt
+      other.openAt === this.openAt &&
+      other.title === this.title &&
+      other.box?.width === this.box?.width &&
+      other.box?.height === this.box?.height
     );
   }
 
@@ -126,14 +202,22 @@ class TextChip extends WidgetType {
     const chip = document.createElement("span");
     if (this.className) chip.className = this.className;
     chip.appendChild(document.createTextNode(this.text));
-    if (isMathClass(this.className)) {
+    if (isMathClass(this.className) || this.className.includes("cm-image")) {
       chip.dataset.source = String(this.openAt);
+    }
+    if (this.title) chip.title = this.title;
+    if (this.box && this.box.width > 0 && this.box.height > 0) {
+      chip.style.minWidth = `${this.box.width}px`;
+      chip.style.minHeight = `${this.box.height}px`;
+      chip.style.display = "inline-block";
     }
     return chip;
   }
 
   ignoreEvent(event: Event): boolean {
-    if (!isMathClass(this.className)) return false;
+    const opens =
+      isMathClass(this.className) || this.className.includes("cm-image");
+    if (!opens) return false;
     return (
       event.type === "mousedown" ||
       event.type === "mouseup" ||
@@ -144,6 +228,245 @@ class TextChip extends WidgetType {
 
 function isMathClass(className: string): boolean {
   return className.split(" ").some((name) => name.startsWith("cm-math"));
+}
+
+class FormulaWidget extends WidgetType {
+  constructor(
+    readonly openAt: number,
+    readonly block: boolean,
+    readonly url: string,
+    readonly widthPx: number,
+    readonly heightPx: number,
+    readonly baselinePx: number,
+    readonly label: string,
+  ) {
+    super();
+  }
+
+  eq(other: WidgetType): boolean {
+    return (
+      other instanceof FormulaWidget &&
+      other.url === this.url &&
+      other.block === this.block &&
+      other.openAt === this.openAt &&
+      other.widthPx === this.widthPx &&
+      other.heightPx === this.heightPx
+    );
+  }
+
+  toDOM(): HTMLElement {
+    const host = document.createElement(this.block ? "div" : "span");
+    host.className = this.block
+      ? "cm-math-formula cm-math-formula-block"
+      : "cm-math-formula";
+    host.dataset.source = String(this.openAt);
+    const image = document.createElement("img");
+    image.src = this.url;
+    image.alt = this.label;
+    image.draggable = false;
+    const width = Math.max(1, this.widthPx);
+    const height = Math.max(1, this.heightPx);
+    image.style.width = `${width}px`;
+    image.style.height = `${height}px`;
+    if (!this.block) {
+      image.style.verticalAlign = `${this.baselinePx - height}px`;
+    }
+    host.appendChild(image);
+    return host;
+  }
+
+  ignoreEvent(event: Event): boolean {
+    return (
+      event.type === "mousedown" ||
+      event.type === "mouseup" ||
+      event.type === "click"
+    );
+  }
+}
+
+class MathPreviewWidget extends WidgetType {
+  constructor(
+    readonly url: string,
+    readonly widthPx: number,
+    readonly heightPx: number,
+    readonly error: string,
+    readonly pending: string,
+  ) {
+    super();
+  }
+
+  eq(other: WidgetType): boolean {
+    return (
+      other instanceof MathPreviewWidget &&
+      other.url === this.url &&
+      other.error === this.error &&
+      other.pending === this.pending &&
+      other.widthPx === this.widthPx
+    );
+  }
+
+  toDOM(): HTMLElement {
+    const host = document.createElement("div");
+    host.className = "cm-math-preview";
+    if (this.url) {
+      const image = document.createElement("img");
+      image.src = this.url;
+      image.alt = "";
+      image.draggable = false;
+      image.style.width = `${Math.max(1, this.widthPx)}px`;
+      image.style.height = `${Math.max(1, this.heightPx)}px`;
+      host.appendChild(image);
+      return host;
+    }
+    host.classList.add("cm-math-preview-error");
+    host.appendChild(document.createTextNode(this.error || this.pending));
+    return host;
+  }
+
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
+
+class PictureWidget extends WidgetType {
+  constructor(
+    readonly openAt: number,
+    readonly url: string,
+    readonly width: number,
+    readonly block: boolean,
+  ) {
+    super();
+  }
+
+  eq(other: WidgetType): boolean {
+    return (
+      other instanceof PictureWidget &&
+      other.url === this.url &&
+      other.openAt === this.openAt &&
+      other.width === this.width
+    );
+  }
+
+  toDOM(): HTMLElement {
+    const host = document.createElement(this.block ? "div" : "span");
+    host.className = "cm-image-frame";
+    host.dataset.source = String(this.openAt);
+    const image = document.createElement("img");
+    image.src = this.url;
+    image.alt = "";
+    image.draggable = false;
+    if (this.width > 0) image.style.width = `${Math.min(this.width, 720)}px`;
+    image.style.maxWidth = "100%";
+    image.style.height = "auto";
+    host.appendChild(image);
+    return host;
+  }
+
+  ignoreEvent(event: Event): boolean {
+    return (
+      event.type === "mousedown" ||
+      event.type === "mouseup" ||
+      event.type === "click"
+    );
+  }
+}
+
+function formulaPaint(
+  source: string,
+  block: boolean,
+  math: MathSnapshot,
+): FormulaPaint | undefined {
+  return math.paints.get(
+    mathCacheKey(
+      { source, block, color: math.color, sizePt: math.sizePt },
+      math.preamble,
+    ),
+  );
+}
+
+function widgetForRange(
+  range: { text: string; className: string },
+  openAt: number,
+  math: MathSnapshot,
+  images: ReadonlyMap<string, ImageRecord>,
+  notePath: string,
+): WidgetType {
+  if (isMathClass(range.className)) {
+    const block = range.className.includes("cm-math-block");
+    const paint = formulaPaint(range.text, block, math);
+    const reserved = math.sizes.get(sizeKey(range.text, block));
+    if (paint?.url && !paint.error) {
+      return new FormulaWidget(
+        openAt,
+        block,
+        paint.url,
+        paint.widthPx,
+        paint.heightPx,
+        paint.baselinePx,
+        range.text,
+      );
+    }
+    return new TextChip(
+      range.text,
+      range.className,
+      openAt,
+      paint?.error ?? "",
+      reserved ? { width: reserved.widthPx, height: reserved.heightPx } : null,
+    );
+  }
+  if (range.className.includes("cm-image")) {
+    const record = images.get(`${notePath}\0${range.text}`);
+    const block = range.className.includes("cm-image-block");
+    if (record?.url && !record.error) {
+      return new PictureWidget(openAt, record.url, record.width, block);
+    }
+    return new TextChip(
+      range.text,
+      range.className,
+      openAt,
+      record?.error ?? "",
+    );
+  }
+  return new TextChip(range.text, range.className, openAt);
+}
+
+function addMathPreview(
+  points: RangeSetBuilder<Decoration>,
+  source: string,
+  spans: Span[],
+  selection: { from: number; to: number }[],
+  math: MathSnapshot,
+): void {
+  if (selection.length !== 1) return;
+  const caret = selection[0];
+  if (!caret || caret.from !== caret.to) return;
+  const pos = caret.from;
+  const span = spans.find(
+    (item) =>
+      item.kind === "math" && item.closed && pos > item.from && pos < item.to,
+  );
+  if (!span) return;
+  const inner = source.slice(span.from + 1, span.to - 1);
+  if (!inner) return;
+  const paint = formulaPaint(inner, span.block, math);
+  const newline = source.indexOf("\n", pos);
+  const lineEnd = newline === -1 ? source.length : newline;
+  const ready = Boolean(paint?.url && !paint.error);
+  points.add(
+    lineEnd,
+    lineEnd,
+    Decoration.widget({
+      widget: new MathPreviewWidget(
+        ready ? (paint?.url ?? "") : "",
+        paint?.widthPx ?? 0,
+        paint?.heightPx ?? 0,
+        paint?.error ?? "",
+        "…",
+      ),
+      side: 1,
+      block: true,
+    }),
+  );
 }
 
 function mergePoints(points: PointWidget[]): PointWidget[] {
@@ -171,6 +494,9 @@ function decorate(
   spans: Span[],
   selection: { from: number; to: number }[],
   diagnostics: PlanDiagnostic[],
+  math: MathSnapshot,
+  images: ReadonlyMap<string, ImageRecord>,
+  notePath: string,
 ) {
   const plan = planDecorations(source, spans, selection, diagnostics);
   const inline = new RangeSetBuilder<Decoration>();
@@ -185,7 +511,7 @@ function decorate(
           range.from,
           range.to,
           Decoration.replace({
-            widget: new TextChip(range.text, range.className, openAt),
+            widget: widgetForRange(range, openAt, math, images, notePath),
           }),
         );
       } else {
@@ -214,6 +540,8 @@ function decorate(
     );
   }
 
+  addMathPreview(points, source, spans, selection, math);
+
   const lines = new RangeSetBuilder<Decoration>();
   for (const line of plan.lines) {
     if (!line.className) continue;
@@ -237,15 +565,21 @@ function createPage(
   doc: { toString(): string; length: number },
   rendered: boolean,
   fonts: EditorFonts,
+  notePath: string,
 ): PageState {
   const source = doc.toString();
   const spans = classifySpans(source, 0, source.length).spans;
+  const math = emptyMathSnapshot(PAGE_TEXT.white, MATH_SIZE_PT);
+  const images = new Map<string, ImageRecord>();
   const drawn = rendered
-    ? decorate(source, spans, [{ from: 0, to: 0 }], [])
+    ? decorate(source, spans, [{ from: 0, to: 0 }], [], math, images, notePath)
     : emptyDecorations;
   return {
     rendered,
     fonts,
+    notePath,
+    math,
+    images,
     spans,
     diagnostics: [],
     ...drawn,
@@ -269,9 +603,13 @@ function updatePage(value: PageState, tr: Transaction): PageState {
   let rendered = value.rendered;
   let fonts = value.fonts;
   let diagnostics = value.diagnostics;
+  let math = value.math;
+  let images = value.images;
+  let notePath = value.notePath;
   let modeChanged = false;
   let fontsChanged = false;
   let diagnosticsChanged = false;
+  let paintChanged = false;
   for (const effect of tr.effects) {
     if (effect.is(setRenderedEffect)) {
       rendered = effect.value;
@@ -282,6 +620,15 @@ function updatePage(value: PageState, tr: Transaction): PageState {
     } else if (effect.is(setDiagnosticsEffect)) {
       diagnostics = effect.value;
       diagnosticsChanged = true;
+    } else if (effect.is(setMathEffect)) {
+      math = effect.value;
+      paintChanged = true;
+    } else if (effect.is(setImagesEffect)) {
+      images = effect.value;
+      paintChanged = true;
+    } else if (effect.is(setNotePathEffect)) {
+      notePath = effect.value;
+      paintChanged = true;
     }
   }
 
@@ -306,7 +653,8 @@ function updatePage(value: PageState, tr: Transaction): PageState {
     !diagnosticsChanged &&
     !modeChanged &&
     !fontsChanged &&
-    !selectionMoved
+    !selectionMoved &&
+    !paintChanged
   ) {
     return value;
   }
@@ -317,13 +665,27 @@ function updatePage(value: PageState, tr: Transaction): PageState {
       value.inline.size === 0 &&
       !fontsChanged &&
       !tr.docChanged &&
-      !diagnosticsChanged
+      !diagnosticsChanged &&
+      !paintChanged
     ) {
-      return { ...value, rendered, fonts, spans, diagnostics };
+      return {
+        ...value,
+        rendered,
+        fonts,
+        notePath,
+        math,
+        images,
+        spans,
+        diagnostics,
+      };
     }
     return {
+      ...value,
       rendered,
       fonts,
+      notePath,
+      math,
+      images,
       spans,
       diagnostics,
       ...emptyDecorations,
@@ -335,6 +697,7 @@ function updatePage(value: PageState, tr: Transaction): PageState {
     !diagnosticsChanged &&
     !modeChanged &&
     !fontsChanged &&
+    !paintChanged &&
     selectionMoved &&
     caretMoveReplacesRanges(
       tr.newDoc.toString(),
@@ -352,25 +715,43 @@ function updatePage(value: PageState, tr: Transaction): PageState {
     !tr.docChanged &&
     !diagnosticsChanged &&
     !modeChanged &&
-    !selectionMoved
+    !selectionMoved &&
+    !paintChanged
   ) {
     return { ...value, fonts };
   }
 
   const source = tr.newDoc.toString();
   return {
+    ...value,
     rendered,
     fonts,
+    notePath,
+    math,
+    images,
     spans,
     diagnostics,
-    ...decorate(source, spans, selectionRanges(tr.newSelection), diagnostics),
+    ...decorate(
+      source,
+      spans,
+      selectionRanges(tr.newSelection),
+      diagnostics,
+      math,
+      images,
+      notePath,
+    ),
   };
 }
 
 const pageField = StateField.define<PageState>({
   create(state) {
     const config = state.facet(pageConfig);
-    return createPage(state.doc, config.rendered, config.fonts);
+    return createPage(
+      state.doc,
+      config.rendered,
+      config.fonts,
+      config.notePath,
+    );
   },
   update: updatePage,
 });
@@ -465,11 +846,81 @@ function runStructure(key: "Enter" | "Backspace" | "Tab", shift: boolean) {
   };
 }
 
-function editorExtensions(options?: EditorOptions): Extension[] {
+type LiveEditor = {
+  notePath: string;
+  pageColor: NotePageColor;
+  services?: EditorServices;
+  onNotice?: (message: string) => void;
+};
+
+function liveFrom(options?: EditorOptions): LiveEditor {
+  return {
+    notePath: options?.notePath ?? "",
+    pageColor: options?.pageColor ?? "white",
+    services: options?.services,
+    onNotice: options?.onNotice,
+  };
+}
+
+function fileFromTransfer(data: DataTransfer | null): File | null {
+  if (!data) return null;
+  for (const file of Array.from(data.files)) {
+    if (extensionForMime(file.type) || extensionForName(file.name)) return file;
+  }
+  for (const item of Array.from(data.items)) {
+    if (item.kind !== "file" || !extensionForMime(item.type)) continue;
+    const file = item.getAsFile();
+    if (file) return file;
+  }
+  return null;
+}
+
+async function insertImageFile(
+  view: EditorView,
+  file: File,
+  from: number,
+  to: number,
+  live: LiveEditor,
+): Promise<void> {
+  const services = live.services;
+  if (!services) return;
+  try {
+    const name = imageFileName(file.type, file.name);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const saved = await services.saveImage(live.notePath, name, bytes);
+    if ("error" in saved) {
+      live.onNotice?.(saved.error);
+      return;
+    }
+    if (!view.dom.isConnected) return;
+    const relative = noteRelativeImagePath(live.notePath, saved.path);
+    const edit = imageInsertion(
+      view.state.doc.toString(),
+      from,
+      to,
+      imageMarkup(relative),
+    );
+    view.dispatch({
+      changes: { from, to, insert: edit.text },
+      selection: { anchor: edit.cursor },
+    });
+  } catch (error) {
+    live.onNotice?.(error instanceof Error ? error.message : String(error));
+  }
+}
+
+function editorExtensions(
+  options?: EditorOptions,
+  live: LiveEditor = liveFrom(options),
+): Extension[] {
   const rendered = options?.rendered ?? true;
   const fonts = options?.fonts ?? DEFAULT_EDITOR_FONTS;
   return [
-    pageConfig.of({ rendered, fonts }),
+    pageConfig.of({
+      rendered,
+      fonts,
+      notePath: options?.notePath ?? live.notePath,
+    }),
     basicSetup,
     EditorView.lineWrapping,
     pageField,
@@ -501,7 +952,78 @@ function editorExtensions(options?: EditorOptions): Extension[] {
         { key: "Shift-Tab", run: runStructure("Tab", true) },
       ]),
     ),
-    EditorView.domEventHandlers({ mousedown: onMathMouseDown }),
+    EditorView.inputHandler.of((view, from, to, text) => {
+      if (text !== "$" || view.composing) return false;
+      if (view.state.selection.ranges.length !== 1) return false;
+      const page = view.state.field(pageField, false);
+      const edit = dollarEdit(
+        view.state.doc.toString(),
+        from,
+        to,
+        page?.spans ?? [],
+      );
+      if (!edit) return false;
+      view.dispatch({
+        changes: { from: edit.from, to: edit.to, insert: edit.insert },
+        selection: { anchor: edit.selection },
+        userEvent: "input.type",
+      });
+      return true;
+    }),
+    EditorView.domEventHandlers({
+      mousedown(event, view) {
+        if (
+          (event.ctrlKey || event.metaKey) &&
+          !event.altKey &&
+          live.services
+        ) {
+          const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+          if (pos !== null) {
+            const page = view.state.field(pageField, false);
+            const url = page
+              ? linkAt(view.state.doc.toString(), page.spans, pos)
+              : null;
+            if (url) {
+              event.preventDefault();
+              void live.services.openLink(url).catch((error: unknown) => {
+                const message =
+                  error instanceof Error ? error.message : String(error);
+                live.onNotice?.(message);
+              });
+              return true;
+            }
+          }
+        }
+        return onMathMouseDown(event, view);
+      },
+      paste(event, view) {
+        const file = fileFromTransfer(event.clipboardData);
+        if (!file || !live.services) return false;
+        event.preventDefault();
+        const range = view.state.selection.main;
+        void insertImageFile(view, file, range.from, range.to, live);
+        return true;
+      },
+      dragover(event) {
+        if (!live.services?.saveImage || !event.dataTransfer) return false;
+        if (!Array.from(event.dataTransfer.types).includes("Files"))
+          return false;
+        event.preventDefault();
+        return true;
+      },
+      drop(event, view) {
+        const file = fileFromTransfer(event.dataTransfer);
+        if (!file || !live.services) return false;
+        event.preventDefault();
+        const coords = view.posAtCoords({
+          x: event.clientX,
+          y: event.clientY,
+        });
+        const pos = coords ?? view.state.selection.main.from;
+        void insertImageFile(view, file, pos, pos, live);
+        return true;
+      },
+    }),
     EditorView.theme({
       "&": { height: "100%" },
       "&.cm-focused": { outline: "none" },
@@ -557,10 +1079,150 @@ export function createEditor(
   onChange: (text: string) => void,
   options?: EditorOptions,
 ): EditorHandle {
+  const live = liveFrom(options);
   let notifying = true;
+  let applyingPaint = false;
+  const blobUrls = new Map<string, string>();
+
+  const batcher = new MathBatcher(
+    (path, preamble, formulas) => {
+      if (!live.services) {
+        return Promise.resolve(
+          formulas.map((formula) => ({
+            id: formula.id,
+            svg: "",
+            width_px: 0,
+            height_px: 0,
+            baseline_px: 0,
+            error: "",
+          })),
+        );
+      }
+      return live.services.renderMath(path, preamble, formulas);
+    },
+    () => publishMath(),
+  );
+
+  function measureImage(
+    url: string,
+  ): Promise<{ width: number; height: number }> {
+    return new Promise((resolve) => {
+      const image = new Image();
+      image.onload = () =>
+        resolve({ width: image.naturalWidth, height: image.naturalHeight });
+      image.onerror = () => resolve({ width: 0, height: 0 });
+      image.src = url;
+    });
+  }
+
+  const imageLoader = new ImageLoader(
+    (path, imagePath) => {
+      if (!live.services) return Promise.resolve({ error: "" });
+      return live.services.loadImage(path, imagePath);
+    },
+    async (loaded) => {
+      const copy = new Uint8Array(loaded.bytes.byteLength);
+      copy.set(loaded.bytes);
+      const blob = new Blob([copy.buffer], {
+        type: loaded.mime || "application/octet-stream",
+      });
+      const url = URL.createObjectURL(blob);
+      const size = await measureImage(url);
+      return { url, width: size.width, height: size.height, error: "" };
+    },
+    () => publishImages(),
+  );
+
+  function publishMath() {
+    if (applyingPaint) return;
+    const snap = batcher.snapshot();
+    const paints = new Map<string, FormulaPaint>();
+    for (const [key, paint] of snap.paints) {
+      let url = "";
+      if (paint.svg) {
+        url = blobUrls.get(key) ?? "";
+        if (!url) {
+          url = URL.createObjectURL(
+            new Blob([paint.svg], { type: "image/svg+xml" }),
+          );
+          blobUrls.set(key, url);
+        }
+      }
+      paints.set(key, { ...paint, url });
+    }
+    applyingPaint = true;
+    try {
+      view.dispatch({ effects: setMathEffect.of({ ...snap, paints }) });
+    } finally {
+      applyingPaint = false;
+    }
+  }
+
+  function publishImages() {
+    if (applyingPaint) return;
+    applyingPaint = true;
+    try {
+      view.dispatch({ effects: setImagesEffect.of(imageLoader.snapshot()) });
+    } finally {
+      applyingPaint = false;
+    }
+  }
+
+  function collectMath(state: EditorState) {
+    if (!live.services || applyingPaint) return;
+    const page = state.field(pageField, false);
+    if (!page?.rendered) return;
+    const source = state.doc.toString();
+    const selection = selectionRanges(state.selection);
+    const preamble = extractMathPreamble(source);
+    const color = PAGE_TEXT[live.pageColor];
+    const jobs: FormulaJob[] = [];
+    const seen = new Set<string>();
+    for (const span of page.spans) {
+      if (span.kind === "image" && span.closed && span.marker) {
+        const touched = selection.some(
+          (range) => range.from < span.to && range.to > span.from,
+        );
+        if (!touched) imageLoader.want(live.notePath, span.marker);
+        continue;
+      }
+      if (span.kind !== "math" || !span.closed) continue;
+      const inner = source.slice(
+        span.from + 1,
+        Math.max(span.from + 1, span.to - 1),
+      );
+      if (!inner) continue;
+      const caretInside = selection.some(
+        (range) =>
+          range.from === range.to &&
+          range.from > span.from &&
+          range.from < span.to,
+      );
+      const touched = selection.some(
+        (range) => range.from < span.to && range.to > span.from,
+      );
+      if (touched && !caretInside) continue;
+      const job: FormulaJob = {
+        source: inner,
+        block: span.block,
+        color,
+        sizePt: MATH_SIZE_PT,
+      };
+      const key = `${job.block}\0${job.source}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (caretInside) jobs.unshift(job);
+      else jobs.push(job);
+    }
+    batcher.schedule(jobs, preamble, color, MATH_SIZE_PT, live.notePath);
+  }
+
   const view = new EditorView({
     parent,
-    state: createEditorState(initial, options),
+    state: EditorState.create({
+      doc: initial,
+      extensions: editorExtensions(options, live),
+    }),
     dispatchTransactions(transactions, editorView) {
       editorView.update(transactions);
       if (
@@ -569,8 +1231,10 @@ export function createEditor(
       ) {
         onChange(editorView.state.doc.toString());
       }
+      if (!applyingPaint) collectMath(editorView.state);
     },
   });
+  collectMath(view.state);
 
   function clamp(position: number): number {
     return Math.max(0, Math.min(position, view.state.doc.length));
@@ -624,7 +1288,15 @@ export function createEditor(
       });
     },
     focus: () => view.focus(),
-    destroy: () => view.destroy(),
+    destroy: () => {
+      for (const url of blobUrls.values()) URL.revokeObjectURL(url);
+      blobUrls.clear();
+      for (const record of imageLoader.snapshot().values()) {
+        if (record.url) URL.revokeObjectURL(record.url);
+      }
+      imageLoader.clear();
+      view.destroy();
+    },
     getState: () => view.state,
     setState: (state) => {
       withoutNotice(() => {
@@ -705,6 +1377,69 @@ export function createEditor(
           range: EditorSelection.cursor(range.from + text.length),
         })),
       );
+    },
+    insertTable: (rows, cols) => {
+      const range = view.state.selection.main;
+      const text = tableSkeleton(rows, cols);
+      view.dispatch({
+        changes: { from: range.from, to: range.to, insert: text },
+        selection: { anchor: range.from + text.length },
+      });
+    },
+    insertCodeBlock: (lang) => {
+      const range = view.state.selection.main;
+      const skeleton = codeBlockSkeleton(lang);
+      view.dispatch({
+        changes: { from: range.from, to: range.to, insert: skeleton.text },
+        selection: { anchor: range.from + skeleton.cursor },
+      });
+    },
+    insertMath: (block) => {
+      const range = view.state.selection.main;
+      const selected = view.state.sliceDoc(range.from, range.to);
+      const skeleton = mathSkeleton(block, selected);
+      view.dispatch({
+        changes: { from: range.from, to: range.to, insert: skeleton.text },
+        selection: { anchor: range.from + skeleton.cursor },
+      });
+    },
+    insertImageFromDialog: () => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/png,image/jpeg,image/gif,image/webp";
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        const range = view.state.selection.main;
+        void insertImageFile(view, file, range.from, range.to, live);
+      };
+      input.click();
+    },
+    insertLink: () => {
+      const range = view.state.selection.main;
+      const selected = view.state.sliceDoc(range.from, range.to);
+      const skeleton = linkSkeleton(selected);
+      view.dispatch({
+        changes: { from: range.from, to: range.to, insert: skeleton.text },
+        selection: {
+          anchor: range.from + skeleton.selectFrom,
+          head: range.from + skeleton.selectTo,
+        },
+      });
+    },
+    setNotePath: (path) => {
+      live.notePath = path;
+      for (const record of imageLoader.snapshot().values()) {
+        if (record.url) URL.revokeObjectURL(record.url);
+      }
+      imageLoader.clear();
+      view.dispatch({
+        effects: [setNotePathEffect.of(path), setImagesEffect.of(new Map())],
+      });
+    },
+    setPageColor: (pageColor) => {
+      live.pageColor = pageColor;
+      collectMath(view.state);
     },
     undo: () => {
       undoCommand(view);

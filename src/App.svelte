@@ -14,6 +14,7 @@
     type EditorHandle,
     type EditorPlace,
   } from "./lib/editor";
+  import { createAppEditorServices } from "./lib/editorServices";
   import { applyLocale, currentLocale, type AppLocale } from "./lib/locale";
   import {
     AUTOSAVE_WAIT_MS,
@@ -1316,10 +1317,18 @@
     void refreshTemplates();
   });
 
+  const editorServices = createAppEditorServices();
+
   function editorAttachment(node: HTMLDivElement) {
     editor = createEditor(node, sourceText, onEditorChange, {
       rendered: viewMode !== "source",
       fonts: { source: sourceFont, render: renderFont },
+      notePath: currentPath,
+      pageColor,
+      services: editorServices,
+      onNotice: (message) => {
+        status = message;
+      },
     });
     editor.restorePlace(heldPlace);
     if (pendingJump !== null) {
@@ -1333,6 +1342,14 @@
       editor = undefined;
     };
   }
+
+  $effect(() => {
+    editor?.setNotePath(currentPath);
+  });
+
+  $effect(() => {
+    editor?.setPageColor(pageColor);
+  });
 </script>
 
 <svelte:window onkeydown={onConfirmKey} onfocus={onWindowFocus} />

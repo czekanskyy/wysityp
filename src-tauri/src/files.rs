@@ -449,6 +449,61 @@ pub fn save_note_image(
     Ok(format!("{folder}/{chosen}"))
 }
 
+fn image_mime(ext: &str) -> Option<&'static str> {
+    match ext.to_ascii_lowercase().as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        _ => None,
+    }
+}
+
+/// The path Typst would use: `image_path` is relative to the note file.
+fn image_relative_to_root(note_path: &str, image_path: &str) -> String {
+    let image = image_path.replace('\\', "/");
+    let note = display_relative(note_path);
+    match note.rsplit_once('/') {
+        Some((dir, _)) if !dir.is_empty() => format!("{dir}/{image}"),
+        _ => image,
+    }
+}
+
+/// Read a picture the note names. The path is checked against the notes folder.
+///
+/// The note text is not changed. A refusal reads nothing outside the folder.
+pub fn read_note_image(
+    root: &Path,
+    note_path: &str,
+    image_path: &str,
+) -> AppResult<(Vec<u8>, &'static str)> {
+    let note_rel = display_relative(note_path);
+    let note_abs = resolve_inside_root(root, &note_rel)?;
+    if !is_typ_file(&note_abs) {
+        return Err(AppError::ImageRefused("the note is not there".to_string()));
+    }
+    let relative = image_relative_to_root(&note_rel, image_path);
+    let image_abs = resolve_inside_root(root, &relative)?;
+    if !image_abs.is_file() {
+        return Err(AppError::ImageRefused(
+            "the picture is not there".to_string(),
+        ));
+    }
+    let ext = image_abs
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("");
+    let mime = image_mime(ext)
+        .ok_or_else(|| AppError::ImageRefused("that image type is not allowed".to_string()))?;
+    let bytes = std::fs::read(&image_abs).map_err(|err| AppError::io(&image_abs, err))?;
+    if bytes.len() > IMAGE_CAP {
+        return Err(AppError::ImageRefused(
+            "file is larger than 20 MB".to_string(),
+        ));
+    }
+    Ok((bytes, mime))
+}
+
 fn pick_image_name(dir: &Path, file_name: &str) -> AppResult<String> {
     let candidates = image_candidates(file_name)?;
     let names = entry_names(dir)?;
@@ -1794,6 +1849,35 @@ mod tests {
         assert!(!dir.path().join("x.png").exists());
         assert!(!dir.path().join("unsaved.assets").join("draw.svg").exists());
         assert!(!dir.path().join("unsaved.assets").join("big.png").exists());
+    }
+
+    #[test]
+    fn read_note_image_stays_inside_the_notes_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        create_note(dir.path(), "", "unsaved.typ").unwrap();
+        create_folder(dir.path(), "", "week").unwrap();
+        create_note(dir.path(), "week", "lecture.typ").unwrap();
+        let written =
+            save_note_image(dir.path(), "week/lecture.typ", "slide.png", b"png-bytes").unwrap();
+        assert_eq!(written, "week/lecture.assets/slide.png");
+        let (bytes, mime) =
+            read_note_image(dir.path(), "week/lecture.typ", "lecture.assets/slide.png").unwrap();
+        assert_eq!(bytes, b"png-bytes");
+        assert_eq!(mime, "image/png");
+        let outside =
+            read_note_image(dir.path(), "week/lecture.typ", "../unsaved.typ").unwrap_err();
+        assert!(
+            outside.to_string().starts_with("image-refused:")
+                || outside.to_string().contains("outside")
+        );
+        let missing = read_note_image(dir.path(), "gone.typ", "a.png").unwrap_err();
+        assert!(missing.to_string().starts_with("image-refused:"));
+        let note = std::fs::read(dir.path().join("week").join("lecture.typ")).unwrap();
+        assert!(
+            !note
+                .windows(b"png-bytes".len())
+                .any(|chunk| chunk == b"png-bytes")
+        );
     }
 
     #[test]
