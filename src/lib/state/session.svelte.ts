@@ -61,6 +61,7 @@ import {
   svgPagesEqual,
 } from "../render";
 import {
+  blankTitleSelection,
   createTab,
   draftIsDisposable,
   fileName,
@@ -518,17 +519,23 @@ export class Session {
     );
     this.editor = editor;
     const saved = tabId ? this.editorStates.get(tabId) : undefined;
-    if (saved && storedEditorMatches(saved.doc.toString(), initial)) {
+    const restored = Boolean(
+      saved && storedEditorMatches(saved.doc.toString(), initial),
+    );
+    if (saved && restored) {
       writeEditorState(editor, saved);
     } else if (tabId && saved) {
       this.editorStates.delete(tabId);
     }
-    this.applyEditorChrome();
-    this.rememberEditor(tabId);
     if (this.pendingJump !== null) {
       editor.setSelection(this.pendingJump);
       this.pendingJump = null;
+    } else if (!restored) {
+      const title = blankTitleSelection(initial);
+      if (title) editor.setSelection(title.anchor, title.head);
     }
+    this.applyEditorChrome();
+    this.rememberEditor(tabId);
     this.focusEditor();
     void this.runRender();
     return () => {

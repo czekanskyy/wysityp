@@ -26,6 +26,21 @@ export type TabModel = {
 
 const BLANK_DRAFTS = ["= Tytuł\n", "= Title\n"];
 
+/**
+ * A new note is `= Tytuł` or `= Title`. Select that word so the first
+ * keystroke replaces it. A caret at 0 types in front of `=` and the
+ * heading disappears.
+ */
+export function blankTitleSelection(
+  text: string,
+): { anchor: number; head: number } | null {
+  const match = /^= (Tytuł|Title)\n?$/.exec(text);
+  const word = match?.[1];
+  if (!word) return null;
+  const anchor = 2;
+  return { anchor, head: anchor + word.length };
+}
+
 /** A draft still has only the blank heading, or no text at all. */
 export function isBlankDraft(text: string): boolean {
   return text.trim() === "" || BLANK_DRAFTS.includes(text);

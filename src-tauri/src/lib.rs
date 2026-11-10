@@ -134,12 +134,37 @@ pub fn run() {
                 gate.set_drafts(drafts);
                 gate.seed_allowed(&settings::stored_loose_paths(&settings_file));
             }
+            if let Some(window) = app.get_webview_window("main") {
+                silence_browser_keys(&window);
+            }
             Ok(())
         })
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+/// WebView2 prints on Ctrl+P and F1 before the page can handle them.
+#[cfg(windows)]
+fn silence_browser_keys(window: &tauri::WebviewWindow) {
+    let _ = window.with_webview(|platform| unsafe {
+        use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
+        use windows::core::Interface;
+        let Ok(core) = platform.controller().CoreWebView2() else {
+            return;
+        };
+        let Ok(settings) = core.Settings() else {
+            return;
+        };
+        let Ok(settings3) = settings.cast::<ICoreWebView2Settings3>() else {
+            return;
+        };
+        let _ = settings3.SetAreBrowserAcceleratorKeysEnabled(false);
+    });
+}
+
+#[cfg(not(windows))]
+fn silence_browser_keys(_window: &tauri::WebviewWindow) {}
 
 #[cfg(test)]
 mod bindings_export {

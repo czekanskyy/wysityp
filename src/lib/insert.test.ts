@@ -86,6 +86,10 @@ describe("insert skeletons", () => {
       text: "```rust\n\n```",
       cursor: "```rust\n".length,
     });
+    expect(codeBlockSkeleton(undefined, "łódź")).toEqual({
+      text: "```\nłódź\n```",
+      cursor: "```\nłódź".length,
+    });
     expect(mathSkeleton(false)).toEqual({ text: "$$", cursor: 1 });
     expect(mathSkeleton(true)).toEqual({ text: "$\n  \n$", cursor: 4 });
     expect(mathSkeleton(false, "x")).toEqual({ text: "$x$", cursor: 3 });

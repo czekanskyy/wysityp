@@ -130,6 +130,11 @@
   font-weight: 700;
 }
 
+.cm-editor.cm-rendered .cm-enum-num,
+.cm-editor.cm-rendered .cm-bullet-mark {
+  margin-inline-end: 0.4em;
+}
+
 .cm-editor.cm-rendered .cm-line.cm-quote-line {
   box-shadow: inset 3px 0 0 var(--color-border-strong);
   padding-left: var(--space-3);

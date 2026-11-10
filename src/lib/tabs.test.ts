@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  blankTitleSelection,
   createTab,
   cycleIndex,
   draftIsDisposable,
@@ -61,6 +62,14 @@ describe("tabs", () => {
     expect(neighborIndex(3, 1)).toBe(1);
     expect(neighborIndex(3, 2)).toBe(1);
     expect(neighborIndex(1, 0)).toBe(-1);
+  });
+
+  it("selects the blank heading word so the first key replaces it", () => {
+    expect(blankTitleSelection("= Tytuł\n")).toEqual({ anchor: 2, head: 7 });
+    expect(blankTitleSelection("= Title\n")).toEqual({ anchor: 2, head: 7 });
+    expect("= Tytuł\n".slice(2, 7)).toBe("Tytuł");
+    expect(blankTitleSelection("= Analiza\n")).toBeNull();
+    expect(blankTitleSelection("= Tytuł\n\nnotatka\n")).toBeNull();
   });
 
   it("treats an untouched or blank draft as disposable and keeps written text", () => {
