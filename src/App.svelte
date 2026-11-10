@@ -37,16 +37,21 @@
 <div class={["shell", { "nav-collapsed": session.sidebarCollapsed }]}>
   <div class="workarea">
     <div class="nav-column">
-      {#if session.sidebarCollapsed}
-        <button
-          type="button"
-          class="nav-rail"
-          aria-label={session.labels.sidebarExpand}
-          onclick={() => session.toggleSidebar()}
-        >
-          {session.workspaceMark}
-        </button>
-      {:else}
+      <button
+        type="button"
+        class="nav-rail"
+        aria-label={session.labels.sidebarExpand}
+        aria-hidden={session.sidebarCollapsed ? undefined : "true"}
+        tabindex={session.sidebarCollapsed ? 0 : -1}
+        onclick={() => session.toggleSidebar()}
+      >
+        {session.workspaceMark}
+      </button>
+      <div
+        class="nav-rest"
+        inert={session.sidebarCollapsed}
+        aria-hidden={session.sidebarCollapsed ? "true" : undefined}
+      >
         <div class="nav-tools">
           <button
             type="button"
@@ -91,7 +96,7 @@
           }}
         />
         <NavFollow {session} />
-      {/if}
+      </div>
     </div>
 
     <main class="stage">

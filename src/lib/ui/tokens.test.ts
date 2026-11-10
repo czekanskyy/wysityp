@@ -96,10 +96,13 @@ describe("papier tokens", () => {
   });
 
   it("records the three motion values as text", () => {
-    expect(base).toContain("--motion-fast: 90ms");
-    expect(base).toContain("--motion-pop: 160ms");
+    expect(base).toContain("--motion-fast: 120ms");
+    expect(base).toContain("--motion-mid: 180ms");
+    expect(base).toContain("--motion-pop: 180ms");
     expect(base).toContain("--motion-slow: 240ms");
+    expect(base).toContain("--ease-standard:");
     expect(base).toContain("--motion-fast: 0ms");
+    expect(base).toContain("--motion-mid: 0ms");
     expect(base).toContain("--motion-pop: 0ms");
     expect(base).toContain("--motion-slow: 0ms");
     expect(base).toContain("prefers-reduced-motion");

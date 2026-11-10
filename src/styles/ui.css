@@ -15,8 +15,10 @@ button.btn {
   font-weight: 500;
   line-height: 1;
   cursor: pointer;
-  transition-property: background-color, border-color;
+  transition-property:
+    background-color, border-color, color, transform, box-shadow;
   transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-standard);
 }
 
 button.btn.sm {
@@ -68,6 +70,7 @@ button.btn.ghost:hover:not(:disabled):not([aria-disabled="true"]) {
 
 button.btn:active:not(:disabled):not([aria-disabled="true"]) {
   background: var(--color-pressed);
+  transform: scale(0.98);
 }
 
 button.btn:disabled,
@@ -87,8 +90,10 @@ button.ibtn {
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition-property: background-color, border-color;
+  transition-property:
+    background-color, border-color, color, transform, box-shadow;
   transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-standard);
 }
 
 button.ibtn.sm {
@@ -104,6 +109,7 @@ button.ibtn:hover:not(:disabled):not([aria-disabled="true"]) {
 
 button.ibtn:active:not(:disabled):not([aria-disabled="true"]) {
   background: var(--color-pressed);
+  transform: scale(0.96);
 }
 
 button.ibtn[aria-pressed="true"] {
@@ -298,19 +304,66 @@ button.menu-trigger:hover {
 
 @media (prefers-reduced-motion: no-preference) {
   .menu,
-  dialog.palette[open],
-  dialog.appearance[open] {
-    animation: pop-in var(--motion-pop) linear;
+  .table-pop {
+    transform-origin: top left;
+    animation: rise-in var(--motion-fast) var(--ease-enter);
   }
 }
 
-@keyframes pop-in {
+dialog.palette,
+dialog.appearance {
+  transform-origin: center top;
+  transition:
+    display var(--motion-pop) allow-discrete,
+    overlay var(--motion-pop) allow-discrete,
+    opacity var(--motion-pop) var(--ease-exit),
+    transform var(--motion-pop) var(--ease-exit);
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
+}
+
+dialog.palette[open],
+dialog.appearance[open] {
+  opacity: 1;
+  transform: none;
+}
+
+dialog.palette::backdrop,
+dialog.appearance::backdrop {
+  transition:
+    display var(--motion-fast) allow-discrete,
+    overlay var(--motion-fast) allow-discrete,
+    opacity var(--motion-fast) linear;
+  opacity: 0;
+}
+
+dialog.palette[open]::backdrop,
+dialog.appearance[open]::backdrop {
+  opacity: 1;
+}
+
+@starting-style {
+  dialog.palette[open],
+  dialog.appearance[open] {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+
+  dialog.palette[open]::backdrop,
+  dialog.appearance[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+@keyframes rise-in {
   from {
     opacity: 0;
+    transform: translateY(4px) scale(0.98);
   }
 
   to {
     opacity: 1;
+    transform: none;
   }
 }
 
@@ -470,6 +523,7 @@ button.tag-remove:hover:not(:disabled) {
   text-align: start;
   transition-property: background-color, border-color, box-shadow, transform;
   transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-standard);
 }
 
 button.card {
@@ -864,6 +918,9 @@ nav.sidebar .tree-row {
   border-radius: var(--radius-sm);
   color: var(--color-text);
   cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
 }
 
 nav.sidebar .tree-row:hover {
