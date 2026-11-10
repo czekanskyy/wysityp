@@ -9,7 +9,10 @@ export type SpanKind =
   | "quote"
   | "math"
   | "emphasis"
-  | "strong";
+  | "strong"
+  | "raw"
+  | "image"
+  | "link";
 
 /** A derived range in the editor buffer. Offsets are UTF-16 code units. */
 export type Span = {
@@ -302,9 +305,10 @@ function scanProtected(
   source: string,
   from: number,
   to: number,
-): { protectedRanges: Protected[]; math: Span[] } {
+): { protectedRanges: Protected[]; math: Span[]; raw: Span[] } {
   const protectedRanges: Protected[] = [];
   const math: Span[] = [];
+  const raw: Span[] = [];
   let i = from;
   while (i < to) {
     const code = source.charCodeAt(i);
@@ -330,6 +334,8 @@ function scanProtected(
       } else {
         const end = close + count;
         protectedRanges.push({ from: i, to: end });
+        const span = rawSpan(source, i, end, count);
+        if (span) raw.push(span);
         i = end;
       }
       continue;
@@ -383,7 +389,25 @@ function scanProtected(
     i += 1;
   }
   protectedRanges.sort((a, b) => a.from - b.from || a.to - b.to);
-  return { protectedRanges, math };
+  return { protectedRanges, math, raw };
+}
+
+function rawSpan(
+  source: string,
+  from: number,
+  to: number,
+  count: number,
+): Span | null {
+  const content = source.slice(from + count, to - count);
+  if (content.length === 0) return null;
+  const newline = content.indexOf("\n");
+  if (count >= 3 && newline !== -1) {
+    const firstLine = content.slice(0, newline).replace(/\r$/u, "");
+    const lang = /^([\p{L}\p{N}_+-]*)$/u.exec(firstLine.trim());
+    return makeSpan(from, to, "raw", null, lang?.[1] ?? "", true, true);
+  }
+  if (newline !== -1) return null;
+  return makeSpan(from, to, "raw", null, "`", true, false);
 }
 
 function boundarySpace(
@@ -820,14 +844,158 @@ function contentHost(
   return null;
 }
 
+function hashName(source: string, index: number, name: string): boolean {
+  if (!source.startsWith(`#${name}`, index)) return false;
+  return !isIdentContinue(source[index + 1 + name.length]);
+}
+
+function readString(
+  source: string,
+  index: number,
+  limit: number,
+): { end: number; value: string } | null {
+  const quote = source[index];
+  if (quote !== '"' && quote !== "'") return null;
+  let i = index + 1;
+  let value = "";
+  while (i < limit) {
+    const ch = source[i];
+    if (ch === "\\") {
+      value += source[i + 1] ?? "";
+      i += 2;
+      continue;
+    }
+    if (ch === quote) return { end: i + 1, value };
+    if (ch === "\n") return null;
+    value += ch ?? "";
+    i += 1;
+  }
+  return null;
+}
+
+function matchDelim(
+  source: string,
+  open: number,
+  limit: number,
+  openChar: string,
+  closeChar: string,
+): number | null {
+  let depth = 1;
+  let i = open + 1;
+  while (i < limit) {
+    const ch = source[i];
+    if (ch === "\\") {
+      i += 2;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      const text = readString(source, i, limit);
+      if (!text) return null;
+      i = text.end;
+      continue;
+    }
+    if (ch === "`") {
+      let count = 0;
+      while (source[i + count] === "`") count += 1;
+      const needle = "`".repeat(count);
+      const close = source.indexOf(needle, i + count);
+      if (close === -1 || close >= limit) return null;
+      i = close + count;
+      continue;
+    }
+    if (ch === openChar) depth += 1;
+    else if (ch === closeChar) {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+    i += 1;
+  }
+  return null;
+}
+
+function tryImage(source: string, index: number, limit: number): Span | null {
+  if (!hashName(source, index, "image")) return null;
+  const cursor = skipSpaces(source, index + 6, limit);
+  if (source[cursor] !== "(") return null;
+  const close = matchDelim(source, cursor, limit, "(", ")");
+  if (close === null) return null;
+  const first = skipSpaces(source, cursor + 1, close);
+  const path = readString(source, first, close);
+  if (!path || path.value.length === 0) return null;
+  const callEnd = close + 1;
+  const lineFrom = lineStart(source, index);
+  const lineTo = lineContentEnd(source, index);
+  const block =
+    source.slice(lineFrom, index).trim().length === 0 &&
+    source.slice(callEnd, lineTo).trim().length === 0;
+  return makeSpan(index, callEnd, "image", null, path.value, true, block);
+}
+
+function tryLink(source: string, index: number, limit: number): Span | null {
+  if (!hashName(source, index, "link")) return null;
+  const cursor = skipSpaces(source, index + 5, limit);
+  if (source[cursor] !== "(") return null;
+  const close = matchDelim(source, cursor, limit, "(", ")");
+  if (close === null) return null;
+  const first = skipSpaces(source, cursor + 1, close);
+  const url = readString(source, first, close);
+  if (!url) return null;
+  const bracket = skipSpaces(source, close + 1, limit);
+  if (source[bracket] !== "[") return null;
+  const end = matchDelim(source, bracket, limit, "[", "]");
+  if (end === null) return null;
+  return makeSpan(index, end + 1, "link", null, url.value, true, false);
+}
+
+function scanCalls(
+  source: string,
+  from: number,
+  to: number,
+  protectedRanges: Protected[],
+): { images: Span[]; links: Span[] } {
+  const images: Span[] = [];
+  const links: Span[] = [];
+  let i = from;
+  while (i < to) {
+    const cover = coveredAt(protectedRanges, i);
+    if (cover) {
+      i = Math.min(cover.to, to);
+      continue;
+    }
+    if (source.charCodeAt(i) === 92) {
+      i += 2;
+      continue;
+    }
+    if (source[i] === "#") {
+      const image = tryImage(source, i, to);
+      if (image) {
+        images.push(image);
+        i = image.to;
+        continue;
+      }
+      const link = tryLink(source, i, to);
+      if (link) {
+        links.push(link);
+        i = link.to;
+        continue;
+      }
+    }
+    i += 1;
+  }
+  return { images, links };
+}
+
 function scanWindow(source: string, from: number, to: number): Span[] {
   if (from >= to) return [];
-  const { protectedRanges, math } = scanProtected(source, from, to);
+  const { protectedRanges, math, raw } = scanProtected(source, from, to);
   const quotes = scanQuotes(source, from, to, protectedRanges);
   const lines = linesOf(source, from, to);
+  const calls = scanCalls(source, from, to, protectedRanges);
   const blocks = [
     ...quotes.map((hit) => hit.span),
     ...math.filter((span) => span.block),
+    ...raw.filter((span) => span.block),
+    ...calls.images.filter((span) => span.block),
     ...scanListsAndHeadings(source, lines, protectedRanges),
   ];
   const bodies = scanBodies(source, lines, blocks, protectedRanges);
@@ -856,9 +1024,16 @@ function scanWindow(source: string, from: number, to: number): Span[] {
     );
   }
   const inlineMath = math.filter((span) => !span.block);
-  const spans = [...hosts, ...inline, ...inlineMath].filter(
-    (span) => span.from >= from && span.to <= to && span.from < span.to,
-  );
+  const inlineRaw = raw.filter((span) => !span.block);
+  const inlineImages = calls.images.filter((span) => !span.block);
+  const spans = [
+    ...hosts,
+    ...inline,
+    ...inlineMath,
+    ...inlineRaw,
+    ...inlineImages,
+    ...calls.links,
+  ].filter((span) => span.from >= from && span.to <= to && span.from < span.to);
   spans.sort((a, b) => a.from - b.from || b.to - a.to);
   return spans;
 }
@@ -935,6 +1110,125 @@ export function integrateSpans(
     (a, b) => a.from - b.from || b.to - a.to,
   );
   return { ...classified, spans };
+}
+
+function backtickRun(source: string, index: number): number {
+  let count = 0;
+  while (source.charCodeAt(index + count) === 96) count += 1;
+  return count;
+}
+
+function planRaw(
+  source: string,
+  span: Span,
+  replaces: ReplaceRange[],
+  styles: StyleRange[],
+  points: PointWidget[],
+  addLine: (at: number, className: string) => void,
+): void {
+  const count = backtickRun(source, span.from);
+  if (count < 1) return;
+  if (span.block) {
+    let openTo = source.indexOf("\n", span.from);
+    openTo = openTo === -1 || openTo >= span.to ? span.to : openTo + 1;
+    let closeFrom = span.to - count;
+    if (source[closeFrom - 1] === "\n") closeFrom -= 1;
+    if (source[closeFrom - 1] === "\r") closeFrom -= 1;
+    replaces.push({ from: span.from, to: openTo, text: "", className: "" });
+    if (closeFrom > openTo) {
+      replaces.push({ from: closeFrom, to: span.to, text: "", className: "" });
+    }
+    pushStyle(styles, openTo, closeFrom, "cm-raw cm-raw-block", []);
+    for (const at of lineStarts(source, openTo, closeFrom)) {
+      addLine(at, "cm-raw-line");
+    }
+    if (span.marker) {
+      points.push({
+        at: openTo,
+        side: -1,
+        text: span.marker,
+        className: "cm-raw-lang",
+      });
+    }
+    return;
+  }
+  replaces.push(
+    { from: span.from, to: span.from + count, text: "", className: "" },
+    { from: span.to - count, to: span.to, text: "", className: "" },
+  );
+  pushStyle(styles, span.from + count, span.to - count, "cm-raw", []);
+}
+
+function linkContentRange(
+  source: string,
+  span: Span,
+): { from: number; to: number } | null {
+  const openParen = source.indexOf("(", span.from);
+  if (openParen < span.from || openParen >= span.to) return null;
+  const closeParen = matchDelim(source, openParen, span.to, "(", ")");
+  if (closeParen === null) return null;
+  const bracket = skipSpaces(source, closeParen + 1, span.to);
+  if (source[bracket] !== "[") return null;
+  if (source[span.to - 1] !== "]") return null;
+  return { from: bracket + 1, to: span.to - 1 };
+}
+
+export type BareLink = { from: number; to: number; url: string };
+
+function coveredByKind(spans: Span[], from: number, to: number): boolean {
+  return spans.some(
+    (span) =>
+      (span.kind === "math" ||
+        span.kind === "raw" ||
+        span.kind === "link" ||
+        span.kind === "image") &&
+      span.from < to &&
+      span.to > from,
+  );
+}
+
+export function bareLinks(source: string, spans: Span[]): BareLink[] {
+  const found: BareLink[] = [];
+  for (const match of source.matchAll(
+    /(?:https?:\/\/|mailto:)[^\s<>[\]"'`]+/giu,
+  )) {
+    const start = match.index ?? 0;
+    let to = start + match[0].length;
+    while (to > start && ",.;:!?".includes(source[to - 1] ?? "")) to -= 1;
+    if (to > start && !coveredByKind(spans, start, to)) {
+      found.push({ from: start, to, url: source.slice(start, to) });
+    }
+  }
+  return found;
+}
+
+export function isOpenableUrl(url: string): boolean {
+  const value = url.trim();
+  if (!value || /\s/u.test(value)) return false;
+  return (
+    /^https:\/\//iu.test(value) ||
+    /^http:\/\//iu.test(value) ||
+    /^mailto:/iu.test(value)
+  );
+}
+
+/** The link under a caret, for Ctrl+click. Only http, https, and mailto. */
+export function linkAt(
+  source: string,
+  spans: Span[],
+  pos: number,
+): string | null {
+  for (const span of spans) {
+    if (span.kind !== "link" || !span.closed) continue;
+    if (pos < span.from || pos >= span.to) continue;
+    return isOpenableUrl(span.marker) ? span.marker : null;
+  }
+  for (const link of bareLinks(source, spans)) {
+    if (pos >= link.from && pos < link.to && isOpenableUrl(link.url)) {
+      return link.url;
+    }
+  }
+  return null;
 }
 
 function rangesOverlap(left: TextRange, right: TextRange): boolean {
@@ -1286,7 +1580,28 @@ export function planDecorations(
         text: inner,
         className: span.block ? "cm-math-block" : "cm-math-chip",
       });
+    } else if (span.kind === "raw") {
+      planRaw(source, span, replaces, styles, points, addLine);
+    } else if (span.kind === "image") {
+      replaces.push({
+        from: span.from,
+        to: span.to,
+        text: span.marker,
+        className: span.block ? "cm-image cm-image-block" : "cm-image",
+      });
+    } else if (span.kind === "link") {
+      const content = linkContentRange(source, span);
+      if (!content) continue;
+      replaces.push(
+        { from: span.from, to: content.from, text: "", className: "" },
+        { from: content.to, to: span.to, text: "", className: "" },
+      );
+      pushStyle(styles, content.from, content.to, "cm-link", []);
     }
+  }
+
+  for (const link of bareLinks(source, spans)) {
+    pushStyle(styles, link.from, link.to, "cm-link", []);
   }
 
   for (const diagnostic of diagnostics) {

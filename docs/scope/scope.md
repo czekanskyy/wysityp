@@ -17,8 +17,8 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 4 | Design system and UI foundation | Foundation | in-progress |
 | 5 | Workspace and note files | Release 1 | in-progress |
 | 6 | Rendered page editor | Release 1 | in-progress |
-| 7 | Math editing | Release 1 | planned |
-| 8 | Tables, code, images and links | Release 1 | planned |
+| 7 | Math editing | Release 1 | in-progress |
+| 8 | Tables, code, images and links | Release 1 | in-progress |
 | 9 | Source view and file safety | Release 1 | in-progress |
 | 10 | Search, recent notes and templates | Release 1 | in-progress |
 | 11 | Spell checking in Polish and English | Release 1 | planned |
@@ -108,15 +108,31 @@ The heart of WYSITyp: you type on a page that renders in place for text, heading
 - [ ] Verify it: `/check verify rendered page editor`
 - [ ] Test it: `/test rendered page editor`
 
-### 7. Math editing · needs a decision
+### 7. Math editing
 Full math support that feels quick in a lecture: insert math inline or as its own block, type it with helpful symbol entry, see it render as you go, and click rendered math to change its source.
 **Done when:** a student can write equations, fractions, sums, integrals and aligned working at typing speed, spot a broken formula from a clear error rather than a blank space, and fix it in place.
-- [ ] Design it (spec): `/architect math editing`
+**Spec:** [0008. Typeset math and paste](../specs/0008-typeset-math-and-paste/index.md)
+**Code:** `src/lib/math.ts`, `src/lib/editor.ts`, `src/lib/insert.ts`, `src-tauri/src/math_render.rs`, `src-tauri/src/typst_engine.rs`
+- [x] Design it (spec): typeset-math decisions are in spec 0008. Symbol entry is still open.
+- [ ] Build it: `/develop math editing`
+  - [x] Typeset math on the page, a live preview, and `$` pairing
+  - [ ] Symbol entry
+- [ ] Verify it: `/check verify math editing`
+- [ ] Test it: `/test math editing`
 
 ### 8. Tables, code, images and links
 Grow the page beyond prose and math with tables you can edit on the page, code blocks with clear structure, images you paste or drop into a note, and links that open where they promise.
 **Done when:** a student can paste a slide screenshot into a note and find the image file beside the note on disk, build a small table without touching source, and include a readable code block in the same note.
+**Spec:** [0008. Typeset math and paste](../specs/0008-typeset-math-and-paste/index.md)
+**Code:** `src/lib/paste.ts`, `src/lib/spans.ts`, `src/lib/editor.ts`, `src/lib/insert.ts`, `src-tauri/src/media.rs`, `src-tauri/src/files.rs`
 - [ ] Build it: `/develop tables, code, images and links`
+  - [x] Paste and drop a picture beside the note, and show it on the page
+  - [x] Code blocks and inline code on the rendered page
+  - [x] Links on the page, opened with Ctrl+click
+  - [x] Insert helpers for a later toolbar
+  - [ ] Table grid editor
+- [ ] Verify it: `/check verify tables, code, images and links`
+- [ ] Test it: `/test tables, code, images and links`
 
 ### 9. Source view and file safety
 Let students switch the whole note between the rendered page and its Typst source with both views always in step, save work as they type, recover gracefully after a crash, and stay safe when another tool changes the same file.

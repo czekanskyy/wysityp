@@ -24,7 +24,13 @@ import {
   type AppTheme,
   type StartupAppearance,
 } from "../appearance";
-import { createEditor, type EditorHandle, type EditorOptions } from "../editor";
+import {
+  createEditor,
+  type EditorHandle,
+  type EditorOptions,
+  type EditorShared,
+} from "../editor";
+import { createAppEditorServices } from "../editorServices";
 import {
   readEditorState,
   replaceEditorText,
@@ -162,6 +168,14 @@ export class Session {
   private readonly leaveApproved = new Set<number>();
   private readonly guard = new RenderGuard();
   private readonly autosave = createAutosaveTimer(AUTOSAVE_WAIT_MS);
+  private readonly editorShared: EditorShared = {
+    notePath: "",
+    pageColor: "white",
+    services: createAppEditorServices(),
+    onNotice: (message) => {
+      this.status = message;
+    },
+  };
   private readonly scheduleRender: () => void;
   private readonly scheduleSearch: () => void;
   editor: EditorHandle | undefined;
@@ -916,10 +930,12 @@ export class Session {
     this.sourceFont = saved.source_font || DEFAULT_SOURCE_FONT;
     this.renderFont = saved.render_font || DEFAULT_RENDER_FONT;
     applyDocumentTheme(this.theme);
+    this.editorShared.pageColor = this.pageColor;
     this.editor?.setFonts({
       source: this.sourceFont,
       render: this.renderFont,
     });
+    this.editor?.setPageColor(this.pageColor);
   }
 
   appearanceFailed(error: unknown): void {
@@ -1454,18 +1470,31 @@ export class Session {
   }
 
   private editorOptions(): EditorOptions {
+    const notePath = this.active ? this.renderPath(this.active) : "";
+    this.editorShared.notePath = notePath;
+    this.editorShared.pageColor = this.pageColor;
     return {
       rendered: this.viewMode !== "source",
       fonts: { source: this.sourceFont, render: this.renderFont },
+      notePath,
+      pageColor: this.pageColor,
+      services: this.editorShared.services,
+      onNotice: this.editorShared.onNotice,
+      shared: this.editorShared,
     };
   }
 
   private applyEditorChrome(): void {
+    const notePath = this.active ? this.renderPath(this.active) : "";
+    this.editorShared.notePath = notePath;
+    this.editorShared.pageColor = this.pageColor;
     this.editor?.setRendered(this.viewMode !== "source");
     this.editor?.setFonts({
       source: this.sourceFont,
       render: this.renderFont,
     });
+    this.editor?.setNotePath(notePath);
+    this.editor?.setPageColor(this.pageColor);
   }
 
   /** The new-note dialog can move focus after it closes, so focus again. */

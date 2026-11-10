@@ -12,6 +12,7 @@ use typst_kit::packages::SystemPackages;
 use typst_layout::PagedDocument;
 use typst_library::diag::{FileResult, Severity, SourceDiagnostic};
 use typst_library::foundations::{Bytes, Datetime, Duration};
+use typst_library::layout::{Frame, FrameItem};
 use typst_library::text::{Font, FontBook};
 use typst_library::{Library, WorldExt};
 use typst_syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
@@ -280,6 +281,117 @@ impl Engine {
         *slot = Some(world);
         result
     }
+
+    /// Compile one tiny formula document. Does not touch the open note's world.
+    ///
+    /// A panic inside Typst becomes an error string. The note preview keeps
+    /// the engine gate between formulas, so a bad formula cannot take it down.
+    pub fn render_math_source(
+        &self,
+        root: &Path,
+        note_path: &str,
+        source: &str,
+    ) -> Result<TinyRender, String> {
+        let _gate = self.gate.lock().unwrap_or_else(|err| err.into_inner());
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            compile_tiny(&self.fonts, root, note_path, source)
+        })) {
+            Ok(result) => result,
+            Err(_) => Err("Typst panicked while compiling a formula".to_string()),
+        }
+    }
+}
+
+/// Pixel size of one compiled formula. The baseline is measured from the top.
+#[derive(Debug, Clone)]
+pub struct TinyRender {
+    pub svg: String,
+    pub width_px: f64,
+    pub height_px: f64,
+    pub baseline_px: f64,
+}
+
+fn pt_to_px(pt: f64) -> f64 {
+    pt * 96.0 / 72.0
+}
+
+fn compile_tiny(
+    fonts: &Arc<FontStore>,
+    root: &Path,
+    note_path: &str,
+    source: &str,
+) -> Result<TinyRender, String> {
+    let world =
+        NoteWorld::new(fonts.clone(), root, note_path, source).map_err(|err| err.to_string())?;
+    let warned = typst::compile::<PagedDocument>(&world as &dyn World);
+    let document = match warned.output {
+        Ok(document) => document,
+        Err(errors) => return Err(short_errors(&world, &errors)),
+    };
+    let page = document
+        .pages()
+        .first()
+        .ok_or_else(|| "Typst produced no page".to_string())?;
+    let frame = &page.frame;
+    let width_px = pt_to_px(frame.width().to_pt());
+    let height_px = pt_to_px(frame.height().to_pt());
+    if !width_px.is_finite() || !height_px.is_finite() || width_px < 0.5 || height_px < 0.5 {
+        return Err("Typst produced an empty formula".to_string());
+    }
+    let baseline_pt = formula_baseline(frame).unwrap_or(frame.height().to_pt());
+    let mut baseline_px = pt_to_px(baseline_pt);
+    if !baseline_px.is_finite() || baseline_px < 0.0 {
+        baseline_px = height_px;
+    }
+    if baseline_px > height_px {
+        baseline_px = height_px;
+    }
+    let svg = typst_svg::svg(page, &typst_svg::SvgOptions::default());
+    Ok(TinyRender {
+        svg,
+        width_px,
+        height_px,
+        baseline_px,
+    })
+}
+
+fn short_errors(world: &NoteWorld, errors: &[SourceDiagnostic]) -> String {
+    if errors.is_empty() {
+        return "Typst could not compile this formula".to_string();
+    }
+    errors
+        .iter()
+        .map(|diagnostic| {
+            let mapped = map_diagnostic(world, diagnostic);
+            if mapped.hints.is_empty() {
+                mapped.message
+            } else {
+                format!("{} ({})", mapped.message, mapped.hints.join("; "))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// The deepest frame baseline, in points from the top of `frame`.
+fn formula_baseline(frame: &Frame) -> Option<f64> {
+    fn walk(frame: &Frame, origin: f64) -> Option<f64> {
+        let mut found = frame
+            .has_baseline()
+            .then(|| origin + frame.baseline().to_pt());
+        for (pos, item) in frame.items() {
+            let FrameItem::Group(group) = item else {
+                continue;
+            };
+            let y = origin + pos.y.to_pt() + group.transform.ty.to_pt();
+            if let Some(child) = walk(&group.frame, y) {
+                found = Some(child);
+                break;
+            }
+        }
+        found
+    }
+    walk(frame, 0.0)
 }
 
 fn export_from_world(world: &mut NoteWorld, source: &str) -> AppResult<Vec<u8>> {
