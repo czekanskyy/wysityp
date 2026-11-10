@@ -1,5 +1,6 @@
 <script lang="ts">
   import Button from "../ui/Button.svelte";
+  import EditorToolbar from "./EditorToolbar.svelte";
   import StatusBar from "./StatusBar.svelte";
   import TabStrip from "./TabStrip.svelte";
   import type { Session } from "../state/session.svelte";
@@ -9,6 +10,7 @@
 
 <div class="stage-body">
   <TabStrip {session} />
+  <EditorToolbar {session} />
 
   {#if session.active?.conflict}
     <section class="conflict-banner" role="alert">

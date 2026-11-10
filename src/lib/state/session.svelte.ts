@@ -813,7 +813,7 @@ export class Session {
     } else if (event.code === "KeyW" && !event.shiftKey) {
       event.preventDefault();
       if (this.active) void this.closeTab(this.active.id);
-    } else if (event.code === "KeyB" && !event.shiftKey) {
+    } else if (event.code === "Backslash" && !event.shiftKey) {
       event.preventDefault();
       this.toggleSidebar();
     } else if (event.code === "Tab") {

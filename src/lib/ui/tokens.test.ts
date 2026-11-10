@@ -61,6 +61,21 @@ const iconIds = [
   "strike",
   "numberedList",
   "warning",
+  "underline",
+  "superscript",
+  "subscript",
+  "highlight",
+  "textColor",
+  "termList",
+  "outdent",
+  "indent",
+  "align",
+  "symbol",
+  "shape",
+  "footnote",
+  "mention",
+  "blocks",
+  "codeBlock",
 ];
 
 describe("papier tokens", () => {
@@ -95,7 +110,7 @@ describe("papier tokens", () => {
 });
 
 describe("icons", () => {
-  it("has the 35 preview drawings", () => {
+  it("draws the shared icons, including the formatting toolbar", () => {
     expect(Object.keys(icons).sort()).toEqual([...iconIds].sort());
   });
 });
