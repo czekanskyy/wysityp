@@ -14,12 +14,13 @@ import {
   asTheme,
   type StartupAppearance,
 } from "../appearance";
-import { createEditor, type EditorHandle } from "../editor";
+import { createEditor, type EditorHandle, type EditorOptions } from "../editor";
 import {
   readEditorState,
   replaceEditorText,
   writeEditorState,
 } from "../editorTabs";
+import { DEFAULT_RENDER_FONT, DEFAULT_SOURCE_FONT } from "../fonts";
 import { applyLocale, currentLocale, type AppLocale } from "../locale";
 import {
   AUTOSAVE_WAIT_MS,
@@ -28,7 +29,6 @@ import {
   savedTextIsCurrent,
   shouldApplySaveResult,
   shouldRunSave,
-  showsSource,
   type NoteView,
   type OpenNote,
   type SaveOrigin,
@@ -46,6 +46,7 @@ import {
 } from "../render";
 import {
   createTab,
+  draftIsDisposable,
   fileName,
   findTabByKey,
   keyWasRemoved,
@@ -54,6 +55,7 @@ import {
   pathsMatch,
   retargetKey,
   sessionToken,
+  storedEditorMatches,
   tabTitle,
   type TabKind,
   type TabModel,
@@ -86,6 +88,8 @@ export class Session {
   locale = $state<AppLocale>(currentLocale());
   theme = $state(asTheme("system"));
   pageColor = $state(asPageColor("white"));
+  sourceFont = $state(DEFAULT_SOURCE_FONT);
+  renderFont = $state(DEFAULT_RENDER_FONT);
   appearanceOpen = $state(false);
   appearanceTrigger = $state<HTMLElement | null>(null);
   rootName = $state("");
@@ -111,7 +115,7 @@ export class Session {
   recentError = $state("");
   templatePending = $state(false);
   exporting = $state(false);
-  viewMode = $state<NoteView>("split");
+  viewMode = $state<NoteView>("rendered");
   namingFolder = $state(false);
   recentExpanded = $state(true);
   notesExpanded = $state(true);
@@ -148,6 +152,8 @@ export class Session {
   constructor(startup: StartupAppearance) {
     this.theme = startup.theme;
     this.pageColor = startup.pageColor;
+    this.sourceFont = startup.sourceFont || DEFAULT_SOURCE_FONT;
+    this.renderFont = startup.renderFont || DEFAULT_RENDER_FONT;
     this.pendingStartupError = startup.error;
     this.scheduleRender = debounce(() => void this.runRender(), 350);
     this.scheduleSearch = debounce(() => this.runSearch(), 200);
@@ -270,6 +276,12 @@ export class Session {
       pageOled: m.page_oled(),
       appearancePreview: m.appearance_preview(),
       appearanceClose: m.appearance_close(),
+      sourceFontLabel: m.source_font_label(),
+      sourceFontHint: m.source_font_hint(),
+      renderFontLabel: m.render_font_label(),
+      renderFontHint: m.render_font_hint(),
+      fontOtherLabel: m.font_other(),
+      fontOtherHint: m.font_other_hint(),
     };
   }
 
@@ -428,31 +440,48 @@ export class Session {
   }
 
   editorAttachment(node: HTMLDivElement): () => void {
+    const tabId = this.activeId;
     const initial = this.active?.text ?? "";
-    const activeId = this.activeId;
-    const editor = createEditor(node, initial, (text) =>
-      this.onEditorChange(text),
+    const editor = createEditor(
+      node,
+      initial,
+      (text) => this.onEditorChange(text),
+      this.editorOptions(),
     );
     this.editor = editor;
-    const state = readEditorState(editor);
-    if (activeId && state) this.editorStates.set(activeId, state);
+    const saved = tabId ? this.editorStates.get(tabId) : undefined;
+    if (saved && storedEditorMatches(saved.doc.toString(), initial)) {
+      writeEditorState(editor, saved);
+    } else if (tabId && saved) {
+      this.editorStates.delete(tabId);
+    }
+    this.applyEditorChrome();
+    this.rememberEditor(tabId);
+    if (this.pendingJump !== null) {
+      editor.setSelection(this.pendingJump);
+      this.pendingJump = null;
+    }
+    this.focusEditor();
     void this.runRender();
     return () => {
-      this.snapshotActive();
-      this.editor?.destroy();
-      this.editor = undefined;
+      if (this.activeId === tabId) this.snapshotActive();
+      if (this.editor === editor) {
+        editor.destroy();
+        this.editor = undefined;
+      }
     };
   }
 
   onEditorChange(text: string): void {
     const tab = this.active;
-    if (!tab) return;
+    if (!tab || !this.editor) return;
     this.patch(tab.id, {
       text,
       revision: tab.revision + 1,
       dirty: true,
       savePhase: "unsaved",
     });
+    this.editorStates.set(tab.id, readEditorState(this.editor));
     if (!tab.conflict) this.scheduleAutosave();
     this.scheduleRender();
   }
@@ -553,32 +582,34 @@ export class Session {
 
   setView(next: NoteView): void {
     if (next === this.viewMode) return;
-    const enteringSource = !showsSource(this.viewMode) && showsSource(next);
-    if (showsSource(this.viewMode) && !showsSource(next)) this.snapshotActive();
     this.viewMode = next;
-    if (!enteringSource) return;
-    queueMicrotask(() => {
-      const tab = this.active;
-      if (!tab || !this.editor) return;
-      this.editor.restorePlace(tab.place);
-      if (this.pendingJump !== null) {
-        this.editor.setSelection(this.pendingJump);
-        this.editor.focus();
-        this.pendingJump = null;
-      }
-    });
+    this.editor?.setRendered(next !== "source");
+    if (this.pendingJump !== null && this.editor) {
+      this.editor.setSelection(this.pendingJump);
+      this.editor.focus();
+      this.pendingJump = null;
+    }
   }
 
   jumpToDiagnostic(diagnostic: RenderDiagnostic): void {
-    const source = this.editor?.getText() ?? this.active?.text ?? "";
-    const position = byteOffsetToUtf16(source, diagnostic.start);
-    if (!showsSource(this.viewMode)) {
-      this.pendingJump = position;
-      this.setView("split");
+    const tab = this.active;
+    if (!tab) return;
+    const path = this.renderPath(tab);
+    if (
+      diagnostic.file !== "" &&
+      diagnostic.file !== path &&
+      !pathsMatch(diagnostic.file, path)
+    ) {
       return;
     }
-    this.editor?.setSelection(position);
-    this.editor?.focus();
+    const source = this.editor?.getText() ?? tab.text;
+    const position = byteOffsetToUtf16(source, diagnostic.start);
+    if (!this.editor) {
+      this.pendingJump = position;
+      return;
+    }
+    this.editor.setSelection(position);
+    this.editor.focus();
   }
 
   requestReload(): void {
@@ -631,7 +662,13 @@ export class Session {
   applyAppearance(saved: Settings): void {
     this.theme = asTheme(saved.theme);
     this.pageColor = asPageColor(saved.page_color);
+    this.sourceFont = saved.source_font || DEFAULT_SOURCE_FONT;
+    this.renderFont = saved.render_font || DEFAULT_RENDER_FONT;
     applyDocumentTheme(this.theme);
+    this.editor?.setFonts({
+      source: this.sourceFont,
+      render: this.renderFont,
+    });
   }
 
   appearanceFailed(error: unknown): void {
@@ -733,6 +770,7 @@ export class Session {
   }
 
   onWindowBlur(): void {
+    this.snapshotActive();
     const tab = this.active;
     if (!tab || tab.conflict || tab.savePhase === "saved") return;
     const pending = this.autosave.take();
@@ -1041,13 +1079,17 @@ export class Session {
         }
       } else {
         this.patch(saved.id, {
+          text: textNow,
           conflict: false,
           reloadArmed: false,
           saveFailed: false,
           savePhase: "unsaved",
           dirty: true,
         });
-        if (saved.id === this.activeId) this.scheduleAutosave();
+        if (saved.id === this.activeId) {
+          this.rememberEditor(saved.id);
+          this.scheduleAutosave();
+        }
       }
     } catch (error) {
       const failed = this.tabForTicket(ticket);
@@ -1091,6 +1133,7 @@ export class Session {
   }
 
   private async flushActive(block: boolean): Promise<boolean> {
+    this.snapshotActive();
     const tab = this.active;
     if (!tab) return true;
     if (block && this.leaveApproved.has(tab.id)) {
@@ -1124,6 +1167,7 @@ export class Session {
     for (const id of this.tabs.map((tab) => tab.id)) {
       const tab = this.tabById(id);
       if (!tab || tab.conflict || tab.savePhase === "saved") continue;
+      if (this.disposable(tab)) continue;
       if (tab.id === this.activeId) await this.flushActive(false);
       else {
         await this.enqueueSave(
@@ -1146,6 +1190,19 @@ export class Session {
         return false;
       }
     }
+    for (const tab of [...this.tabs]) {
+      if (!this.disposable(tab)) continue;
+      const removed = await this.dropDraft(tab.id);
+      const still = this.tabById(tab.id);
+      if (
+        !removed &&
+        still &&
+        (still.conflict || still.saveFailed || this.disposable(still))
+      ) {
+        if (this.activeId !== still.id) await this.focusTabNow(still.id);
+        return false;
+      }
+    }
     await this.flushAll();
     const blocked = this.tabs.find(
       (tab) => tab.conflict || tab.saveFailed || tab.savePhase !== "saved",
@@ -1155,23 +1212,103 @@ export class Session {
     return false;
   }
 
+  private editorOptions(): EditorOptions {
+    return {
+      rendered: this.viewMode !== "source",
+      fonts: { source: this.sourceFont, render: this.renderFont },
+    };
+  }
+
+  private applyEditorChrome(): void {
+    this.editor?.setRendered(this.viewMode !== "source");
+    this.editor?.setFonts({
+      source: this.sourceFont,
+      render: this.renderFont,
+    });
+  }
+
+  /** The new-note dialog can move focus after it closes, so focus again. */
+  private focusEditor(): void {
+    const editor = this.editor;
+    if (!editor) return;
+    editor.focus();
+    requestAnimationFrame(() => {
+      if (this.editor === editor) editor.focus();
+    });
+  }
+
+  private renderPath(tab: TabModel): string {
+    return tab.kind === "template" ? "" : tab.key;
+  }
+
+  private liveText(tab: TabModel): string {
+    if (tab.id === this.activeId && this.editor) return this.editor.getText();
+    return tab.text;
+  }
+
+  private disposable(tab: TabModel): boolean {
+    if (tab.conflict || tab.saveFailed) return false;
+    return draftIsDisposable({ ...tab, text: this.liveText(tab) });
+  }
+
+  private async dropDraft(id: number): Promise<boolean> {
+    this.autosave.cancel();
+    await this.saveChain;
+    const tab = this.tabById(id);
+    if (!tab || !this.disposable(tab)) return false;
+    try {
+      await api.discardDraft(tab.key);
+    } catch (error) {
+      this.status = `${this.labels.actionFailed}: ${messageOf(error)}`;
+      return false;
+    }
+    if (!this.tabById(id)) return true;
+    this.removeTab(id);
+    return true;
+  }
+
+  /** The editor's undo history, when it still shows this tab. */
+  private rememberEditor(id: number): void {
+    if (!id || this.activeId !== id || !this.editor) return;
+    const tab = this.tabById(id);
+    const state = readEditorState(this.editor);
+    if (!tab || !storedEditorMatches(state.doc.toString(), tab.text)) return;
+    this.editorStates.set(id, state);
+  }
+
   private snapshotActive(): void {
     const tab = this.active;
     if (!tab || !this.editor) return;
     const state = readEditorState(this.editor);
-    if (state) this.editorStates.set(tab.id, state);
+    const text = state.doc.toString();
+    const changed = text !== tab.text;
     this.patch(tab.id, {
-      text: this.editor.getText(),
+      text,
       place: this.editor.getPlace(),
+      ...(changed
+        ? {
+            dirty: true,
+            savePhase: "unsaved" as const,
+            revision: tab.revision + 1,
+          }
+        : {}),
     });
+    this.editorStates.set(tab.id, state);
+    if (changed && !tab.conflict) this.scheduleAutosave();
   }
 
   private restoreEditor(id: number): void {
     const tab = this.tabById(id);
     if (!tab || !this.editor) return;
     const state = this.editorStates.get(id);
-    if (state) writeEditorState(this.editor, state);
-    else replaceEditorText(this.editor, tab.text);
+    if (state && storedEditorMatches(state.doc.toString(), tab.text)) {
+      writeEditorState(this.editor, state);
+    } else {
+      this.editorStates.delete(id);
+      replaceEditorText(this.editor, tab.text, this.editorOptions());
+    }
+    this.applyEditorChrome();
+    this.rememberEditor(id);
   }
 
   private showCached(id: number): void {
@@ -1192,21 +1329,33 @@ export class Session {
   }
 
   private async focusTabNow(id: number): Promise<void> {
-    if (id === this.activeId) return;
+    if (id === this.activeId) {
+      this.snapshotActive();
+      this.focusEditor();
+      return;
+    }
     const next = this.tabById(id);
     if (!next) return;
     await this.flushActive(false);
-    this.snapshotActive();
+    if (!this.tabById(id) || this.activeId === id) return;
     this.activeId = id;
     this.restoreEditor(id);
     this.showCached(id);
+    this.focusEditor();
     this.persist();
     void this.runRender();
   }
 
   private async closeTabNow(id: number): Promise<void> {
-    const tab = this.tabById(id);
+    if (this.activeId === id) this.snapshotActive();
+    let tab = this.tabById(id);
     if (!tab) return;
+    if (this.disposable(tab)) {
+      const removed = await this.dropDraft(id);
+      const latest = this.tabById(id);
+      if (removed || !latest || this.disposable(latest)) return;
+      tab = latest;
+    }
     if (this.activeId !== id) {
       if (tab.conflict || tab.saveFailed) {
         await this.focusTabNow(id);
@@ -1254,6 +1403,7 @@ export class Session {
       if (neighbor) {
         this.restoreEditor(neighbor.id);
         this.showCached(neighbor.id);
+        this.focusEditor();
         void this.runRender();
       }
     }
@@ -1566,8 +1716,10 @@ export class Session {
       reloadArmed: false,
       saveFailed: false,
     });
-    if (this.activeId === id && this.editor)
-      replaceEditorText(this.editor, text);
+    if (this.activeId === id && this.editor) {
+      replaceEditorText(this.editor, text, this.editorOptions());
+      this.applyEditorChrome();
+    }
   }
 
   private async submitNewFolderNow(): Promise<void> {
@@ -1733,19 +1885,36 @@ export class Session {
   private async runRender(): Promise<void> {
     const tab = this.active;
     if (!tab) return;
+    const tabId = tab.id;
     if (tab.kind === "template" && !this.rootName) {
-      this.dropPages(tab.id);
+      this.dropPages(tabId);
+      this.diagnostics = [];
+      this.editor?.setDiagnostics([], "", "", false);
       return;
     }
     const token = this.guard.next();
-    const tabId = tab.id;
     const source = this.editor?.getText() ?? tab.text;
-    const path = tab.kind === "template" ? "" : tab.key;
+    const path = this.renderPath(tab);
     try {
       const result = await api.renderNote(path, source, token);
       if (!this.guard.isCurrent(result.revision) || !this.tabById(tabId))
         return;
-      await this.swapPages(tabId, result.pages, result.diagnostics, token);
+      const live =
+        this.activeId === tabId ? (this.editor?.getText() ?? source) : source;
+      const accept = live === source;
+      if (this.activeId === tabId) {
+        this.editor?.setDiagnostics(
+          accept ? result.diagnostics : [],
+          source,
+          path,
+          accept,
+        );
+        if (accept) this.diagnostics = result.diagnostics;
+      }
+      const listed = accept
+        ? result.diagnostics
+        : (this.pages.get(tabId)?.diagnostics ?? []);
+      await this.swapPages(tabId, result.pages, listed, token);
     } catch (error) {
       if (this.guard.isCurrent(token) && this.activeId === tabId) {
         this.status = `${this.labels.renderFailed}: ${messageOf(error)}`;

@@ -179,7 +179,7 @@ fn note_file_name(name: &str) -> AppResult<String> {
         return Err(AppError::InvalidName(name.to_string()));
     }
     match Path::new(name).extension().and_then(|ext| ext.to_str()) {
-        Some("typ") => Ok(name.to_string()),
+        Some(ext) if ext.eq_ignore_ascii_case("typ") => Ok(name.to_string()),
         Some(_) => Err(AppError::InvalidName(name.to_string())),
         None => Ok(format!("{name}.typ")),
     }
@@ -317,7 +317,10 @@ fn read_tree(root: &Path, dir: &Path) -> AppResult<Vec<TreeNode>> {
                 kind: "folder".to_string(),
                 children,
             });
-        } else if path.extension().is_some_and(|ext| ext == "typ") {
+        } else if path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("typ"))
+        {
             nodes.push(TreeNode {
                 name,
                 path: relative,
@@ -879,7 +882,9 @@ fn collect_notes(root: &Path, dir: &Path, notes: &mut Vec<String>) -> AppResult<
         }
         if file_type.is_dir() {
             collect_notes(root, &path, notes)?;
-        } else if path.extension().is_some_and(|ext| ext == "typ")
+        } else if path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("typ"))
             && let Ok(rel) = path.strip_prefix(root)
         {
             notes.push(rel.to_string_lossy().replace('\\', "/"));
@@ -1736,6 +1741,9 @@ mod tests {
         let tree = list_tree(dir.path()).unwrap();
         assert!(tree.iter().all(|node| !node.name.starts_with('.')));
         assert_eq!(tree.len(), 2);
+        std::fs::write(dir.path().join("Caps.TYP"), "= Caps\n").unwrap();
+        let tree = list_tree(dir.path()).unwrap();
+        assert!(tree.iter().any(|node| node.name == "Caps.TYP"));
     }
 
     #[test]

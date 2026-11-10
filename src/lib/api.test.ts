@@ -29,6 +29,7 @@ vi.mock("../bindings", () => ({
     setLocale: vi.fn(),
     setTheme: vi.fn(),
     setPageColor: vi.fn(),
+    setFonts: vi.fn(),
     greetingName: vi.fn(),
   },
 }));
@@ -391,5 +392,21 @@ describe("appearance api", () => {
       "unknown page colour: navy",
     );
     expect(mocked.setTheme).not.toHaveBeenCalled();
+  });
+
+  it("sends both editor fonts and does not send the theme", async () => {
+    const saved = {
+      locale: "pl",
+      theme: "dark",
+      page_color: "graphite",
+      source_font: "Consolas",
+      render_font: "Segoe UI",
+    };
+    mocked.setFonts.mockResolvedValue(saved as never);
+
+    await expect(api.setFonts("Consolas", "Segoe UI")).resolves.toEqual(saved);
+    expect(mocked.setFonts).toHaveBeenCalledWith("Consolas", "Segoe UI");
+    expect(mocked.setTheme).not.toHaveBeenCalled();
+    expect(mocked.setPageColor).not.toHaveBeenCalled();
   });
 });

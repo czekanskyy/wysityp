@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createTab,
   cycleIndex,
+  draftIsDisposable,
   findTabByKey,
   keyWasRemoved,
   moveItem,
@@ -10,6 +11,7 @@ import {
   pathsMatch,
   retargetKey,
   sessionToken,
+  storedEditorMatches,
   tabTitle,
 } from "./tabs";
 
@@ -59,6 +61,43 @@ describe("tabs", () => {
     expect(neighborIndex(3, 1)).toBe(1);
     expect(neighborIndex(3, 2)).toBe(1);
     expect(neighborIndex(1, 0)).toBe(-1);
+  });
+
+  it("treats an untouched or blank draft as disposable and keeps written text", () => {
+    const blank = createTab(
+      1,
+      "draft",
+      "C:/drafts/untitled.typ",
+      "= Tytuł\n",
+      "Untitled",
+    );
+    expect(draftIsDisposable(blank)).toBe(true);
+    expect(draftIsDisposable({ ...blank, text: "  \n" })).toBe(true);
+    expect(draftIsDisposable({ ...blank, text: "= Title\n" })).toBe(true);
+    expect(draftIsDisposable({ ...blank, text: "= Tytuł\n\nnotatka\n" })).toBe(
+      false,
+    );
+    const restored = createTab(
+      2,
+      "draft",
+      "C:/drafts/untitled-2.typ",
+      "= wykład\n",
+      "Untitled",
+    );
+    expect(restored.origin).toBe("");
+    expect(draftIsDisposable(restored)).toBe(false);
+    const note = createTab(3, "note", "a.typ", "= Tytuł\n", "Untitled");
+    expect(draftIsDisposable(note)).toBe(false);
+  });
+
+  it("keeps undo history only when it is still the tab document", () => {
+    expect(
+      storedEditorMatches("= Tytuł\n\nnotatka\n", "= Tytuł\n\nnotatka\n"),
+    ).toBe(true);
+    expect(storedEditorMatches("= Tytuł\n", "= Tytuł\n\nnotatka\n")).toBe(
+      false,
+    );
+    expect(storedEditorMatches(undefined, "= Tytuł\n")).toBe(false);
   });
 
   it("treats a relative note and its absolute path as the same file", () => {

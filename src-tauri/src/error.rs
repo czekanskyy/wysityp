@@ -32,6 +32,8 @@ pub enum AppError {
     BadTheme(String),
     #[error("unknown page colour: {0}")]
     BadPageColor(String),
+    #[error("invalid font name: {0}")]
+    BadFont(String),
     #[error("settings are not ready yet")]
     SettingsNotReady,
     /// The page matches this prefix. The words after it are for logs.

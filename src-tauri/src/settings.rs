@@ -13,16 +13,22 @@ pub const DEFAULT_THEME: &str = "system";
 pub const THEMES: [&str; 3] = ["system", "light", "dark"];
 pub const DEFAULT_PAGE_COLOR: &str = "white";
 pub const PAGE_COLORS: [&str; 4] = ["white", "beige", "graphite", "oled"];
+pub const DEFAULT_SOURCE_FONT: &str = "JetBrains Mono";
+pub const DEFAULT_RENDER_FONT: &str = "Inter";
 pub const RECENT_LIMIT: usize = 10;
+const MAX_FONT_CHARS: usize = 200;
 
-/// What the page is allowed to see: `locale`, `theme`, and `page_color`.
-/// Recent notes stay on their own command so the workspace identity
-/// never travels to the page.
+/// What the page is allowed to see. Recent notes stay on their own
+/// command so the workspace identity never travels to the page.
+/// `source_font` and `render_font` are editor families only. A missing
+/// or illegal stored name is read as the shipped default and left on disk.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct Settings {
     pub locale: String,
     pub theme: String,
     pub page_color: String,
+    pub source_font: String,
+    pub render_font: String,
 }
 
 impl Default for Settings {
@@ -31,6 +37,8 @@ impl Default for Settings {
             locale: DEFAULT_LOCALE.to_string(),
             theme: DEFAULT_THEME.to_string(),
             page_color: DEFAULT_PAGE_COLOR.to_string(),
+            source_font: DEFAULT_SOURCE_FONT.to_string(),
+            render_font: DEFAULT_RENDER_FONT.to_string(),
         }
     }
 }
@@ -112,8 +120,8 @@ impl RecentNotes {
 /// Every writer loads this, changes only the fields it owns, and writes
 /// the object back through [`files::write_atomically`]. `locale`,
 /// `theme`, `page_color`, and `recent_notes` are the fields this module
-/// understands. Font fields and anything else stay in `object` and ride
-/// along on every save.
+/// understands. `source_font` and `render_font` are written only by
+/// [`set_fonts`]. Anything else stays in `object` and rides along.
 #[derive(Debug, Clone)]
 struct SettingsFile {
     locale: String,
@@ -222,6 +230,36 @@ pub fn set_page_color(path: &Path, page_color: &str) -> AppResult<Settings> {
     Ok(settings_view(&file))
 }
 
+/// Write only the two editor font names. An empty, too long, or illegal
+/// name (quote, apostrophe, comma, or a control character) leaves the
+/// file untouched. The names are trimmed before they are stored.
+pub fn set_fonts(path: &Path, source_font: &str, render_font: &str) -> AppResult<Settings> {
+    let source_font = checked_font_name(source_font)?;
+    let render_font = checked_font_name(render_font)?;
+    let mut file = load_file(path)?;
+    let _ = file
+        .object
+        .insert("source_font".to_string(), Value::String(source_font));
+    let _ = file
+        .object
+        .insert("render_font".to_string(), Value::String(render_font));
+    save_file(path, &file)?;
+    Ok(settings_view(&file))
+}
+
+fn checked_font_name(name: &str) -> AppResult<String> {
+    let trimmed = name.trim();
+    let illegal = trimmed.is_empty()
+        || trimmed.chars().count() > MAX_FONT_CHARS
+        || trimmed
+            .chars()
+            .any(|ch| ch == '"' || ch == '\'' || ch == ',' || ch.is_control());
+    if illegal {
+        return Err(AppError::BadFont(name.to_string()));
+    }
+    Ok(trimmed.to_string())
+}
+
 fn settings_view(file: &SettingsFile) -> Settings {
     Settings {
         locale: file.locale.clone(),
@@ -232,6 +270,19 @@ fn settings_view(file: &SettingsFile) -> Settings {
             PAGE_COLORS.as_slice(),
             DEFAULT_PAGE_COLOR,
         ),
+        source_font: resolved_font(&file.object, "source_font", DEFAULT_SOURCE_FONT),
+        render_font: resolved_font(&file.object, "render_font", DEFAULT_RENDER_FONT),
+    }
+}
+
+/// A missing key, a value that is not a string, or an illegal family
+/// reads as `fallback`. This does not write the object.
+fn resolved_font(object: &Map<String, Value>, key: &str, fallback: &str) -> String {
+    match object.get(key) {
+        Some(Value::String(value)) => {
+            checked_font_name(value).unwrap_or_else(|_| fallback.to_string())
+        }
+        _ => fallback.to_string(),
     }
 }
 
@@ -646,7 +697,10 @@ fn same_note(left: &str, right: &str) -> bool {
 }
 
 fn is_typ_file(path: &Path) -> bool {
-    path.is_file() && path.extension().is_some_and(|ext| ext == "typ")
+    path.is_file()
+        && path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("typ"))
 }
 
 const GLOBAL_RECENT_KEY: &str = "recent_files";
@@ -1842,5 +1896,88 @@ mod tests {
         let cleaned = list_global_recent(&path).unwrap();
         assert_eq!(cleaned, listed);
         assert_eq!(read_settings(&path)["display_name"], "Ada");
+    }
+
+    // covers: spec 0002 AC-12, a missing font name reads as the shipped default
+    #[test]
+    fn a_missing_or_illegal_font_reads_as_the_default_and_is_not_rewritten() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let original =
+            "{\"locale\":\"en\",\"source_font\":\"\",\"render_font\":null,\"theme\":\"dark\"}\n";
+        std::fs::write(&path, original).unwrap();
+        let loaded = load_settings(&path).unwrap();
+        assert_eq!(loaded.source_font, DEFAULT_SOURCE_FONT);
+        assert_eq!(loaded.render_font, DEFAULT_RENDER_FONT);
+        assert_eq!(loaded.theme, "dark");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+
+        let quoted =
+            "{\"locale\":\"pl\",\"source_font\":\"\\\"Bad\\\"\",\"render_font\":\"Has,comma\"}\n";
+        std::fs::write(&path, quoted).unwrap();
+        let illegal = load_settings(&path).unwrap();
+        assert_eq!(illegal.source_font, DEFAULT_SOURCE_FONT);
+        assert_eq!(illegal.render_font, DEFAULT_RENDER_FONT);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), quoted);
+    }
+
+    // covers: spec 0002 AC-12
+    #[test]
+    fn set_fonts_stores_trimmed_names_and_keeps_the_other_fields() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(
+            &path,
+            "{\"locale\":\"en\",\"theme\":\"dark\",\"page_color\":\"beige\",\"display_name\":\"Ada\",\"recent_notes\":{\"paths\":[\"a.typ\"]}}\n",
+        )
+        .unwrap();
+        let saved = set_fonts(&path, "  Consolas  ", " Segoe UI ").unwrap();
+        assert_eq!(saved.source_font, "Consolas");
+        assert_eq!(saved.render_font, "Segoe UI");
+        assert_eq!(saved.locale, "en");
+        assert_eq!(saved.theme, "dark");
+        assert_eq!(saved.page_color, "beige");
+        let file = read_settings(&path);
+        assert_eq!(file["source_font"], "Consolas");
+        assert_eq!(file["render_font"], "Segoe UI");
+        assert_eq!(file["locale"], "en");
+        assert_eq!(file["theme"], "dark");
+        assert_eq!(file["page_color"], "beige");
+        assert_eq!(file["display_name"], "Ada");
+        assert!(file["recent_notes"].is_object());
+    }
+
+    // covers: spec 0002 AC-12, a refused name does not create or change the file
+    #[test]
+    fn a_refused_font_name_leaves_the_file_unchanged() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let original =
+            "{\"locale\":\"pl\",\"source_font\":\"Kept Font\",\"render_font\":\"Inter\"}\n";
+        std::fs::write(&path, original).unwrap();
+        let too_long = "n".repeat(201);
+        for (source_font, render_font) in [
+            ("", "Inter"),
+            ("Inter", " "),
+            ("Bad\"Name", "Inter"),
+            ("Inter", "Bad'Name"),
+            ("One, Two", "Inter"),
+            ("Bad\nName", "Inter"),
+            (too_long.as_str(), "Inter"),
+        ] {
+            let error = set_fonts(&path, source_font, render_font).unwrap_err();
+            assert!(
+                error.to_string().starts_with("invalid font name:"),
+                "{error}"
+            );
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+        }
+        let broken = dir.path().join("broken.json");
+        std::fs::write(&broken, "{").unwrap();
+        assert!(set_fonts(&broken, "Inter", "Inter").is_err());
+        assert_eq!(std::fs::read_to_string(&broken).unwrap(), "{");
+        let missing = dir.path().join("missing.json");
+        assert!(set_fonts(&missing, "Bad\"Name", "Inter").is_err());
+        assert!(!missing.exists());
     }
 }

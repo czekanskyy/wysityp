@@ -1,43 +1,32 @@
 import type { EditorState } from "@codemirror/state";
 
-import type { EditorHandle } from "./editor";
+import {
+  createEditorState,
+  type EditorHandle,
+  type EditorOptions,
+} from "./editor";
 
-type StateHost = EditorHandle & {
-  getState?: () => EditorState;
-  setState?: (state: EditorState) => void;
-  freshState?: (text: string) => EditorState;
-};
-
-function host(handle: EditorHandle): StateHost {
-  return handle;
+/** Read the live CodeMirror state, including that tab's undo history. */
+export function readEditorState(handle: EditorHandle): EditorState {
+  return handle.getState();
 }
 
-/** Read the live CodeMirror state. Null until the editor exposes getState. */
-export function readEditorState(handle: EditorHandle): EditorState | null {
-  return host(handle).getState?.() ?? null;
-}
-
-/** Put a saved state back. Returns false when the editor cannot do that yet. */
+/** Put one tab's state back. The document change does not notify the page. */
 export function writeEditorState(
   handle: EditorHandle,
   state: EditorState,
-): boolean {
-  const editor = host(handle);
-  if (!editor.setState) return false;
-  editor.setState(state);
-  return true;
+): void {
+  handle.setState(state);
 }
 
 /**
  * Replace the document without keeping the previous note's undo history.
- * Uses freshState when the editor has it, otherwise setText.
+ * setText would keep that history, so a tab switch uses a fresh state.
  */
-export function replaceEditorText(handle: EditorHandle, text: string): void {
-  const editor = host(handle);
-  const fresh = editor.freshState?.(text);
-  if (fresh && editor.setState) {
-    editor.setState(fresh);
-    return;
-  }
-  handle.setText(text);
+export function replaceEditorText(
+  handle: EditorHandle,
+  text: string,
+  options?: EditorOptions,
+): void {
+  handle.setState(createEditorState(text, options));
 }

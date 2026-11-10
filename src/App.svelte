@@ -9,11 +9,14 @@
   import Welcome from "./lib/shell/Welcome.svelte";
   import { createSession } from "./lib/state/session.svelte";
   import type { StartupAppearance } from "./lib/appearance";
+  import { DEFAULT_RENDER_FONT, DEFAULT_SOURCE_FONT } from "./lib/fonts";
 
   let {
     startup = {
       theme: "system",
       pageColor: "white",
+      sourceFont: DEFAULT_SOURCE_FONT,
+      renderFont: DEFAULT_RENDER_FONT,
       error: "",
     },
   }: {
@@ -116,6 +119,14 @@
     beigeLabel={session.labels.pageBeige}
     graphiteLabel={session.labels.pageGraphite}
     oledLabel={session.labels.pageOled}
+    sourceFont={session.sourceFont}
+    renderFont={session.renderFont}
+    sourceFontLabel={session.labels.sourceFontLabel}
+    sourceFontHint={session.labels.sourceFontHint}
+    renderFontLabel={session.labels.renderFontLabel}
+    renderFontHint={session.labels.renderFontHint}
+    fontOtherLabel={session.labels.fontOtherLabel}
+    fontOtherHint={session.labels.fontOtherHint}
     preview={session.labels.appearancePreview}
     closeLabel={session.labels.appearanceClose}
     onClose={() => session.closeAppearance()}

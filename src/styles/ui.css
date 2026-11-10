@@ -1134,10 +1134,26 @@ dialog.appearance::backdrop {
 }
 
 .appearance-theme,
-.appearance-pages {
+.appearance-pages,
+.appearance-fonts {
   display: grid;
   gap: var(--space-2);
   min-width: 0;
+}
+
+button.font-choice {
+  min-height: var(--control-md);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  text-align: start;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+button.font-choice[aria-checked="true"] {
+  border-color: var(--color-accent);
 }
 
 .appearance-theme .seg {

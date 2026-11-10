@@ -446,7 +446,11 @@ fn export_open_note(engine: &Engine, root: &Path, path: &str, source: &str) -> A
     // Only a real note may be exported: anything else could make the
     // derived PDF path overwrite an unrelated file beside it.
     let resolved = files::resolve_inside_root(root, path)?;
-    if resolved.extension().is_none_or(|ext| ext != "typ") || !resolved.is_file() {
+    if resolved
+        .extension()
+        .is_none_or(|ext| !ext.eq_ignore_ascii_case("typ"))
+        || !resolved.is_file()
+    {
         return Err(crate::error::AppError::InvalidName(path.to_string()));
     }
     let bytes = engine.export_pdf(root, path, source)?;
@@ -559,6 +563,18 @@ pub fn save_draft_as(
     baselines(&state)?.remember(&placed.path, placed.fingerprint.clone());
     remember_resolved(&state, &resolved);
     Ok(Some(placed))
+}
+
+/// Delete an untouched empty draft. Anything that is not a draft is refused.
+#[tauri::command]
+#[specta::specta]
+pub fn discard_draft(state: State<'_, AppState>, path: String) -> Result<(), String> {
+    let gate = access_gate(&state)?;
+    let key = gate.resolve(&path).map_err(String::from)?.key;
+    access::discard_draft_file(&gate, &path).map_err(String::from)?;
+    drop(gate);
+    baselines(&state)?.forget(&key);
+    Ok(())
 }
 
 #[tauri::command]
@@ -804,6 +820,18 @@ pub fn set_theme(state: State<'_, AppState>, theme: String) -> Result<Settings, 
 pub fn set_page_color(state: State<'_, AppState>, page_color: String) -> Result<Settings, String> {
     let path = settings_file(&state)?;
     settings::set_page_color(&path, &page_color).map_err(String::from)
+}
+
+/// Write the editor families. The note file is not changed.
+#[tauri::command]
+#[specta::specta]
+pub fn set_fonts(
+    state: State<'_, AppState>,
+    source_font: String,
+    render_font: String,
+) -> Result<Settings, String> {
+    let path = settings_file(&state)?;
+    settings::set_fonts(&path, &source_font, &render_font).map_err(String::from)
 }
 
 /// The spoken greeting word, or an empty string. Never an error on the page.

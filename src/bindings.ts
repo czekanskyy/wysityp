@@ -32,6 +32,8 @@ export const commands = {
 	setLocale: (locale: string) => typedError<Settings, string>(__TAURI_INVOKE("set_locale", { locale })),
 	setTheme: (theme: string) => typedError<Settings, string>(__TAURI_INVOKE("set_theme", { theme })),
 	setPageColor: (pageColor: string) => typedError<Settings, string>(__TAURI_INVOKE("set_page_color", { pageColor })),
+	/**  Write the editor families. The note file is not changed. */
+	setFonts: (sourceFont: string, renderFont: string) => typedError<Settings, string>(__TAURI_INVOKE("set_fonts", { sourceFont, renderFont })),
 	/**
 	 *  The spoken greeting word, or an empty string. Never an error on the page.
 	 * 
@@ -48,6 +50,8 @@ export const commands = {
 	openLooseFile: () => typedError<PlacedNote | null, string>(__TAURI_INVOKE("open_loose_file")),
 	/**  Native Save As. Moves the draft and keeps the bytes. Cancel returns none. */
 	saveDraftAs: (path: string) => typedError<PlacedNote | null, string>(__TAURI_INVOKE("save_draft_as", { path })),
+	/**  Delete an untouched empty draft. Anything that is not a draft is refused. */
+	discardDraft: (path: string) => typedError<null, string>(__TAURI_INVOKE("discard_draft", { path })),
 	listGlobalRecents: () => typedError<string[], string>(__TAURI_INVOKE("list_global_recents")),
 	/**
 	 *  Open tabs Rust stored, plus any draft file still in the drafts folder.
@@ -127,14 +131,17 @@ export type SessionRestore = {
 };
 
 /**
- *  What the page is allowed to see: `locale`, `theme`, and `page_color`.
- *  Recent notes stay on their own command so the workspace identity
- *  never travels to the page.
+ *  What the page is allowed to see. Recent notes stay on their own
+ *  command so the workspace identity never travels to the page.
+ *  `source_font` and `render_font` are editor families only. A missing
+ *  or illegal stored name is read as the shipped default and left on disk.
  */
 export type Settings = {
 	locale: string,
 	theme: string,
 	page_color: string,
+	source_font: string,
+	render_font: string,
 };
 
 /**  One template open in the editor. `name` is the file name, including `.typ`. */

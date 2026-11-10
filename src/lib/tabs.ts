@@ -13,6 +13,8 @@ export type TabModel = {
   title: string;
   dirty: boolean;
   text: string;
+  /** Text the draft was created with. Empty when a restored draft already had writing. */
+  origin: string;
   place: EditorPlace;
   revision: number;
   epoch: number;
@@ -21,6 +23,13 @@ export type TabModel = {
   reloadArmed: boolean;
   saveFailed: boolean;
 };
+
+const BLANK_DRAFTS = ["= Tytuł\n", "= Title\n"];
+
+/** A draft still has only the blank heading, or no text at all. */
+export function isBlankDraft(text: string): boolean {
+  return text.trim() === "" || BLANK_DRAFTS.includes(text);
+}
 
 export function fileName(path: string): string {
   const cut = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
@@ -46,6 +55,7 @@ export function createTab(
     title: tabTitle(kind, key, untitled),
     dirty: false,
     text,
+    origin: kind === "draft" && !isBlankDraft(text) ? "" : text,
     place: { ...EDITOR_PLACE_START },
     revision: 0,
     epoch: 1,
@@ -107,8 +117,32 @@ export function keyWasRemoved(key: string, removed: string): boolean {
   return path === target || path.startsWith(`${target}/`);
 }
 
+/**
+ * An empty draft can be deleted on close. A draft that holds the student's
+ * text stays. Conflict and a failed save are decided by the caller.
+ */
+export function draftIsDisposable(
+  tab: Pick<TabModel, "kind" | "text" | "origin">,
+): boolean {
+  if (tab.kind !== "draft") return false;
+  if (tab.text.trim() === "") return true;
+  if (isBlankDraft(tab.text)) return true;
+  return tab.origin !== "" && tab.text === tab.origin;
+}
+
 export function sessionToken(tab: Pick<TabModel, "kind" | "key">): string {
   return tab.kind === "template" ? `template:${tab.key}` : tab.key;
+}
+
+/**
+ * Undo history is put back only when it is still that tab's document.
+ * The state captured when the editor first mounted must not hide later text.
+ */
+export function storedEditorMatches(
+  storedText: string | undefined,
+  tabText: string,
+): boolean {
+  return storedText !== undefined && storedText === tabText;
 }
 
 export function neighborIndex(length: number, index: number): number {

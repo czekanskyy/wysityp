@@ -281,6 +281,28 @@ pub fn move_draft_file(from: &Path, dest: &Path) -> AppResult<PathBuf> {
     canonical_file(&dest)
 }
 
+/// Delete a draft the student never wrote in. A note, a picked file, and a
+/// path that was never allowed stay on disk.
+pub fn discard_draft_file(gate: &AccessGate, path: &str) -> AppResult<()> {
+    let resolved = gate.resolve(path)?;
+    if !resolved.draft {
+        return Err(AppError::NotAllowed(path.to_string()));
+    }
+    let meta = match std::fs::symlink_metadata(&resolved.file) {
+        Ok(meta) => meta,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(err) => return Err(AppError::io(&resolved.file, err)),
+    };
+    if meta.file_type().is_symlink() || !meta.is_file() {
+        return Err(AppError::NotAllowed(resolved.key));
+    }
+    match std::fs::remove_file(&resolved.file) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(AppError::io(&resolved.file, err)),
+    }
+}
+
 pub fn list_draft_files(drafts: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(drafts) else {
         return Vec::new();
@@ -433,5 +455,37 @@ mod tests {
         }
         assert!(create_draft_file(drafts.path(), "en").is_err());
         assert!(drafts.path().join("untitled.typ").is_file());
+    }
+
+    #[test]
+    fn discard_removes_a_created_draft_and_refuses_other_files() {
+        let drafts = tempfile::tempdir().unwrap();
+        let folder = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let mut gate = AccessGate::new(drafts.path().to_path_buf());
+        let placed = create_draft_file(drafts.path(), "en").unwrap();
+        discard_draft_file(&gate, &placed.path).unwrap();
+        assert!(!Path::new(&placed.path).exists());
+
+        let note = write_typ(folder.path(), "note.typ", "= note\n");
+        gate.set_workspace(Some(folder.path().to_path_buf()));
+        let refused = discard_draft_file(&gate, "note.typ")
+            .unwrap_err()
+            .to_string();
+        assert!(
+            refused.contains("not open for editing"),
+            "a workspace note stays: {refused}"
+        );
+        assert!(note.is_file());
+
+        let secret = write_typ(outside.path(), "secret.typ", "= no\n");
+        let never = discard_draft_file(&gate, &secret.to_string_lossy())
+            .unwrap_err()
+            .to_string();
+        assert!(
+            never.contains("not open for editing"),
+            "a path that was never picked stays: {never}"
+        );
+        assert!(secret.is_file());
     }
 }

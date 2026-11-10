@@ -450,6 +450,7 @@ button.danger {
 }
 
 .panes.source .editor-pane,
+.panes.rendered .editor-pane,
 .panes.rendered .preview-pane {
   border-right: none;
 }

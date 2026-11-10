@@ -131,5 +131,11 @@
   "tab_close": "Zamknij kartę",
   "sidebar_collapse": "Ukryj pasek",
   "sidebar_expand": "Pokaż pasek",
-  "draft_names_exhausted": "Brak wolnej nazwy na szkic."
+  "draft_names_exhausted": "Brak wolnej nazwy na szkic.",
+  "source_font_label": "Czcionka źródła",
+  "source_font_hint": "Kod, wzory i tekst, którego strona jeszcze nie rysuje.",
+  "render_font_label": "Czcionka strony",
+  "render_font_hint": "Nagłówki, listy, cytaty i tekst akapitu.",
+  "font_other": "Inna rodzina",
+  "font_other_hint": "Czcionka zainstalowana na tym komputerze. Plik notatki się nie zmienia."
 }

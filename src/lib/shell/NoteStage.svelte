@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { showsRendered, showsSource } from "../noteSafety";
   import Button from "../ui/Button.svelte";
   import StatusBar from "./StatusBar.svelte";
   import TabStrip from "./TabStrip.svelte";
@@ -74,15 +73,19 @@
   <div class={["panes", session.viewMode]}>
     <section
       class="pane editor-pane"
+      class:page-mode={session.viewMode !== "source"}
+      data-page={session.pageColor}
       aria-label={session.labels.editor}
-      hidden={!showsSource(session.viewMode)}
     >
+      <h2 class:visually-hidden={session.viewMode !== "source"}>
+        {session.labels.editor}
+      </h2>
       <div class="editor-host" {@attach session.attachEditor}></div>
     </section>
     <section
       class="pane preview-pane"
       aria-label={session.labels.preview}
-      hidden={!showsRendered(session.viewMode)}
+      hidden={session.viewMode !== "split"}
     >
       <div class="pages">
         {#each session.pageUrls as pageUrl, index (index)}
