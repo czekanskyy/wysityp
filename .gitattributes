@@ -1,0 +1,3 @@
+# The shipped templates are compiled into the app (include_str!), so their
+# line endings must not depend on the machine that checks them out.
+src-tauri/templates/*.typ text eol=lf
