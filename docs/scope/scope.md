@@ -96,13 +96,14 @@ Open a folder on disk, show its folders and notes as a tree, and let students cr
 The heart of WYSITyp: you type on a page that renders in place for text, headings, lists and quotes, typing shortcuts turn marks into structure as you go, and clicking any rendered part lets you edit its Typst source right there without the page losing your place or your cursor.
 **Done when:** a student can write a full lecture note by typing on the rendered page, every edit lands correctly in the Typst file on disk, opening that file again shows the same page, and long notes stay responsive while typing.
 **Spec:** [0002. Rendered page editor](../specs/0002-rendered-page-editor/index.md)
+**Code:** `src/lib/spans.ts`, `src/lib/editor.ts`, `src/lib/fonts.ts`, `src/styles/editor.css`, `src-tauri/src/settings.rs`
 - [x] Design it (spec): `/architect rendered page editor`
-- [ ] Build it: `/develop rendered page editor`
-  - [ ] Rendered prose page (headings, lists, quotes, body, click, arrows, selection, undo), covers AC-1, AC-2, AC-3, AC-6, AC-7
-  - [ ] Errors, a steady caret, and a print preview that does not take focus, covers AC-4, AC-8, AC-10, AC-11
-  - [ ] Math placeholders you can click through, covers AC-5, AC-6
-  - [ ] Structure keys and the long note check, covers AC-9, AC-8
-  - [ ] Editable fonts (source and rendered, shipped with the app), covers AC-12
+- [x] Build it: `/develop rendered page editor`
+  - [x] Rendered prose page (headings, lists, quotes, body, click, arrows, selection, undo), covers AC-1, AC-2, AC-3, AC-6, AC-7
+  - [x] Errors, a steady caret, and a print preview that does not take focus, covers AC-4, AC-8, AC-10, AC-11
+  - [x] Math placeholders you can click through, covers AC-5, AC-6
+  - [x] Structure keys and the long note check, covers AC-9, AC-8
+  - [x] Editable fonts (source and rendered, shipped with the app), covers AC-12
 - [ ] Verify it: `/check verify rendered page editor`
 - [ ] Test it: `/test rendered page editor`
 
