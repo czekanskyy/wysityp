@@ -27,7 +27,11 @@ export function createAppEditorServices(): EditorServices {
         const path = await api.saveNoteImage(notePath, fileName, [...bytes]);
         return { path };
       } catch (error) {
-        if (textOf(error) === "no folder is open") {
+        const message = textOf(error);
+        if (
+          message === "no folder is open" ||
+          message.startsWith("that file is not open for editing")
+        ) {
           return { error: m.image_needs_note() };
         }
         return { error: m.image_refused() };

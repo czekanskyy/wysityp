@@ -44,6 +44,29 @@ export const commands = {
 	 *  read. The raw strings stay here. Nothing is written and nothing is logged.
 	 */
 	greetingName: () => typedError<string, string>(__TAURI_INVOKE("greeting_name")),
+	/**
+	 *  A draft in the app data `drafts` folder. The tab title stays "Untitled"
+	 *  until Save As moves the file.
+	 */
+	createDraft: () => typedError<PlacedNote, string>(__TAURI_INVOKE("create_draft")),
+	/**  Native file dialog for one `.typ` file, with or without a folder open. */
+	openLooseFile: () => typedError<PlacedNote | null, string>(__TAURI_INVOKE("open_loose_file")),
+	/**  Native Save As. Moves the draft and keeps the bytes. Cancel returns none. */
+	saveDraftAs: (path: string) => typedError<PlacedNote | null, string>(__TAURI_INVOKE("save_draft_as", { path })),
+	/**  Delete an untouched empty draft. Anything that is not a draft is refused. */
+	discardDraft: (path: string) => typedError<null, string>(__TAURI_INVOKE("discard_draft", { path })),
+	listGlobalRecents: () => typedError<string[], string>(__TAURI_INVOKE("list_global_recents")),
+	/**
+	 *  Open tabs Rust stored, plus any draft file still in the drafts folder.
+	 *  A missing file is skipped.
+	 */
+	restoreSession: () => typedError<SessionRestore, string>(__TAURI_INVOKE("restore_session")),
+	/**  Store canonical paths for tabs the gate already allows. Anything else is dropped. */
+	saveSession: (tabs: string[], active: string) => typedError<null, string>(__TAURI_INVOKE("save_session", { tabs, active })),
+	/**  Turn workspace-relative tab keys into absolute paths before the folder changes. */
+	releaseWorkspacePaths: (paths: string[]) => typedError<string[], string>(__TAURI_INVOKE("release_workspace_paths", { paths })),
+	/**  Turn absolute keys that sit in the open folder back into relative paths. */
+	adoptOpenPaths: (paths: string[]) => typedError<string[], string>(__TAURI_INVOKE("adopt_open_paths", { paths })),
 };
 
 /* Types */
@@ -85,6 +108,17 @@ export type NoteImageBytes = {
 	mime: string,
 };
 
+/**
+ *  A note the page may show. `path` is the key later commands must send
+ *  back: a workspace-relative path, or a canonical absolute path.
+ */
+export type PlacedNote = {
+	path: string,
+	text: string,
+	fingerprint: NoteFingerprint,
+	draft: boolean,
+};
+
 export type RenderDiagnostic = {
 	severity: string,
 	file: string,
@@ -105,6 +139,20 @@ export type SearchHit = {
 	path: string,
 	line: number,
 	snippet: string,
+};
+
+/**  One file restored on launch. A template uses `path` as its file name. */
+export type SessionFile = {
+	path: string,
+	text: string,
+	fingerprint: NoteFingerprint,
+	draft: boolean,
+	template: boolean,
+};
+
+export type SessionRestore = {
+	files: SessionFile[],
+	active: string,
 };
 
 /**

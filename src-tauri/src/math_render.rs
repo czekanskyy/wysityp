@@ -12,7 +12,6 @@ use tauri::State;
 
 use crate::AppState;
 use crate::error::AppError;
-use crate::files;
 use crate::typst_engine::{Engine, TinyRender};
 
 const MAX_FORMULAS: usize = 64;
@@ -336,18 +335,19 @@ pub async fn render_math(
     preamble: String,
     formulas: Vec<MathFormula>,
 ) -> Result<Vec<MathSvg>, String> {
-    let root = state
-        .workspace_root
-        .lock()
-        .map_err(|_| "workspace lock was poisoned".to_string())?
-        .clone()
-        .ok_or_else(|| AppError::NoWorkspace.to_string())?;
-    if !path.trim().is_empty() {
-        files::resolve_inside_root(&root, &path).map_err(String::from)?;
-    }
+    let (root, note_path) = if path.trim().is_empty() {
+        (std::env::temp_dir(), "formula.typ".to_string())
+    } else {
+        let gate = state
+            .access
+            .lock()
+            .map_err(|_| "access lock was poisoned".to_string())?;
+        let resolved = gate.resolve(&path).map_err(String::from)?;
+        (resolved.root.clone(), resolved.relative.clone())
+    };
     let engine = state.engine.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        render_math_batch(&engine, &root, &path, &preamble, &formulas)
+        render_math_batch(&engine, &root, &note_path, &preamble, &formulas)
     })
     .await
     .map_err(|err| AppError::Message(err.to_string()).to_string())

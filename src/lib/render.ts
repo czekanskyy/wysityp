@@ -30,6 +30,29 @@ export class RenderGuard {
   }
 }
 
+/** True when two compiled page lists are the same SVG text. */
+export function svgPagesEqual(
+  previous: readonly string[],
+  next: readonly string[],
+): boolean {
+  if (previous.length !== next.length) return false;
+  return previous.every((page, index) => page === next[index]);
+}
+
+export function svgBlobUrl(svg: string): string {
+  return URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+}
+
+/** Resolve once the browser has decoded the image, or if it cannot. */
+export function preloadImage(url: string): Promise<void> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve();
+    image.onerror = () => resolve();
+    image.src = url;
+  });
+}
+
 export function debounce<A extends unknown[]>(
   fn: (...args: A) => void,
   waitMs: number,

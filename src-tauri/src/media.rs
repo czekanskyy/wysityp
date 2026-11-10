@@ -9,7 +9,6 @@ use tauri::State;
 use tauri_plugin_opener::OpenerExt;
 
 use crate::AppState;
-use crate::error::AppError;
 use crate::files;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -25,13 +24,16 @@ pub fn read_note_image(
     path: String,
     image_path: String,
 ) -> Result<NoteImageBytes, String> {
-    let root = state
-        .workspace_root
-        .lock()
-        .map_err(|_| "workspace lock was poisoned".to_string())?
-        .clone()
-        .ok_or_else(|| AppError::NoWorkspace.to_string())?;
-    let (bytes, mime) = files::read_note_image(&root, &path, &image_path).map_err(String::from)?;
+    let (root, note_path) = {
+        let gate = state
+            .access
+            .lock()
+            .map_err(|_| "access lock was poisoned".to_string())?;
+        let resolved = gate.resolve(&path).map_err(String::from)?;
+        (resolved.root.clone(), resolved.relative)
+    };
+    let (bytes, mime) =
+        files::read_note_image(&root, &note_path, &image_path).map_err(String::from)?;
     Ok(NoteImageBytes {
         bytes,
         mime: mime.to_string(),

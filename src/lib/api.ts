@@ -115,4 +115,31 @@ export const api = {
   async greetingName() {
     return unwrap(await commands.greetingName());
   },
+  async createDraft() {
+    return unwrap(await commands.createDraft());
+  },
+  async openLooseFile() {
+    return unwrap(await commands.openLooseFile());
+  },
+  async saveDraftAs(path: string) {
+    return unwrap(await commands.saveDraftAs(path));
+  },
+  async discardDraft(path: string) {
+    return unwrap(await commands.discardDraft(path));
+  },
+  async listGlobalRecents() {
+    return unwrap(await commands.listGlobalRecents());
+  },
+  async restoreSession() {
+    return unwrap(await commands.restoreSession());
+  },
+  async saveSession(tabs: string[], active: string) {
+    return unwrap(await commands.saveSession(tabs, active));
+  },
+  async releaseWorkspacePaths(paths: string[]) {
+    return unwrap(await commands.releaseWorkspacePaths(paths));
+  },
+  async adoptOpenPaths(paths: string[]) {
+    return unwrap(await commands.adoptOpenPaths(paths));
+  },
 };

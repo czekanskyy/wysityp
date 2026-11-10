@@ -124,6 +124,17 @@ export type EditorServices = {
   openLink: (url: string) => Promise<void>;
 };
 
+/**
+ * One mutable bag for every tab. The math cache and the picture cache
+ * live on the single editor, and each tab's state reads this same object.
+ */
+export type EditorShared = {
+  notePath: string;
+  pageColor: NotePageColor;
+  services?: EditorServices;
+  onNotice?: (message: string) => void;
+};
+
 export type EditorOptions = {
   /** Decorations on. Source view passes false and keeps the same buffer. */
   rendered?: boolean;
@@ -132,6 +143,8 @@ export type EditorOptions = {
   pageColor?: NotePageColor;
   services?: EditorServices;
   onNotice?: (message: string) => void;
+  /** When set, tab switches share the cache, the path, and the services. */
+  shared?: EditorShared;
 };
 
 type PageState = {
@@ -846,14 +859,19 @@ function runStructure(key: "Enter" | "Backspace" | "Tab", shift: boolean) {
   };
 }
 
-type LiveEditor = {
-  notePath: string;
-  pageColor: NotePageColor;
-  services?: EditorServices;
-  onNotice?: (message: string) => void;
-};
+type LiveEditor = EditorShared;
 
 function liveFrom(options?: EditorOptions): LiveEditor {
+  if (options?.shared) {
+    if (options.notePath !== undefined)
+      options.shared.notePath = options.notePath;
+    if (options.pageColor !== undefined) {
+      options.shared.pageColor = options.pageColor;
+    }
+    if (options.services) options.shared.services = options.services;
+    if (options.onNotice) options.shared.onNotice = options.onNotice;
+    return options.shared;
+  }
   return {
     notePath: options?.notePath ?? "",
     pageColor: options?.pageColor ?? "white",
@@ -1133,9 +1151,7 @@ export function createEditor(
     () => publishImages(),
   );
 
-  function publishMath() {
-    if (applyingPaint) return;
-    const snap = batcher.snapshot();
+  function paintsFrom(snap: MathSnapshot): Map<string, FormulaPaint> {
     const paints = new Map<string, FormulaPaint>();
     for (const [key, paint] of snap.paints) {
       let url = "";
@@ -1150,9 +1166,17 @@ export function createEditor(
       }
       paints.set(key, { ...paint, url });
     }
+    return paints;
+  }
+
+  function publishMath() {
+    if (applyingPaint) return;
+    const snap = batcher.snapshot();
     applyingPaint = true;
     try {
-      view.dispatch({ effects: setMathEffect.of({ ...snap, paints }) });
+      view.dispatch({
+        effects: setMathEffect.of({ ...snap, paints: paintsFrom(snap) }),
+      });
     } finally {
       applyingPaint = false;
     }
@@ -1299,9 +1323,20 @@ export function createEditor(
     },
     getState: () => view.state,
     setState: (state) => {
+      const snap = batcher.snapshot();
+      const next = state.field(pageField, false)
+        ? state.update({
+            effects: [
+              setMathEffect.of({ ...snap, paints: paintsFrom(snap) }),
+              setImagesEffect.of(imageLoader.snapshot()),
+              setNotePathEffect.of(live.notePath),
+            ],
+          }).state
+        : state;
       withoutNotice(() => {
-        view.setState(state);
+        view.setState(next);
       });
+      collectMath(view.state);
     },
     setRendered: (rendered) => {
       view.dispatch({ effects: setRenderedEffect.of(rendered) });
@@ -1429,13 +1464,9 @@ export function createEditor(
     },
     setNotePath: (path) => {
       live.notePath = path;
-      for (const record of imageLoader.snapshot().values()) {
-        if (record.url) URL.revokeObjectURL(record.url);
-      }
-      imageLoader.clear();
-      view.dispatch({
-        effects: [setNotePathEffect.of(path), setImagesEffect.of(new Map())],
-      });
+      if (!view.state.field(pageField, false)) return;
+      view.dispatch({ effects: setNotePathEffect.of(path) });
+      collectMath(view.state);
     },
     setPageColor: (pageColor) => {
       live.pageColor = pageColor;
