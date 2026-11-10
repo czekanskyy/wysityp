@@ -431,6 +431,18 @@ pub fn set_page_color(state: State<'_, AppState>, page_color: String) -> Result<
     settings::set_page_color(&path, &page_color).map_err(String::from)
 }
 
+/// Write the editor families. The note file is not changed.
+#[tauri::command]
+#[specta::specta]
+pub fn set_fonts(
+    state: State<'_, AppState>,
+    source_font: String,
+    render_font: String,
+) -> Result<Settings, String> {
+    let path = settings_file(&state)?;
+    settings::set_fonts(&path, &source_font, &render_font).map_err(String::from)
+}
+
 /// The spoken greeting word, or an empty string. Never an error on the page.
 ///
 /// A saved `display_name` wins. Otherwise the account display name is

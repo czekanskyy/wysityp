@@ -63,6 +63,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::set_locale,
         commands::set_theme,
         commands::set_page_color,
+        commands::set_fonts,
         commands::greeting_name
     ])
 }

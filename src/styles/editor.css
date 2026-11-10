@@ -1,0 +1,216 @@
+/* The note page. Source view keeps the code-editor chrome from basicSetup. */
+
+.cm-editor {
+  height: 100%;
+  color: var(--page-text);
+  background: transparent;
+  font-family: var(--editor-source-font, "JetBrains Mono", Consolas, monospace);
+}
+
+.cm-editor .cm-scroller {
+  font-family: inherit;
+  line-height: 1.55;
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-editor.cm-rendered {
+  background: var(--page-bg);
+  color: var(--page-text);
+}
+
+.cm-editor.cm-rendered .cm-scroller {
+  line-height: 1.65;
+  background: var(--page-bg);
+}
+
+.cm-editor.cm-rendered .cm-gutters {
+  display: none;
+}
+
+.cm-editor.cm-rendered .cm-activeLine,
+.cm-editor.cm-rendered .cm-activeLineGutter {
+  background: transparent;
+}
+
+.cm-editor.cm-rendered .cm-content {
+  max-width: var(--note-measure);
+  margin-inline: auto;
+  padding: var(--space-8) var(--space-6);
+  caret-color: var(--page-text);
+}
+
+.cm-editor.cm-rendered .cm-line {
+  padding: 0;
+}
+
+.cm-editor.cm-rendered .cm-h1,
+.cm-editor.cm-rendered .cm-h2,
+.cm-editor.cm-rendered .cm-h3,
+.cm-editor.cm-rendered .cm-h4,
+.cm-editor.cm-rendered .cm-h5,
+.cm-editor.cm-rendered .cm-prose,
+.cm-editor.cm-rendered .cm-bullet,
+.cm-editor.cm-rendered .cm-enum,
+.cm-editor.cm-rendered .cm-term,
+.cm-editor.cm-rendered .cm-quote,
+.cm-editor.cm-rendered .cm-em,
+.cm-editor.cm-rendered .cm-strong,
+.cm-editor.cm-rendered .cm-enum-num,
+.cm-editor.cm-rendered .cm-term-label {
+  font-family: var(--editor-render-font, Inter, "Segoe UI", sans-serif);
+}
+
+.cm-editor.cm-rendered .cm-h1 {
+  font-size: 30px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.cm-editor.cm-rendered .cm-h2 {
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.cm-editor.cm-rendered .cm-h3 {
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.cm-editor.cm-rendered .cm-h4 {
+  font-size: 17px;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+.cm-editor.cm-rendered .cm-h5 {
+  font-size: 15px;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+.cm-editor.cm-rendered .cm-prose,
+.cm-editor.cm-rendered .cm-bullet,
+.cm-editor.cm-rendered .cm-enum,
+.cm-editor.cm-rendered .cm-term,
+.cm-editor.cm-rendered .cm-quote {
+  font-size: 17px;
+  line-height: 1.65;
+  font-weight: 400;
+}
+
+.cm-editor.cm-rendered .cm-em {
+  font-style: italic;
+}
+
+.cm-editor.cm-rendered .cm-strong {
+  font-weight: 700;
+}
+
+.cm-editor.cm-rendered .cm-term-label {
+  font-weight: 700;
+}
+
+.cm-editor.cm-rendered .cm-line.cm-quote-line {
+  box-shadow: inset 3px 0 0 var(--color-border-strong);
+  padding-left: var(--space-3);
+}
+
+.cm-editor.cm-rendered .cm-line.cm-depth-1 {
+  padding-left: 1.5rem;
+}
+
+.cm-editor.cm-rendered .cm-line.cm-depth-2 {
+  padding-left: 3rem;
+}
+
+.cm-editor.cm-rendered .cm-line.cm-depth-3 {
+  padding-left: 4.5rem;
+}
+
+.cm-editor.cm-rendered .cm-line.cm-depth-4 {
+  padding-left: 6rem;
+}
+
+.cm-editor.cm-rendered .cm-line.cm-depth-5 {
+  padding-left: 7.5rem;
+}
+
+.cm-editor.cm-rendered .cm-line.cm-depth-6 {
+  padding-left: 9rem;
+}
+
+.cm-editor.cm-rendered .cm-line.cm-depth-7 {
+  padding-left: 10.5rem;
+}
+
+.cm-editor.cm-rendered .cm-line.cm-depth-8 {
+  padding-left: 12rem;
+}
+
+.cm-math-chip,
+.cm-math-block,
+.cm-error-note {
+  font-family: var(--editor-source-font, "JetBrains Mono", Consolas, monospace);
+}
+
+.cm-math-chip,
+.cm-math-block {
+  color: var(--color-math);
+  background: var(--color-math-soft);
+  border-radius: var(--radius-sm);
+}
+
+.cm-math-chip {
+  padding: 0 0.25em;
+}
+
+.cm-math-block {
+  display: block;
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+}
+
+.cm-error-range {
+  text-decoration: underline wavy var(--color-danger);
+  text-decoration-skip-ink: none;
+}
+
+.cm-warning-range {
+  text-decoration: underline wavy var(--color-warning);
+  text-decoration-skip-ink: none;
+}
+
+.cm-error-note {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-danger);
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.cm-quote-attr {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--page-muted);
+  font-family: var(--editor-render-font, Inter, "Segoe UI", sans-serif);
+  font-size: 15px;
+}
+
+.editor-pane.page-mode {
+  background: var(--page-bg);
+  color: var(--page-text);
+}
+
+.editor-pane.page-mode .editor-host {
+  border: none;
+  background: transparent;
+  border-radius: 0;
+}

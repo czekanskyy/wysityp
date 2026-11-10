@@ -5,6 +5,8 @@ export type AppTheme = "system" | "light" | "dark";
 export type StartupAppearance = {
   theme: AppTheme;
   pageColor: NotePageColor;
+  sourceFont: string;
+  renderFont: string;
   error: string;
 };
 

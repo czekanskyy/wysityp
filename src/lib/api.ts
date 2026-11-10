@@ -100,6 +100,9 @@ export const api = {
   async setPageColor(pageColor: string) {
     return unwrap(await commands.setPageColor(pageColor));
   },
+  async setFonts(sourceFont: string, renderFont: string) {
+    return unwrap(await commands.setFonts(sourceFont, renderFont));
+  },
   async greetingName() {
     return unwrap(await commands.greetingName());
   },
