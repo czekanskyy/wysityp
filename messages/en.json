@@ -121,5 +121,11 @@
   "page_oled": "OLED black",
   "page_color_hint": "The page keeps this colour inside a dark window.",
   "appearance_preview": "A short sample on the page.",
-  "appearance_close": "Close"
+  "appearance_close": "Close",
+  "source_font_label": "Source font",
+  "source_font_hint": "Code, math, and text the page has not rendered.",
+  "render_font_label": "Page font",
+  "render_font_hint": "Headings, lists, quotes, and body text.",
+  "font_other": "Other family",
+  "font_other_hint": "A font installed on this computer. The note file is not changed."
 }

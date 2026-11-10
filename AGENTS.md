@@ -12,7 +12,7 @@ The shell is Tauri 2. The page is Svelte 5 and TypeScript, built with Vite (not 
 
 Page packages are installed with Bun. `bun.lock` is committed. Rust versions are pinned in `src-tauri/Cargo.lock`.
 
-Settings are one JSON file in the app config folder, written by Rust. The chosen language is the `locale` field in that file (Polish by default). The interface theme is the `theme` field (`system`, `light`, or `dark`). The note page colour is the `page_color` field (`white`, `beige`, `graphite`, or `oled`). A missing or illegal value is left on disk and read as `system` or `white`.
+Settings are one JSON file in the app config folder, written by Rust. The chosen language is the `locale` field in that file (Polish by default). The interface theme is the `theme` field (`system`, `light`, or `dark`). The note page colour is the `page_color` field (`white`, `beige`, `graphite`, or `oled`). A missing or illegal value is left on disk and read as `system` or `white`. The editor families are `source_font` (default JetBrains Mono) and `render_font` (default Inter). A missing or illegal family is left on disk and read as that default. Those names are never written into a note.
 
 ## Layout
 

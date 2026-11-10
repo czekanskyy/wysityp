@@ -121,5 +121,11 @@
   "page_oled": "Czarny (OLED)",
   "page_color_hint": "Strona zostaje w tym kolorze także przy ciemnym oknie.",
   "appearance_preview": "Krótka próbka na stronie.",
-  "appearance_close": "Zamknij"
+  "appearance_close": "Zamknij",
+  "source_font_label": "Czcionka źródła",
+  "source_font_hint": "Kod, wzory i tekst, którego strona jeszcze nie rysuje.",
+  "render_font_label": "Czcionka strony",
+  "render_font_hint": "Nagłówki, listy, cytaty i tekst akapitu.",
+  "font_other": "Inna rodzina",
+  "font_other_hint": "Czcionka zainstalowana na tym komputerze. Plik notatki się nie zmienia."
 }

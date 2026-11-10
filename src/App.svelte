@@ -8,6 +8,7 @@
     asTheme,
     type StartupAppearance,
   } from "./lib/appearance";
+  import { DEFAULT_RENDER_FONT, DEFAULT_SOURCE_FONT } from "./lib/fonts";
   import {
     createEditor,
     type EditorHandle,
@@ -23,8 +24,6 @@
     savedTextIsCurrent,
     shouldApplySaveResult,
     shouldRunSave,
-    showsRendered,
-    showsSource,
     TEMPLATE_PATH_PREFIX,
     type NoteView,
     type OpenNote,
@@ -57,6 +56,8 @@
     startup = {
       theme: "system",
       pageColor: "white",
+      sourceFont: DEFAULT_SOURCE_FONT,
+      renderFont: DEFAULT_RENDER_FONT,
       error: "",
     },
   }: {
@@ -66,6 +67,8 @@
   let locale = $state<AppLocale>(currentLocale());
   let theme = $state(untrack(() => startup.theme));
   let pageColor = $state(untrack(() => startup.pageColor));
+  let sourceFont = $state(untrack(() => startup.sourceFont));
+  let renderFont = $state(untrack(() => startup.renderFont));
   let pendingStartupError = $state(untrack(() => startup.error));
   let appearanceOpen = $state(false);
   let appearanceTrigger = $state<HTMLElement | null>(null);
@@ -246,6 +249,12 @@
       pageOled: m.page_oled(),
       appearancePreview: m.appearance_preview(),
       appearanceClose: m.appearance_close(),
+      sourceFontLabel: m.source_font_label(),
+      sourceFontHint: m.source_font_hint(),
+      renderFontLabel: m.render_font_label(),
+      renderFontHint: m.render_font_hint(),
+      fontOther: m.font_other(),
+      fontOtherHint: m.font_other_hint(),
     };
   });
 
@@ -505,18 +514,13 @@
 
   function setView(next: NoteView) {
     if (next === viewMode) return;
-    const enteringSource = !showsSource(viewMode) && showsSource(next);
-    if (showsSource(viewMode) && !showsSource(next)) captureEditorPlace();
     viewMode = next;
-    if (!enteringSource) return;
-    queueMicrotask(() => {
-      editor?.restorePlace(heldPlace);
-      if (pendingJump !== null && editor) {
-        editor.setSelection(pendingJump);
-        editor.focus();
-        pendingJump = null;
-      }
-    });
+    editor?.setRendered(next !== "source");
+    if (pendingJump !== null && editor) {
+      editor.setSelection(pendingJump);
+      editor.focus();
+      pendingJump = null;
+    }
   }
 
   async function runRender() {
@@ -526,6 +530,7 @@
     if (template && !rootName) {
       setPages([]);
       diagnostics = [];
+      editor?.setDiagnostics([], "", "", false);
       return;
     }
     const revision = guard.next();
@@ -535,7 +540,13 @@
     try {
       const result = await api.renderNote(path, source, revision);
       if (!guard.isCurrent(result.revision)) return;
-      diagnostics = result.diagnostics;
+      const live = editor?.getText() ?? sourceText;
+      if (live !== source) {
+        editor?.setDiagnostics([], source, path, false);
+      } else {
+        diagnostics = result.diagnostics;
+        editor?.setDiagnostics(result.diagnostics, source, path, true);
+      }
       // A failed draw keeps the last good page on screen.
       if (result.pages.length > 0) setPages(result.pages);
       if (
@@ -570,6 +581,7 @@
     heldPlace = { ...EDITOR_PLACE_START };
     pendingJump = null;
     editor?.setText("");
+    editor?.setDiagnostics([], "", "", false);
     setPages([]);
     diagnostics = [];
   }
@@ -1153,7 +1165,10 @@
   function applyAppearance(saved: Settings) {
     theme = asTheme(saved.theme);
     pageColor = asPageColor(saved.page_color);
+    sourceFont = saved.source_font || DEFAULT_SOURCE_FONT;
+    renderFont = saved.render_font || DEFAULT_RENDER_FONT;
     applyDocumentTheme(theme);
+    editor?.setFonts({ source: sourceFont, render: renderFont });
   }
 
   function appearanceFailed(error: unknown) {
@@ -1172,15 +1187,15 @@
   }
 
   function jumpToDiagnostic(diagnostic: RenderDiagnostic) {
+    if (diagnostic.file !== "" && diagnostic.file !== currentPath) return;
     const source = editor?.getText() ?? sourceText;
     const position = byteOffsetToUtf16(source, diagnostic.start);
-    if (!showsSource(viewMode)) {
+    if (!editor) {
       pendingJump = position;
-      setView("split");
       return;
     }
-    editor?.setSelection(position);
-    editor?.focus();
+    editor.setSelection(position);
+    editor.focus();
   }
 
   function onEditorChange(text: string) {
@@ -1302,13 +1317,18 @@
   });
 
   function editorAttachment(node: HTMLDivElement) {
-    editor = createEditor(node, sourceText, onEditorChange);
+    editor = createEditor(node, sourceText, onEditorChange, {
+      rendered: viewMode !== "source",
+      fonts: { source: sourceFont, render: renderFont },
+    });
     editor.restorePlace(heldPlace);
+    if (pendingJump !== null) {
+      editor.setSelection(pendingJump);
+      editor.focus();
+      pendingJump = null;
+    }
     return () => {
-      if (editor) {
-        heldPlace = editor.getPlace();
-        sourceText = editor.getText();
-      }
+      captureEditorPlace();
       editor?.destroy();
       editor = undefined;
     };
@@ -1676,17 +1696,20 @@
         <div class={["panes", viewMode]}>
           <section
             class="pane editor-pane"
+            class:page-mode={viewMode !== "source"}
+            data-page={pageColor}
             aria-label={labels.editor}
-            hidden={!showsSource(viewMode)}
           >
-            <h2>{labels.editor}</h2>
+            <h2 class:visually-hidden={viewMode !== "source"}>
+              {labels.editor}
+            </h2>
             <div class="editor-host" {@attach editorAttachment}></div>
           </section>
 
           <section
             class="pane preview-pane"
             aria-label={labels.preview}
-            hidden={!showsRendered(viewMode)}
+            hidden={viewMode !== "split"}
           >
             <h2>{labels.preview}</h2>
             <div class="pages">
@@ -1747,6 +1770,14 @@
     beigeLabel={labels.pageBeige}
     graphiteLabel={labels.pageGraphite}
     oledLabel={labels.pageOled}
+    {sourceFont}
+    {renderFont}
+    sourceFontLabel={labels.sourceFontLabel}
+    sourceFontHint={labels.sourceFontHint}
+    renderFontLabel={labels.renderFontLabel}
+    renderFontHint={labels.renderFontHint}
+    fontOtherLabel={labels.fontOther}
+    fontOtherHint={labels.fontOtherHint}
     preview={labels.appearancePreview}
     closeLabel={labels.appearanceClose}
     onClose={closeAppearance}

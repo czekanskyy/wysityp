@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Settings } from "../../bindings";
   import { api } from "../api";
+  import { RENDER_FONT_CHOICES, SOURCE_FONT_CHOICES } from "../fonts";
   import type { NotePageColor } from "./types";
   import Button from "./Button.svelte";
   import SegmentedControl from "./SegmentedControl.svelte";
@@ -29,6 +30,14 @@
     beigeLabel,
     graphiteLabel,
     oledLabel,
+    sourceFont,
+    renderFont,
+    sourceFontLabel,
+    sourceFontHint,
+    renderFontLabel,
+    renderFontHint,
+    fontOtherLabel,
+    fontOtherHint,
     preview,
     closeLabel,
     onClose,
@@ -51,6 +60,14 @@
     beigeLabel: string;
     graphiteLabel: string;
     oledLabel: string;
+    sourceFont: string;
+    renderFont: string;
+    sourceFontLabel: string;
+    sourceFontHint: string;
+    renderFontLabel: string;
+    renderFontHint: string;
+    fontOtherLabel: string;
+    fontOtherHint: string;
     preview: string;
     closeLabel: string;
     onClose: () => void;
@@ -63,6 +80,16 @@
   let pageGroup = $state<HTMLElement | null>(null);
   let busy = $state(false);
   let wasOpen = false;
+  function listed(choices: readonly string[], value: string): boolean {
+    return choices.some((choice) => choice === value);
+  }
+
+  let sourceDraft = $derived(
+    listed(SOURCE_FONT_CHOICES, sourceFont) ? "" : sourceFont,
+  );
+  let renderDraft = $derived(
+    listed(RENDER_FONT_CHOICES, renderFont) ? "" : renderFont,
+  );
 
   const themeOptions = $derived([
     { value: "system", label: systemLabel },
@@ -111,6 +138,41 @@
     } finally {
       busy = false;
     }
+  }
+
+  async function commitFonts(nextSource: string, nextRender: string) {
+    if (busy || (nextSource === sourceFont && nextRender === renderFont))
+      return;
+    busy = true;
+    try {
+      const saved = await api.setFonts(nextSource, nextRender);
+      onSaved(saved);
+    } catch (error) {
+      onFailed(error);
+    } finally {
+      busy = false;
+    }
+  }
+
+  function commitCustom(kind: "source" | "render") {
+    const current = kind === "source" ? sourceFont : renderFont;
+    const choices =
+      kind === "source" ? SOURCE_FONT_CHOICES : RENDER_FONT_CHOICES;
+    const draft = (kind === "source" ? sourceDraft : renderDraft).trim();
+    if (!draft) {
+      const shown = listed(choices, current) ? "" : current;
+      if (kind === "source") sourceDraft = shown;
+      else renderDraft = shown;
+      return;
+    }
+    if (kind === "source") void commitFonts(draft, renderFont);
+    else void commitFonts(sourceFont, draft);
+  }
+
+  function onCustomKey(kind: "source" | "render", event: KeyboardEvent) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    commitCustom(kind);
   }
 
   function requestTheme(next: string): false {
@@ -218,6 +280,78 @@
       <p id="appearance-page-hint" class="appearance-hint text-sm">
         {pageColorHint}
       </p>
+    </div>
+
+    <div
+      class="appearance-fonts"
+      role="radiogroup"
+      aria-label={sourceFontLabel}
+    >
+      <p class="appearance-kicker text-sm" aria-hidden="true">
+        {sourceFontLabel}
+      </p>
+      {#each SOURCE_FONT_CHOICES as choice (choice)}
+        <button
+          type="button"
+          class="font-choice"
+          role="radio"
+          aria-checked={sourceFont === choice}
+          disabled={busy}
+          onclick={() => void commitFonts(choice, renderFont)}
+        >
+          {choice}
+        </button>
+      {/each}
+      <label class="field">
+        <span class="field-label">{fontOtherLabel}</span>
+        <input
+          class="input"
+          value={sourceDraft}
+          disabled={busy}
+          oninput={(event) => {
+            sourceDraft = event.currentTarget.value;
+          }}
+          onblur={() => commitCustom("source")}
+          onkeydown={(event) => onCustomKey("source", event)}
+        />
+      </label>
+      <p class="appearance-hint text-sm">{sourceFontHint}</p>
+    </div>
+
+    <div
+      class="appearance-fonts"
+      role="radiogroup"
+      aria-label={renderFontLabel}
+    >
+      <p class="appearance-kicker text-sm" aria-hidden="true">
+        {renderFontLabel}
+      </p>
+      {#each RENDER_FONT_CHOICES as choice (choice)}
+        <button
+          type="button"
+          class="font-choice"
+          role="radio"
+          aria-checked={renderFont === choice}
+          disabled={busy}
+          onclick={() => void commitFonts(sourceFont, choice)}
+        >
+          {choice}
+        </button>
+      {/each}
+      <label class="field">
+        <span class="field-label">{fontOtherLabel}</span>
+        <input
+          class="input"
+          value={renderDraft}
+          disabled={busy}
+          oninput={(event) => {
+            renderDraft = event.currentTarget.value;
+          }}
+          onblur={() => commitCustom("render")}
+          onkeydown={(event) => onCustomKey("render", event)}
+        />
+      </label>
+      <p class="appearance-hint text-sm">{renderFontHint} {fontOtherHint}</p>
     </div>
 
     <div class="appearance-preview" data-page={pageColor}>
