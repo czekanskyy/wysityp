@@ -1,3 +1,4 @@
+mod access;
 mod commands;
 mod error;
 mod files;
@@ -20,6 +21,8 @@ pub struct AppState {
     pub note_baselines: Mutex<files::NoteBaselines>,
     /// Separate from note baselines so a template and a note can share a file name.
     pub template_baselines: Mutex<templates::TemplateBaselines>,
+    /// Open folder, drafts folder, and files the student picked.
+    pub access: Mutex<access::AccessGate>,
 }
 
 impl AppState {
@@ -30,6 +33,7 @@ impl AppState {
             engine: Arc::new(Engine::new()),
             note_baselines: Mutex::new(files::NoteBaselines::default()),
             template_baselines: Mutex::new(templates::TemplateBaselines::default()),
+            access: Mutex::new(access::AccessGate::new(PathBuf::new())),
         }
     }
 }
@@ -64,7 +68,16 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::set_theme,
         commands::set_page_color,
         commands::set_fonts,
-        commands::greeting_name
+        commands::greeting_name,
+        commands::create_draft,
+        commands::open_loose_file,
+        commands::save_draft_as,
+        commands::discard_draft,
+        commands::list_global_recents,
+        commands::restore_session,
+        commands::save_session,
+        commands::release_workspace_paths,
+        commands::adopt_open_paths
     ])
 }
 
@@ -106,7 +119,14 @@ pub fn run() {
             let _ = settings::load_settings(&settings_file);
             let state = app.state::<AppState>();
             if let Ok(mut slot) = state.settings_file.lock() {
-                *slot = Some(settings_file);
+                *slot = Some(settings_file.clone());
+            }
+            let data_dir = app.path().app_data_dir().unwrap_or(config_dir);
+            let drafts = data_dir.join("drafts");
+            let _ = std::fs::create_dir_all(&drafts);
+            if let Ok(mut gate) = state.access.lock() {
+                gate.set_drafts(drafts);
+                gate.seed_allowed(&settings::stored_loose_paths(&settings_file));
             }
             Ok(())
         })

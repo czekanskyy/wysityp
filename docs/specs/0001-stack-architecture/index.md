@@ -35,7 +35,7 @@ No CodeMirror skill is installed. The search found only skills with a handful of
 | Typst packages | Follow the standard Typst cache, through `typst-kit` pointed at the same default cache the Typst tool uses. A package may be fetched the first time a note imports it while online, then works offline from the cache | Student files stay portable to the plain Typst tool and back. A missing package while offline gives a clear error, never a blank page. |
 | App languages | Paraglide, with Polish and English checked at build time. The chosen language lives in the settings JSON as `locale`, defaults to Polish, and applies at run time | A missing word in either language becomes a build error, and Polish plural rules are handled by the tool. There is no web address in this app for Paraglide to read a language from, and no second store may hold the language. |
 | Styling | Plain CSS, with design tokens held in CSS variables | No extra build tooling, and full control over focus and keyboard states. The design system work fills in token values later. |
-| File access | Rust only. One open command runs the folder picker, resolves the folder to its true form, and stores it in Rust. Rust may then touch that stored folder, the app config folder, and the Typst package cache. The page gets no direct file access and never sends a root folder | Every file action is checked in one place against a root the page cannot widen, which matches the trust promise made to students. Paths that climb out, follow links out, or name an absolute place outside the root are refused, and Typst reads inside a note follow the same rule. |
+| File access | Rust only. The page never touches disk and never decides which paths are allowed. Rust checks every path against the opened folder, the drafts folder, or an in-memory allow list of files the student picked in a native dialog, plus loose paths Rust itself stored. The page never sends a root. Rust may also touch the app config folder and the Typst package cache | Every file action is checked in one place against a set the page cannot widen. Paths that climb out, follow links out, or name a place the student did not pick are refused. A loose note compiles with that file's parent as the Typst root. |
 | Tests | Vitest for TypeScript, the Rust test runner for Rust, and a few full app smoke tests only where a unit test cannot reach | Fast tests a solo builder will actually run, with costly full app tests kept few. |
 | Logging and privacy | A local log file in the app config folder. No usage data ever leaves the machine | The app makes a no tracking promise, and a local log still gives you something to read when a student reports a fault. |
 | Installer shape | An NSIS installer from the Tauri bundler, installed per student with no admin account needed | The common Windows shape students know. Signing and updates are decided in the public release work, not here. |
@@ -77,7 +77,7 @@ This is the path every later editor feature must follow, written plainly as your
 
 - A note file that Typst itself can read must open in WYSITyp, and a file WYSITyp saves must stay readable by Typst and by plain text tools.
 - Rendering never changes the source. Only typing and saving change what is on disk.
-- The page never touches the disk directly. All file work goes through Rust commands with the opened folder checked.
+- The page never touches the disk directly. Rust checks every path against the opened folder, the drafts folder, or the allow list of files the student picked. The page cannot widen that set.
 - No part of the core loop needs a network connection. The only network use in this stack is fetching a Typst package a note imports for the first time, and only while the machine is online.
 - An error from Typst is shown with its place in the source. It is never swallowed into a blank or silently stale page.
 - A render result that arrives after newer typing is dropped by revision number, never painted. A failed render keeps the last good page on screen beside the error.
@@ -94,7 +94,7 @@ The scaffold task that follows this spec is done when all of this holds on Windo
 2. A student can open a folder.
 3. A student can type Typst source in a plain CodeMirror editor.
 4. The rendered page appears as SVG from the Rust Typst engine shortly after typing pauses.
-5. The file saves back to disk inside the opened folder.
+5. The file saves back to disk through Rust, inside the opened folder or at a loose path the student picked.
 6. The type checks, the Vitest tests, and the Rust tests that ship with the scaffold pass.
 7. One sample note with Polish letters and math renders with its glyphs and figures visible in the SVG, with no file read by the page, and a Typst error in that sample after Polish letters marks the right place in the source.
 

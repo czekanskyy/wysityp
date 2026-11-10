@@ -161,4 +161,15 @@ describe("createAutosaveTimer", () => {
     vi.advanceTimersByTime(AUTOSAVE_WAIT_MS);
     expect(run).not.toHaveBeenCalled();
   });
+
+  it("take returns the latest ticket immediately and does not fire later", () => {
+    const timer = createAutosaveTimer(AUTOSAVE_WAIT_MS);
+    const run = vi.fn();
+    timer.schedule(ticket({ text: "a", revision: 1 }), run);
+    timer.schedule(ticket({ text: "ab", revision: 2 }), run);
+    expect(timer.take()).toEqual(ticket({ text: "ab", revision: 2 }));
+    vi.advanceTimersByTime(AUTOSAVE_WAIT_MS);
+    expect(run).not.toHaveBeenCalled();
+    expect(timer.take()).toBeUndefined();
+  });
 });

@@ -257,7 +257,7 @@ fn write_unsaved_note(root: &Path, parent: &str, text: &str) -> AppResult<Note> 
     Err(AppError::NoteNamesExhausted)
 }
 
-fn blank_heading(locale: &str) -> &'static str {
+pub(crate) fn blank_heading(locale: &str) -> &'static str {
     if locale == "en" {
         "= Title\n"
     } else {
