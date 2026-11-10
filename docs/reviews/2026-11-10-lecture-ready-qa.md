@@ -70,3 +70,32 @@ Save As moved the draft, then a save that still named `untitled.typ` failed and 
 | After Save As, confirm the new file on disk once before relying on it. The follow-up save is fixed here and was not re-checked on screen. | High until this build is the one running | If a toast names `drafts\untitled.typ`, select all, copy, close the tab, and open the file you just saved with Ctrl+O. Keep typing in that tab. |
 | Caret inside a list item still shows the source marker (`-` or `+`). | Low | Click the next paragraph. |
 | Sidebar repeats "Notatki, które otworzysz, pojawią się tutaj." while no folder is open. | Low | Use the three welcome actions. |
+
+## Round 3
+
+Drove the window on port 1430 (`bun run tauri dev`, 1420 was already taken). The port edits were not committed. Scratch notes lived under the system temp directory and were removed. The owner's settings file was restored to the snapshot taken before the session. The OneDrive lecture folder was not opened. Its two `.typ` files kept the timestamps from before this pass (`lecture.typ` 2026-11-09 12:25:54, `unsaved.typ` 2026-11-10 02:44:48). Another WYSITyp process was already running, so the kill test targeted this pass's process id rather than every `wysityp.exe`.
+
+| Check | Result |
+| --- | --- |
+| 1. Save As, then more typing | Pass. Ctrl+N, type, Ctrl+S into the scratch folder. The file on disk gained `aftersave`, `morewords`, and a later `STILLSAVES`. No error toast. The Save As dialog opened on the lecture folder; the path was set to the scratch file before Zapisz, and the replace prompt for `unsaved.typ` was declined. |
+| 2. Folder, three tabs, switch, undo, close | Pass. Ctrl+Shift+O on the scratch folder. Three notes each received one word. After two seconds each file held only its own word. Undo in one tab left the other files unchanged and dropped the undone word. Ctrl+W after `LASTALPHA` left that word on disk and removed the tab. |
+| 3. Kill after two seconds, then restart | Pass. `KILLSENTENCE` was on disk after the process was killed. Restart restored the tabs, and the open note showed that sentence. |
+| 4. Ctrl+O a note outside the folder | Pass. The outside file gained `OUTSIDEWORD` from autosave. |
+| 5. Export PDF into the scratch folder | Pass. `b-beta.pdf` is 9090 bytes and starts with `%PDF`. The toast said the PDF was exported. |
+| 6. Source, split, page, and a Typst error | Pass. The same sentence was visible in page, source, and split. `#foo(` (the editor closed it to `#foo()`) drew a red squiggle on the page. Split view said `unknown variable: foo`. Deleting the line changed that pane to "Typst nie zgłasza uwag." |
+| Paste a PNG | Not reached. |
+| Light theme and a white page | Not reached. |
+| English | Not reached. |
+
+### What was fixed
+
+Nothing. The Save As follow-up save from round 2 held, and the other data paths held. No code change in this round.
+
+### Still open
+
+| Issue | Severity | In a lecture |
+| --- | --- | --- |
+| Save As and the folder picker open on the last folder. This time that was the OneDrive lecture folder, with `lecture.typ` and `unsaved.typ` in the list. | High if Zapisz or Wybierz folder is clicked there | Type the notes folder into the address bar and press Enter before confirming. Do not click a `.typ` that is already in the list. |
+| Opening the scratch folder once showed "Inne narzędzie zmieniło tę notatkę na dysku. Autozapis jest wstrzymany…". A later sentence still reached that file. | Low | If the banner stays, select all and copy before more typing, then confirm the file on disk. |
+| Caret inside a list item still shows the source marker (`-` or `+`). Not retested this round. | Low | Click the next paragraph. |
+| Sidebar repeats "Notatki, które otworzysz, pojawią się tutaj." while no folder is open. It was still on the cold window. | Low | Use the three welcome actions. |
