@@ -75,6 +75,29 @@ export function shouldRunSave(
   return true;
 }
 
+/** The tab a disk check started on. `id` is the tab, `epoch` is its generation. */
+export type DiskCheckTarget = {
+  id: number;
+  epoch: number;
+  path: string;
+};
+
+/**
+ * A disk check started against one open note. Save As moves a draft and
+ * bumps its epoch, so a result for the old path must not mark the tab.
+ */
+export function diskCheckStillOpen(
+  started: DiskCheckTarget,
+  current: DiskCheckTarget | null,
+): boolean {
+  if (!current) return false;
+  return (
+    current.id === started.id &&
+    current.epoch === started.epoch &&
+    current.path === started.path
+  );
+}
+
 /** Ignore a save result that belongs to an older request or another note. */
 export function shouldApplySaveResult(
   open: OpenNote | null,

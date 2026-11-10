@@ -284,7 +284,13 @@ pub fn move_draft_file(from: &Path, dest: &Path) -> AppResult<PathBuf> {
         Ok(()) => {}
         Err(_) => {
             std::fs::copy(&from, &dest).map_err(|err| AppError::io(&dest, err))?;
-            std::fs::remove_file(&from).map_err(|err| AppError::io(&from, err))?;
+            // The copy landed. A missing source means another save already
+            // moved it; the destination still holds the note.
+            match std::fs::remove_file(&from) {
+                Ok(()) => {}
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                Err(err) => return Err(AppError::io(&from, err)),
+            }
         }
     }
     if let Some((assets, dest_assets)) = assets_move

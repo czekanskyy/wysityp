@@ -41,6 +41,7 @@ import { applyLocale, currentLocale, type AppLocale } from "../locale";
 import {
   AUTOSAVE_WAIT_MS,
   createAutosaveTimer,
+  diskCheckStillOpen,
   isExternalChange,
   savedTextIsCurrent,
   shouldApplySaveResult,
@@ -155,6 +156,8 @@ export class Session {
   private started = false;
   private nextId = 0;
   private saveSerial = 0;
+  /** True while the native Save As dialog is open, so blur cannot write the draft. */
+  private draftDialog = false;
   private saveChain: Promise<void> = Promise.resolve();
   private gate: Promise<void> = Promise.resolve();
   private pendingJump: number | null = null;
@@ -1046,10 +1049,12 @@ export class Session {
   }
 
   onWindowFocus(): Promise<void> {
+    if (this.draftDialog) return Promise.resolve();
     return this.checkExternalChange();
   }
 
   onWindowBlur(): void {
+    if (this.draftDialog) return;
     this.snapshotActive();
     const tab = this.active;
     if (!tab || tab.conflict || tab.savePhase === "saved") return;
@@ -1857,19 +1862,31 @@ export class Session {
   private async saveDraftAs(id: number): Promise<void> {
     const tab = this.tabById(id);
     if (!tab || tab.kind !== "draft") return;
+    // The dialog blurs the window. A blur save would keep writing the draft
+    // after the file has moved, then mark this tab failed.
+    this.autosave.cancel();
+    await this.saveChain;
+    this.draftDialog = true;
     try {
       const placed = await api.saveDraftAs(tab.key);
       if (!placed) return;
       const kind: TabKind = placed.draft ? "draft" : "note";
+      const current = this.tabById(id);
       this.patch(id, {
         kind,
         key: placed.path,
         title: tabTitle(kind, placed.path, this.labels.untitled),
+        epoch: (current?.epoch ?? tab.epoch) + 1,
+        conflict: false,
+        reloadArmed: false,
+        saveFailed: false,
       });
       const live = this.editor?.getText() ?? placed.text;
       if (live !== placed.text && this.activeId === id) {
         this.patch(id, { text: live, dirty: true, savePhase: "unsaved" });
-        this.scheduleAutosave();
+        this.applyEditorChrome();
+        const ticket = this.ticketFor(this.tabById(id));
+        if (ticket) await this.enqueueSave(ticket, "auto");
       } else {
         this.patch(id, {
           text: placed.text,
@@ -1878,6 +1895,7 @@ export class Session {
           conflict: false,
           saveFailed: false,
         });
+        this.applyEditorChrome();
       }
       if (!placed.draft) await this.refreshRecents();
       if (this.rootName) await this.refreshTree();
@@ -1885,6 +1903,8 @@ export class Session {
       await this.runRender();
     } catch (error) {
       this.status = this.commandStatus(error, this.labels.actionFailed);
+    } finally {
+      this.draftDialog = false;
     }
   }
 
@@ -2111,19 +2131,25 @@ export class Session {
   private async checkExternalChange(): Promise<void> {
     const tab = this.active;
     if (!tab || tab.conflict || tab.savePhase === "saving") return;
-    const epoch = tab.epoch;
-    const key = tab.key;
+    const started = {
+      id: tab.id,
+      epoch: tab.epoch,
+      path: sessionToken(tab),
+    };
     const kind = tab.kind;
     try {
       const changed =
         kind === "template"
-          ? await api.templateChangedOnDisk(key)
-          : await api.noteChangedOnDisk(key);
+          ? await api.templateChangedOnDisk(tab.key)
+          : await api.noteChangedOnDisk(tab.key);
       const current = this.active;
       if (
         !current ||
-        current.id !== tab.id ||
-        current.epoch !== epoch ||
+        !diskCheckStillOpen(started, {
+          id: current.id,
+          epoch: current.epoch,
+          path: sessionToken(current),
+        }) ||
         current.conflict ||
         current.savePhase === "saving"
       ) {
@@ -2135,7 +2161,16 @@ export class Session {
       }
     } catch (error) {
       const current = this.active;
-      if (!current || current.id !== tab.id || current.epoch !== epoch) return;
+      if (
+        !current ||
+        !diskCheckStillOpen(started, {
+          id: current.id,
+          epoch: current.epoch,
+          path: sessionToken(current),
+        })
+      ) {
+        return;
+      }
       if (isExternalChange(error)) {
         this.patch(current.id, { conflict: true, reloadArmed: false });
         this.autosave.cancel();

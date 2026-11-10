@@ -6,6 +6,7 @@ import {
   isExternalChange,
   openIdentityPath,
   savedTextIsCurrent,
+  diskCheckStillOpen,
   shouldApplySaveResult,
   shouldRunSave,
   showsRendered,
@@ -54,6 +55,27 @@ describe("openIdentityPath", () => {
   });
 });
 
+describe("diskCheckStillOpen", () => {
+  const started = {
+    id: 4,
+    epoch: 1,
+    path: "C:/AppData/Roaming/app.wysityp/drafts/untitled.typ",
+  };
+
+  // covers: Save As moves the draft, then a focus check must not fail that tab
+  it("drops a check from before Save As moved the draft", () => {
+    expect(diskCheckStillOpen(started, { ...started })).toBe(true);
+    expect(
+      diskCheckStillOpen(started, {
+        ...started,
+        epoch: 2,
+        path: "C:/Temp/analiza-draft.typ",
+      }),
+    ).toBe(false);
+    expect(diskCheckStillOpen(started, null)).toBe(false);
+  });
+});
+
 describe("shouldRunSave", () => {
   // covers: feature 9, a stale autosave must not write the note that is open now
   it("refuses a ticket for a note that is no longer open", () => {
@@ -78,6 +100,28 @@ describe("shouldRunSave", () => {
     expect(shouldRunSave(null, ticket(), false, "unsaved", "manual")).toBe(
       false,
     );
+    const moved: OpenNote = {
+      id: 1,
+      path: "C:/Temp/analiza-draft.typ",
+      revision: 3,
+    };
+    expect(
+      shouldRunSave(
+        moved,
+        ticket({ path: "C:/drafts/untitled.typ" }),
+        false,
+        "unsaved",
+        "auto",
+      ),
+    ).toBe(false);
+    expect(
+      shouldApplySaveResult(
+        moved,
+        ticket({ path: "C:/drafts/untitled.typ" }),
+        1,
+        1,
+      ),
+    ).toBe(false);
   });
 
   it("lets autosave run only for the current unsaved revision, and pauses it on a conflict", () => {
