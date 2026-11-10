@@ -121,5 +121,15 @@
   "page_oled": "OLED black",
   "page_color_hint": "The page keeps this colour inside a dark window.",
   "appearance_preview": "A short sample on the page.",
-  "appearance_close": "Close"
+  "appearance_close": "Close",
+  "untitled": "Untitled",
+  "blank_note": "Blank note",
+  "open_note": "Open note",
+  "open_folder_short": "Open folder",
+  "new_note_hint": "Enter confirms. Escape cancels.",
+  "welcome_recent": "Recent",
+  "tab_close": "Close tab",
+  "sidebar_collapse": "Hide sidebar",
+  "sidebar_expand": "Show sidebar",
+  "draft_names_exhausted": "No free name for a draft."
 }

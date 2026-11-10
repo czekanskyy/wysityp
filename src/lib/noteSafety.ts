@@ -1,5 +1,5 @@
 /** How long typing must pause before the note is written. */
-export const AUTOSAVE_WAIT_MS = 750;
+export const AUTOSAVE_WAIT_MS = 1000;
 
 export type SavePhase = "saved" | "saving" | "unsaved";
 
@@ -128,6 +128,18 @@ export function createAutosaveTimer(waitMs: number) {
       timer = undefined;
       pending = undefined;
       pendingRun = undefined;
+    },
+    /**
+     * Drop the wait and hand back the latest ticket, if typing is still
+     * unsaved. The caller writes it. A later timer does not also fire.
+     */
+    take(): SaveTicket | undefined {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = undefined;
+      const current = pending;
+      pending = undefined;
+      pendingRun = undefined;
+      return current;
     },
   };
 }

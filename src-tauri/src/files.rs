@@ -107,7 +107,7 @@ pub fn resolve_inside_root(root: &Path, relative: &str) -> AppResult<PathBuf> {
     Ok(true_existing.join(tail))
 }
 
-fn display_relative(path: &str) -> String {
+pub(crate) fn display_relative(path: &str) -> String {
     path.trim()
         .replace('\\', "/")
         .trim_end_matches('/')
@@ -1087,6 +1087,66 @@ impl NoteBaselines {
             .retain(|key, _| key != &path && !key.starts_with(&prefix));
     }
 
+    /// Drop workspace-relative keys and keep loose files, which are stored
+    /// under their canonical absolute path.
+    pub fn forget_relative(&mut self) {
+        self.by_path.retain(|key, _| Path::new(key).is_absolute());
+    }
+
+    /// True when the file at `file` is not the bytes last read or written
+    /// under `key`. Used for a loose note whose path is not inside the
+    /// open folder.
+    pub fn changed_at(&self, key: &str, file: &Path) -> AppResult<bool> {
+        let key = display_relative(key);
+        let Some(expected) = self.by_path.get(&key) else {
+            return Ok(true);
+        };
+        match std::fs::read(file) {
+            Ok(bytes) => Ok(&fingerprint_bytes(&bytes) != expected),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(true),
+            Err(err) => Err(AppError::io(file, err)),
+        }
+    }
+
+    /// Write `text` to an already checked file. The caller resolved `file`.
+    /// A refused save leaves the file untouched.
+    pub fn save_at(
+        &mut self,
+        key: &str,
+        file: &Path,
+        text: &str,
+        force: bool,
+    ) -> AppResult<NoteFingerprint> {
+        let key = display_relative(key);
+        if !force {
+            let Some(expected) = self.by_path.get(&key).cloned() else {
+                return Err(AppError::ExternalChange);
+            };
+            let current = match std::fs::read(file) {
+                Ok(bytes) => fingerprint_bytes(&bytes),
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                    return Err(AppError::ExternalChange);
+                }
+                Err(err) => return Err(AppError::io(file, err)),
+            };
+            if current != expected {
+                return Err(AppError::ExternalChange);
+            }
+        }
+        if let Ok(meta) = std::fs::symlink_metadata(file)
+            && meta.file_type().is_symlink()
+        {
+            return Err(AppError::OutsideRoot(key));
+        }
+        if let Some(parent) = file.parent() {
+            std::fs::create_dir_all(parent).map_err(|err| AppError::io(parent, err))?;
+        }
+        write_atomically(file, text.as_bytes())?;
+        let fingerprint = fingerprint_bytes(text.as_bytes());
+        self.by_path.insert(key, fingerprint.clone());
+        Ok(fingerprint)
+    }
+
     /// Keep the record when a note or folder moves to a new path.
     pub fn retarget(&mut self, from: &str, to: &str) {
         let from = display_relative(from);
@@ -1932,5 +1992,24 @@ mod tests {
             read_note(dir.path(), "term/lecture.typ").unwrap().text,
             text
         );
+    }
+
+    #[test]
+    fn save_at_refuses_a_file_this_process_did_not_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("loose.typ");
+        std::fs::write(&file, "disk\n").unwrap();
+        let mut baselines = NoteBaselines::default();
+        let key = canonical_key(&file).unwrap();
+        assert!(baselines.save_at(&key, &file, "mine\n", false).is_err());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "disk\n");
+        baselines.remember(&key, fingerprint_of(b"disk\n"));
+        let saved = baselines.save_at(&key, &file, "mine\n", false).unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "mine\n");
+        assert_eq!(saved, fingerprint_of(b"mine\n"));
+        std::fs::write(&file, "other\n").unwrap();
+        assert!(baselines.changed_at(&key, &file).unwrap());
+        assert!(baselines.save_at(&key, &file, "mine\n", false).is_err());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "other\n");
     }
 }

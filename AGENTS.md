@@ -51,7 +51,7 @@ Rust is not formatted or linted by those page tools. `bun run rust:fmt` applies 
 These come from spec 0001 and the scaffold. Later features keep them.
 
 - Typst source is the truth. The note on disk is a plain Typst file. Rendering never changes that source.
-- The page never touches disk. All file work is checked in Rust against the stored root (the folder the student opened). The page does not send that root.
+- The page never touches disk and never chooses what is allowed. Rust checks every path against the opened folder, the drafts folder, or an in-memory allow list of files the student picked in a native dialog (plus loose paths Rust itself stored). The page does not send a root.
 - The app language lives only in the settings JSON, under `locale`. Do not store it anywhere else.
 - Theme and page colour live only in that same settings file. `system` leaves `data-theme` off `html`, so the window follows the system setting. A PDF export does not read `page_color`.
 - Every app string exists in both `messages/pl.json` and `messages/en.json`.

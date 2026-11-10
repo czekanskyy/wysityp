@@ -19,6 +19,10 @@ export interface EditorHandle {
   setSelection(position: number): void;
   focus(): void;
   destroy(): void;
+  /** Tab snapshots. editorTabs.ts is the caller. */
+  getState(): EditorState;
+  setState(state: EditorState): void;
+  freshState(text: string): EditorState;
 }
 
 export function createEditor(
@@ -27,31 +31,32 @@ export function createEditor(
   onChange: (text: string) => void,
 ): EditorHandle {
   let notifying = true;
+  const extensions = [
+    basicSetup,
+    lineNumbers(),
+    highlightActiveLine(),
+    EditorView.lineWrapping,
+    EditorView.updateListener.of((update) => {
+      if (update.docChanged && notifying) {
+        onChange(update.state.doc.toString());
+      }
+    }),
+    EditorView.theme({
+      "&": { height: "100%", fontSize: "14px" },
+      ".cm-scroller": {
+        fontFamily: "Consolas, 'Cascadia Mono', monospace",
+        lineHeight: "1.55",
+      },
+      ".cm-content": { padding: "16px 0" },
+      "&.cm-focused": { outline: "none" },
+    }),
+    keymap.of([]),
+  ];
   const view = new EditorView({
     parent,
     state: EditorState.create({
       doc: initial,
-      extensions: [
-        basicSetup,
-        lineNumbers(),
-        highlightActiveLine(),
-        EditorView.lineWrapping,
-        EditorView.updateListener.of((update) => {
-          if (update.docChanged && notifying) {
-            onChange(update.state.doc.toString());
-          }
-        }),
-        EditorView.theme({
-          "&": { height: "100%", fontSize: "14px" },
-          ".cm-scroller": {
-            fontFamily: "Consolas, 'Cascadia Mono', monospace",
-            lineHeight: "1.55",
-          },
-          ".cm-content": { padding: "16px 0" },
-          "&.cm-focused": { outline: "none" },
-        }),
-        keymap.of([]),
-      ],
+      extensions,
     }),
   });
 
@@ -99,5 +104,13 @@ export function createEditor(
     },
     focus: () => view.focus(),
     destroy: () => view.destroy(),
+    // Kept at the end so a later editor rewrite can replace this block.
+    getState: () => view.state,
+    setState: (state: EditorState) => {
+      notifying = false;
+      view.setState(state);
+      notifying = true;
+    },
+    freshState: (text: string) => EditorState.create({ doc: text, extensions }),
   };
 }

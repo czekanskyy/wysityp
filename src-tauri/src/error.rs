@@ -12,6 +12,10 @@ pub enum AppError {
     NoWorkspace,
     #[error("path stays outside the open folder: {0}")]
     OutsideRoot(String),
+    /// The page named a file that was not picked, is not a draft, and is
+    /// not inside the open folder.
+    #[error("that file is not open for editing: {0}")]
+    NotAllowed(String),
     #[error("a file or folder already has that name: {0}")]
     AlreadyExists(String),
     #[error("that name is not allowed: {0}")]

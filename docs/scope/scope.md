@@ -28,6 +28,7 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 20 | Working editor chrome | Release 1 | planned |
 | 21 | Command palette and shortcut sheet | Release 1 | planned |
 | 22 | Search screen | Release 1 | planned |
+| 23 | Tabs, loose notes and welcome page | Release 1 | in-progress |
 | 13 | Smart suggestions for Typst and math | Release 2 | planned |
 | 14 | Visual geometry and diagrams | Release 3 | planned |
 | 15 | Markdown import | Release 4 | planned |
@@ -185,6 +186,13 @@ Reach the actions the app already has from the keyboard, through a command palet
 Restyle search to match the export. Search still finds text inside notes, with the path, line, and snippet it already returns. Replace, and a separate search of folder names or file names, wait.
 **Done when:** a student can search note text and open a hit from a screen that matches the export, in both languages and both themes, and replace is not offered.
 - [ ] Design it (spec): `/architect search screen`
+
+### 23. Tabs, loose notes and welcome page · in-progress
+Several notes stay open in a tab strip. A note can be a draft or a file the student picked outside the open folder. The welcome page is the three start actions and the last few notes.
+**Done when:** a student can open several notes, switch without losing the caret or undo, start a draft with no folder, save that draft with Save As, and see the same tabs after a restart. The welcome page shows when no tab is open.
+**Spec:** [0007. Tabs, loose notes and welcome page](../specs/0007-tabs-loose-notes-welcome/index.md)
+**Code:** `src/App.svelte`, `src/lib/state/session.svelte.ts`, `src/lib/shell/`, `src/lib/tabs.ts`, `src/lib/editorTabs.ts`, `src/lib/noteSafety.ts`, `src-tauri/src/access.rs`, `src-tauri/src/commands.rs`, `src-tauri/src/settings.rs`
+- [x] Build it: `/develop tabs, loose notes and welcome page`
 
 ## Release 2: Faster typing
 

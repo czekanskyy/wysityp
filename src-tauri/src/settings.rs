@@ -649,6 +649,205 @@ fn is_typ_file(path: &Path) -> bool {
     path.is_file() && path.extension().is_some_and(|ext| ext == "typ")
 }
 
+const GLOBAL_RECENT_KEY: &str = "recent_files";
+const SESSION_KEY: &str = "session";
+
+fn string_list(value: Option<&Value>) -> Vec<String> {
+    let Some(Value::Array(entries)) = value else {
+        return Vec::new();
+    };
+    entries
+        .iter()
+        .filter_map(|entry| entry.as_str().map(str::to_string))
+        .collect()
+}
+
+fn strings_value(paths: &[String]) -> Value {
+    Value::Array(paths.iter().cloned().map(Value::String).collect())
+}
+
+fn same_stored_path(left: &str, right: &str) -> bool {
+    left.eq_ignore_ascii_case(right)
+}
+
+/// Remember one loose or workspace note in the global list. Newest first,
+/// capped at [`RECENT_LIMIT`]. Only `recent_files` changes.
+pub fn record_global_recent(settings_path: &Path, file: &Path) -> AppResult<()> {
+    if !file.is_file() {
+        return Err(AppError::InvalidName(file.to_string_lossy().to_string()));
+    }
+    let key = files::canonical_key(file)?;
+    let mut stored = load_file(settings_path)?;
+    let mut paths = string_list(stored.object.get(GLOBAL_RECENT_KEY));
+    paths.retain(|path| !same_stored_path(path, &key));
+    paths.insert(0, key);
+    paths.truncate(RECENT_LIMIT);
+    let _ = stored
+        .object
+        .insert(GLOBAL_RECENT_KEY.to_string(), strings_value(&paths));
+    save_file(settings_path, &stored)
+}
+
+/// Global recent notes, newest first. Missing files are dropped.
+/// A value that is not a list is left on disk and reads as empty.
+pub fn list_global_recent(settings_path: &Path) -> AppResult<Vec<String>> {
+    let mut stored = load_file(settings_path)?;
+    let Some(value) = stored.object.get(GLOBAL_RECENT_KEY) else {
+        return Ok(Vec::new());
+    };
+    if !value.is_array() {
+        return Ok(Vec::new());
+    }
+    let mut kept = Vec::new();
+    for path in string_list(Some(value)) {
+        let file = PathBuf::from(&path);
+        if !is_typ_file(&file) {
+            continue;
+        }
+        let Ok(key) = files::canonical_key(&file) else {
+            continue;
+        };
+        if kept
+            .iter()
+            .any(|item: &String| same_stored_path(item, &key))
+        {
+            continue;
+        }
+        kept.push(key);
+        if kept.len() == RECENT_LIMIT {
+            break;
+        }
+    }
+    let original = string_list(stored.object.get(GLOBAL_RECENT_KEY));
+    if original != kept {
+        let _ = stored
+            .object
+            .insert(GLOBAL_RECENT_KEY.to_string(), strings_value(&kept));
+        let _ = save_file(settings_path, &stored);
+    }
+    Ok(kept)
+}
+
+/// Paths Rust stored, used to seed the allow list. A broken file yields nothing.
+pub fn stored_loose_paths(settings_path: &Path) -> Vec<String> {
+    let Ok(stored) = load_file(settings_path) else {
+        return Vec::new();
+    };
+    let mut paths = string_list(stored.object.get(GLOBAL_RECENT_KEY));
+    if let Some(session) = stored.object.get(SESSION_KEY).and_then(Value::as_object) {
+        paths.extend(string_list(session.get("tabs")));
+    }
+    paths
+}
+
+pub fn read_session(settings_path: &Path) -> (Vec<String>, String) {
+    let Ok(stored) = load_file(settings_path) else {
+        return (Vec::new(), String::new());
+    };
+    let Some(session) = stored.object.get(SESSION_KEY).and_then(Value::as_object) else {
+        return (Vec::new(), String::new());
+    };
+    let tabs = string_list(session.get("tabs"));
+    let active = session
+        .get("active")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    (tabs, active)
+}
+
+/// Write `session` only. Other settings stay as they were.
+pub fn write_session(settings_path: &Path, tabs: &[String], active: &str) -> AppResult<()> {
+    let mut stored = load_file(settings_path)?;
+    let mut session = Map::new();
+    let _ = session.insert("tabs".to_string(), strings_value(tabs));
+    let _ = session.insert("active".to_string(), Value::String(active.to_string()));
+    let _ = stored
+        .object
+        .insert(SESSION_KEY.to_string(), Value::Object(session));
+    save_file(settings_path, &stored)
+}
+
+/// Follow a rename in the global list and in the stored tabs.
+pub fn retarget_stored_paths(settings_path: &Path, from: &Path, to: &Path) -> AppResult<()> {
+    let from_key = match files::canonical_key(from) {
+        Ok(key) => key,
+        Err(_) => from.to_string_lossy().replace('\\', "/"),
+    };
+    let to_key = match files::canonical_key(to) {
+        Ok(key) => key,
+        Err(_) => to.to_string_lossy().replace('\\', "/"),
+    };
+    let mut stored = load_file(settings_path)?;
+    let mut changed = false;
+    if let Some(paths) = retarget_path_list(
+        &string_list(stored.object.get(GLOBAL_RECENT_KEY)),
+        &from_key,
+        &to_key,
+    ) {
+        let _ = stored
+            .object
+            .insert(GLOBAL_RECENT_KEY.to_string(), strings_value(&paths));
+        changed = true;
+    }
+    if let Some(session) = stored.object.get(SESSION_KEY).cloned()
+        && let Some(object) = session.as_object()
+    {
+        let tabs = string_list(object.get("tabs"));
+        let active = object
+            .get("active")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let next_tabs = retarget_path_list(&tabs, &from_key, &to_key);
+        let next_active = retarget_one(&active, &from_key, &to_key);
+        if next_tabs.is_some() || next_active.is_some() {
+            let mut session = object.clone();
+            if let Some(tabs) = next_tabs {
+                let _ = session.insert("tabs".to_string(), strings_value(&tabs));
+            }
+            if let Some(active) = next_active {
+                let _ = session.insert("active".to_string(), Value::String(active));
+            }
+            let _ = stored
+                .object
+                .insert(SESSION_KEY.to_string(), Value::Object(session));
+            changed = true;
+        }
+    }
+    if changed {
+        save_file(settings_path, &stored)?;
+    }
+    Ok(())
+}
+
+fn retarget_one(path: &str, from: &str, to: &str) -> Option<String> {
+    if path.eq_ignore_ascii_case(from) {
+        return Some(to.to_string());
+    }
+    let rest = strip_prefix_ignore_ascii_case(path, from)?;
+    if rest.starts_with('/') || rest.starts_with('\\') {
+        return Some(format!("{to}{rest}"));
+    }
+    None
+}
+
+fn retarget_path_list(paths: &[String], from: &str, to: &str) -> Option<Vec<String>> {
+    let mut changed = false;
+    let next = paths
+        .iter()
+        .map(|path| {
+            if let Some(updated) = retarget_one(path, from, to) {
+                changed = true;
+                updated
+            } else {
+                path.clone()
+            }
+        })
+        .collect();
+    if changed { Some(next) } else { None }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1605,5 +1804,43 @@ mod tests {
         assert_eq!(loaded.page_color, "white");
         assert_eq!(loaded.locale, "pl");
         assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+    }
+
+    #[test]
+    fn global_recents_and_session_keep_other_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let note = dir.path().join("lecture.typ");
+        std::fs::write(&note, "= lecture\n").unwrap();
+        std::fs::write(&path, "{\"locale\":\"en\",\"display_name\":\"Ada\"}\n").unwrap();
+        record_global_recent(&path, &note).unwrap();
+        let listed = list_global_recent(&path).unwrap();
+        assert_eq!(listed.len(), 1);
+        assert!(listed[0].ends_with("lecture.typ"));
+        write_session(&path, &listed, &listed[0]).unwrap();
+        let file = read_settings(&path);
+        assert_eq!(file["locale"], "en");
+        assert_eq!(file["display_name"], "Ada");
+        assert!(file["recent_files"].is_array());
+        assert_eq!(file["session"]["active"], listed[0]);
+        let (tabs, active) = read_session(&path);
+        assert_eq!(tabs, listed);
+        assert_eq!(active, listed[0]);
+        let missing = dir.path().join("gone.typ");
+        let mut paths = listed.clone();
+        paths.push(missing.to_string_lossy().replace('\\', "/"));
+        let _ = file;
+        // A missing path is dropped. The display name stays.
+        std::fs::write(
+            &path,
+            format!(
+                "{{\"locale\":\"en\",\"display_name\":\"Ada\",\"recent_files\":{}}}\n",
+                serde_json::to_string(&paths).unwrap()
+            ),
+        )
+        .unwrap();
+        let cleaned = list_global_recent(&path).unwrap();
+        assert_eq!(cleaned, listed);
+        assert_eq!(read_settings(&path)["display_name"], "Ada");
     }
 }
