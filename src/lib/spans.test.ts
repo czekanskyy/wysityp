@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  bareLinks,
   caretMoveReplacesRanges,
   classifySpans,
   editorDiagnostics,
   flattenRanges,
+  isOpenableUrl,
+  linkAt,
   mathArrowTarget,
   planDecorations,
   rangesOverlapEachOther,
@@ -455,5 +458,66 @@ describe("long note window", () => {
       expect(span.to).toBeLessThanOrEqual(result.windowTo);
     }
     expect(result.spans.some((span) => span.from < 10)).toBe(false);
+  });
+});
+
+describe("code, images, and links", () => {
+  it("draws inline code and a fenced block", () => {
+    const inline = spanOf("Wynik `x` jest.", "raw");
+    expect(inline.block).toBe(false);
+    expect(inline.marker).toBe("`");
+    const fenced = "```rust\nlet x = 1\n```\n";
+    const block = spanOf(fenced, "raw");
+    expect(block.block).toBe(true);
+    expect(block.marker).toBe("rust");
+    const plan = rendered(fenced);
+    const marks = flattenRanges(plan).filter((range) => range.kind === "mark");
+    expect(marks.some((range) => range.className.includes("cm-raw"))).toBe(
+      true,
+    );
+    expect(plan.points.some((point) => point.text === "rust")).toBe(true);
+    expect(spanShownAsSource(block, fenced, [], [])).toBe(false);
+  });
+
+  it("shows an image path and keeps a table as source", () => {
+    const source = '#image("lecture.assets/slide.png")\n';
+    const image = spanOf(source, "image");
+    expect(image.block).toBe(true);
+    expect(image.marker).toBe("lecture.assets/slide.png");
+    const plan = rendered(source);
+    const replaced = flattenRanges(plan).find(
+      (range) =>
+        range.kind === "replace" && range.className.includes("cm-image"),
+    );
+    expect(replaced && replaced.kind === "replace" ? replaced.text : "").toBe(
+      "lecture.assets/slide.png",
+    );
+    const table = "#table(\n  columns: (1fr),\n  [a],\n)\n";
+    expect(kinds(table)).not.toContain("image");
+    expect(kinds('Zobacz #image("a.png") tu.')).toContain("image");
+  });
+
+  it("draws a link call and a bare url", () => {
+    const source = '#link("https://example.com/a")[wzór]\n';
+    const link = spanOf(source, "link");
+    expect(link.marker).toBe("https://example.com/a");
+    const plan = rendered(source);
+    const marked = flattenRanges(plan).find(
+      (range) => range.kind === "mark" && range.className === "cm-link",
+    );
+    expect(marked ? source.slice(marked.from, marked.to) : "").toBe("wzór");
+    const bare = "Zobacz https://example.com/b.\n";
+    expect(
+      bareLinks(bare, classifySpans(bare, 0, bare.length).spans)[0]?.url,
+    ).toBe("https://example.com/b");
+    expect(
+      linkAt(
+        source,
+        classifySpans(source, 0, source.length).spans,
+        link.from + 8,
+      ),
+    ).toBe("https://example.com/a");
+    expect(isOpenableUrl("javascript:alert(1)")).toBe(false);
+    expect(isOpenableUrl("mailto:a@b.c")).toBe(true);
   });
 });

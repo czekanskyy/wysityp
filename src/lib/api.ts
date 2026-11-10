@@ -1,4 +1,4 @@
-import { commands } from "../bindings";
+import { commands, type MathFormula } from "../bindings";
 
 type SpectaResult<T> =
   { status: "ok"; data: T } | { status: "error"; error: string };
@@ -87,6 +87,15 @@ export const api = {
   },
   async exportPdf(path: string, source: string) {
     return unwrap(await commands.exportPdf(path, source));
+  },
+  async renderMath(path: string, preamble: string, formulas: MathFormula[]) {
+    return unwrap(await commands.renderMath(path, preamble, formulas));
+  },
+  async readNoteImage(path: string, imagePath: string) {
+    return unwrap(await commands.readNoteImage(path, imagePath));
+  },
+  async openLink(url: string) {
+    return unwrap(await commands.openLink(url));
   },
   async getSettings() {
     return unwrap(await commands.getSettings());

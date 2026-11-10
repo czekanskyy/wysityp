@@ -177,6 +177,85 @@
   padding: var(--space-2) var(--space-3);
 }
 
+.cm-math-formula {
+  display: inline-block;
+  line-height: 0;
+  vertical-align: baseline;
+}
+
+.cm-math-formula img {
+  display: inline-block;
+}
+
+.cm-math-formula-block {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-2) 0;
+}
+
+.cm-math-preview {
+  display: block;
+  margin: 0.15em 0 0.35em;
+  padding: 0.2em 0.4em;
+  background: var(--page-code-bg);
+  border-radius: var(--radius-sm);
+  line-height: 0;
+}
+
+.cm-math-preview-error {
+  line-height: 1.4;
+  font-family: var(--editor-source-font, "JetBrains Mono", Consolas, monospace);
+  font-size: 0.85em;
+  color: var(--color-danger);
+  white-space: pre-wrap;
+}
+
+.cm-image,
+.cm-raw,
+.cm-raw-lang {
+  font-family: var(--editor-source-font, "JetBrains Mono", Consolas, monospace);
+}
+
+.cm-image,
+.cm-raw {
+  background: var(--page-code-bg);
+  border-radius: var(--radius-sm);
+}
+
+.cm-raw {
+  padding: 0 0.15em;
+}
+
+.cm-raw-block {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  white-space: pre-wrap;
+}
+
+.cm-editor.cm-rendered .cm-line.cm-raw-line {
+  font-family: var(--editor-source-font, "JetBrains Mono", Consolas, monospace);
+  background: var(--page-code-bg);
+}
+
+.cm-raw-lang {
+  font-size: 0.75em;
+  opacity: 0.7;
+  margin-right: 0.4em;
+}
+
+.cm-image-frame img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.cm-link {
+  color: var(--page-math);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  cursor: pointer;
+}
+
 .cm-error-range {
   text-decoration: underline wavy var(--color-danger);
   text-decoration-skip-ink: none;

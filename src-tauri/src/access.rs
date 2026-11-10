@@ -271,6 +271,15 @@ pub fn move_draft_file(from: &Path, dest: &Path) -> AppResult<PathBuf> {
     if canonical_file(&dest).ok().as_ref() == Some(&from) {
         return Ok(from);
     }
+    let assets_move = kept_assets_move(&from, &dest);
+    if let Some((assets, dest_assets)) = &assets_move
+        && dest_assets.exists()
+        && canonical_file(dest_assets).ok() != canonical_file(assets).ok()
+    {
+        return Err(AppError::AlreadyExists(
+            dest_assets.to_string_lossy().to_string(),
+        ));
+    }
     match std::fs::rename(&from, &dest) {
         Ok(()) => {}
         Err(_) => {
@@ -278,7 +287,53 @@ pub fn move_draft_file(from: &Path, dest: &Path) -> AppResult<PathBuf> {
             std::fs::remove_file(&from).map_err(|err| AppError::io(&from, err))?;
         }
     }
+    if let Some((assets, dest_assets)) = assets_move
+        && assets.is_dir()
+    {
+        move_dir(&assets, &dest_assets)?;
+    }
     canonical_file(&dest)
+}
+
+/// The assets folder keeps the draft's stem, so `#image("untitled.assets/…")`
+/// still resolves after Save As renames the note.
+fn kept_assets_move(from_note: &Path, dest_note: &Path) -> Option<(PathBuf, PathBuf)> {
+    let stem = from_note.file_stem()?.to_str()?;
+    let name = format!("{stem}.assets");
+    Some((
+        from_note.parent()?.join(&name),
+        dest_note.parent()?.join(name),
+    ))
+}
+
+fn move_dir(from: &Path, dest: &Path) -> AppResult<()> {
+    if canonical_file(from).ok().as_ref() == canonical_file(dest).ok().as_ref() {
+        return Ok(());
+    }
+    match std::fs::rename(from, dest) {
+        Ok(()) => Ok(()),
+        Err(_) => {
+            copy_dir(from, dest)?;
+            std::fs::remove_dir_all(from).map_err(|err| AppError::io(from, err))
+        }
+    }
+}
+
+fn copy_dir(from: &Path, dest: &Path) -> AppResult<()> {
+    std::fs::create_dir_all(dest).map_err(|err| AppError::io(dest, err))?;
+    for entry in std::fs::read_dir(from).map_err(|err| AppError::io(from, err))? {
+        let entry = entry.map_err(|err| AppError::io(from, err))?;
+        let target = dest.join(entry.file_name());
+        let kind = entry
+            .file_type()
+            .map_err(|err| AppError::io(entry.path(), err))?;
+        if kind.is_dir() {
+            copy_dir(&entry.path(), &target)?;
+        } else {
+            std::fs::copy(entry.path(), &target).map_err(|err| AppError::io(&target, err))?;
+        }
+    }
+    Ok(())
 }
 
 /// Delete a draft the student never wrote in. A note, a picked file, and a
@@ -422,6 +477,40 @@ mod tests {
 
         let never = write_typ(dest_dir.path(), "other.typ", "= no\n");
         assert!(gate.resolve(&never.to_string_lossy()).is_err());
+    }
+
+    #[test]
+    fn a_draft_picture_moves_with_save_as_and_keeps_its_folder_name() {
+        let drafts = tempfile::tempdir().unwrap();
+        let dest_dir = tempfile::tempdir().unwrap();
+        let mut gate = AccessGate::new(drafts.path().to_path_buf());
+        let placed = create_draft_file(drafts.path(), "pl").unwrap();
+        let resolved = gate.resolve(&placed.path).unwrap();
+        let saved = files::save_note_image(
+            &resolved.root,
+            &resolved.relative,
+            "slide.png",
+            b"png-bytes",
+        )
+        .unwrap();
+        assert_eq!(saved, "untitled.assets/slide.png");
+        let dest = dest_dir.path().join("lecture.typ");
+        let moved = move_draft_file(&resolved.file, &dest).unwrap();
+        assert!(!drafts.path().join("untitled.assets").exists());
+        assert_eq!(
+            std::fs::read(dest_dir.path().join("untitled.assets").join("slide.png")).unwrap(),
+            b"png-bytes"
+        );
+        gate.allow_file(&moved).unwrap();
+        let saved_note = gate.resolve(&moved.to_string_lossy()).unwrap();
+        let (bytes, mime) = files::read_note_image(
+            &saved_note.root,
+            &saved_note.relative,
+            "untitled.assets/slide.png",
+        )
+        .unwrap();
+        assert_eq!(bytes, b"png-bytes");
+        assert_eq!(mime, "image/png");
     }
 
     #[test]
