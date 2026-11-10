@@ -1118,9 +1118,15 @@ export class Session {
       void getCurrentWindow()
         .onCloseRequested(async (event) => {
           event.preventDefault();
+          // Rust closes the window by itself after a short wait, so a hang
+          // or a failure here can never keep the window open for good.
           const ok = await this.run(() => this.settleAll());
-          if (!ok) return;
-          await this.writeSession();
+          if (!ok) {
+            // A save failed: keep the window open until the student decides.
+            await api.holdClose().catch(() => undefined);
+            return;
+          }
+          await this.writeSession().catch(() => undefined);
           await getCurrentWindow().destroy();
         })
         .then((fn) => {

@@ -142,4 +142,7 @@ export const api = {
   async adoptOpenPaths(paths: string[]) {
     return unwrap(await commands.adoptOpenPaths(paths));
   },
+  async holdClose() {
+    await commands.holdClose();
+  },
 };
