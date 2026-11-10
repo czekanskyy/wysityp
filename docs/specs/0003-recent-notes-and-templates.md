@@ -7,6 +7,8 @@
 
 Your recent notes and the three ready made templates live in small, plain places you can inspect. Recent notes sit in the same settings file as your language, with one short list for each folder you open. Templates are Typst text held in the app itself, and using one writes a new plain Typst file in your folder and never writes over a note that is already there.
 
+Spec 0006 replaces the template home and the template note names below. Recent notes in this spec stay as written.
+
 ## Context
 
 Feature 10 shipped on an assumed decision recorded by `/develop`, because scope feature 3 (the data model) is still planned and no home for recents or templates had been chosen. The build put recents in the settings JSON and templates in Rust strings. One part of that build is wrong for real use: the settings file holds one list for one folder, so opening a second folder and a note there wipes the first folder list. A student with a folder per subject loses a list by visiting another subject. The rest of the assumption has held up in review: the file loads when the field is missing, the language field is untouched by recency, and a broken settings file must not stop a note from opening.

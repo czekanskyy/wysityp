@@ -1,0 +1,6 @@
+= Example title
+
+== Problem
+
+== Solution
+

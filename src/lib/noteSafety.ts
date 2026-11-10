@@ -18,6 +18,21 @@ export type SaveTicket = OpenNote & {
   text: string;
 };
 
+/** Prefix that tells a template save from a note save. */
+export const TEMPLATE_PATH_PREFIX = "template:";
+
+/**
+ * The path that names what is open, for a note or a template. A template has
+ * no note path, so it is named `template:<file>`. The open note and every save
+ * ticket must use this one rule, or `shouldRunSave` refuses the save.
+ */
+export function openIdentityPath(
+  currentPath: string,
+  openTemplate: string,
+): string {
+  return openTemplate ? `${TEMPLATE_PATH_PREFIX}${openTemplate}` : currentPath;
+}
+
 export type EditorPlace = {
   anchor: number;
   head: number;

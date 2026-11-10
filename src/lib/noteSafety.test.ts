@@ -4,6 +4,7 @@ import {
   AUTOSAVE_WAIT_MS,
   createAutosaveTimer,
   isExternalChange,
+  openIdentityPath,
   savedTextIsCurrent,
   shouldApplySaveResult,
   shouldRunSave,
@@ -27,6 +28,29 @@ describe("note views", () => {
     expect(showsRendered("rendered")).toBe(true);
     expect(showsSource("split")).toBe(true);
     expect(showsRendered("split")).toBe(true);
+  });
+});
+
+describe("openIdentityPath", () => {
+  // covers: spec 0006 AC-8, a template save must pass the same check as a note save
+  it("names an open template the same way for the open item and its ticket", () => {
+    const path = openIdentityPath("", "alpha.typ");
+    expect(path).toBe("template:alpha.typ");
+    const templateOpen: OpenNote = { id: 4, path, revision: 2 };
+    const templateTicket = ticket({
+      id: 4,
+      path: openIdentityPath("", "alpha.typ"),
+      revision: 2,
+    });
+    for (const origin of ["auto", "manual", "force"] as const) {
+      expect(
+        shouldRunSave(templateOpen, templateTicket, false, "unsaved", origin),
+      ).toBe(true);
+    }
+  });
+
+  it("uses the note path when no template is open", () => {
+    expect(openIdentityPath("notes/one.typ", "")).toBe("notes/one.typ");
   });
 });
 

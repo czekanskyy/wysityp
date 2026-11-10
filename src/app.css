@@ -200,7 +200,8 @@ input:focus-visible {
   min-width: 0;
 }
 
-.start-block h2 {
+.start-block h2,
+.start-block h3 {
   margin: 0;
 }
 

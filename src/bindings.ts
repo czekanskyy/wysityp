@@ -15,7 +15,13 @@ export const commands = {
 	searchNotes: (query: string) => typedError<SearchHit[], string>(__TAURI_INVOKE("search_notes", { query })),
 	listRecentNotes: () => typedError<string[], string>(__TAURI_INVOKE("list_recent_notes")),
 	openNote: (path: string) => typedError<Note, string>(__TAURI_INVOKE("open_note", { path })),
-	createFromTemplate: (parent: string, template: string) => typedError<Note, string>(__TAURI_INVOKE("create_from_template", { parent, template })),
+	createFromTemplate: (parent: string, kind: string, name: string) => typedError<Note, string>(__TAURI_INVOKE("create_from_template", { parent, kind, name })),
+	listTemplates: () => typedError<TemplateList, string>(__TAURI_INVOKE("list_templates")),
+	copyShippedTemplate: (name: string) => typedError<TemplateDoc, string>(__TAURI_INVOKE("copy_shipped_template", { name })),
+	openTemplate: (name: string) => typedError<TemplateDoc, string>(__TAURI_INVOKE("open_template", { name })),
+	saveTemplate: (name: string, text: string, force: boolean) => typedError<TemplateDoc, string>(__TAURI_INVOKE("save_template", { name, text, force })),
+	templateChangedOnDisk: (name: string) => typedError<boolean, string>(__TAURI_INVOKE("template_changed_on_disk", { name })),
+	saveNoteImage: (path: string, fileName: string, bytes: number[]) => typedError<string, string>(__TAURI_INVOKE("save_note_image", { path, fileName, bytes })),
 	createSampleNote: () => typedError<Note, string>(__TAURI_INVOKE("create_sample_note")),
 	saveNote: (path: string, text: string, force: boolean) => typedError<NoteFingerprint, string>(__TAURI_INVOKE("save_note", { path, text, force })),
 	/**  Compare the open note with the bytes on disk. Does not change the baseline. */
@@ -83,6 +89,23 @@ export type Settings = {
 	locale: string,
 	theme: string,
 	page_color: string,
+};
+
+/**  One template open in the editor. `name` is the file name, including `.typ`. */
+export type TemplateDoc = {
+	name: string,
+	text: string,
+	fingerprint: NoteFingerprint,
+};
+
+/**
+ *  Shipped stems for one language, your `.typ` file names, and whether
+ *  the templates folder could be used.
+ */
+export type TemplateList = {
+	shipped: string[],
+	yours: string[],
+	folder_ready: boolean,
 };
 
 /**  One folder or note in the open workspace, as it sits on disk. */

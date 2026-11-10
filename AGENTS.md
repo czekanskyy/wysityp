@@ -2,13 +2,17 @@
 
 WYSITyp (What You See Is Typst) is a Windows desktop app for lecture notes. You type on a page that renders as you type. Every note stays a plain Typst file on your own disk. The app is free under the MIT licence, works offline, and speaks Polish and English.
 
+## Build approach
+
+Skateboard (the thinnest usable whole first, then grow it piece by piece).
+
 ## Stack
 
 The shell is Tauri 2. The page is Svelte 5 and TypeScript, built with Vite (not SvelteKit). Rust lives in one crate under `src-tauri/`: files, the Typst engine, settings, errors, and the commands the page calls. The page talks to Rust through Tauri commands. Shared types are generated with `tauri-specta` into `src/bindings.ts`.
 
 Page packages are installed with Bun. `bun.lock` is committed. Rust versions are pinned in `src-tauri/Cargo.lock`.
 
-Settings are one JSON file in the app config folder, written by Rust. The chosen language is the `locale` field in that file (Polish by default).
+Settings are one JSON file in the app config folder, written by Rust. The chosen language is the `locale` field in that file (Polish by default). The interface theme is the `theme` field (`system`, `light`, or `dark`). The note page colour is the `page_color` field (`white`, `beige`, `graphite`, or `oled`). A missing or illegal value is left on disk and read as `system` or `white`.
 
 ## Layout
 
@@ -49,6 +53,7 @@ These come from spec 0001 and the scaffold. Later features keep them.
 - Typst source is the truth. The note on disk is a plain Typst file. Rendering never changes that source.
 - The page never touches disk. All file work is checked in Rust against the stored root (the folder the student opened). The page does not send that root.
 - The app language lives only in the settings JSON, under `locale`. Do not store it anywhere else.
+- Theme and page colour live only in that same settings file. `system` leaves `data-theme` off `html`, so the window follows the system setting. A PDF export does not read `page_color`.
 - Every app string exists in both `messages/pl.json` and `messages/en.json`.
 - Do not hand edit `src/bindings.ts` or `src/paraglide/`.
 - No tracking. The app is offline first. The only network use in this stack is fetching a Typst package the first time a note imports it, and only while online.

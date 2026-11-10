@@ -19,11 +19,13 @@
     createAutosaveTimer,
     EDITOR_PLACE_START,
     isExternalChange,
+    openIdentityPath,
     savedTextIsCurrent,
     shouldApplySaveResult,
     shouldRunSave,
     showsRendered,
     showsSource,
+    TEMPLATE_PATH_PREFIX,
     type NoteView,
     type OpenNote,
     type SaveOrigin,
@@ -76,6 +78,10 @@
   let renameValue = $state("");
   let pendingDelete = $state("");
   let currentPath = $state("");
+  let openTemplate = $state("");
+  let shippedStems = $state<string[]>([]);
+  let yourTemplates = $state<string[]>([]);
+  let templateFolderReady = $state(true);
   let pageUrls = $state<string[]>([]);
   let diagnostics = $state<RenderDiagnostic[]>([]);
   let status = $state("");
@@ -195,14 +201,28 @@
       templateLecture: m.template_lecture(),
       templateProblemSet: m.template_problem_set(),
       templateLab: m.template_lab(),
+      templateDefinitions: m.template_definitions(),
+      templateProof: m.template_proof(),
+      templateExample: m.template_example(),
+      templateReview: m.template_review(),
+      templateReading: m.template_reading(),
+      templateProject: m.template_project(),
+      templateFormulas: m.template_formulas(),
+      templateGroupShipped: m.template_group_shipped(),
+      templateGroupYours: m.template_group_yours(),
+      templateFolderUnavailable: m.template_folder_unavailable(),
+      templateNamesExhausted: m.template_names_exhausted(),
+      noteNamesExhausted: m.note_names_exhausted(),
+      imageRefused: m.image_refused(),
+      pdfNeedsNote: m.pdf_needs_note(),
+      templateStartNote: m.template_start_note(),
+      templateMakeCopy: m.template_make_copy(),
+      templateEditFile: m.template_edit_file(),
       templateCreated: m.template_created(),
       templateFailed: m.template_failed(),
       closeNote: m.close_note(),
       notesHeading: m.notes_heading(),
       rowMenu: m.row_menu(),
-      templateLectureBody: m.template_lecture_body(),
-      templateProblemBody: m.template_problem_set_body(),
-      templateLabBody: m.template_lab_body(),
       phrases: [
         m.greeting_0(),
         m.greeting_1(),
@@ -235,26 +255,11 @@
     pendingStartupError = "";
   });
 
-  const templateChoices = $derived([
-    {
-      id: "lecture",
-      label: labels.templateLecture,
-      file: "lecture.typ",
-      description: labels.templateLectureBody,
-    },
-    {
-      id: "problem-set",
-      label: labels.templateProblemSet,
-      file: "problem-set.typ",
-      description: labels.templateProblemBody,
-    },
-    {
-      id: "lab",
-      label: labels.templateLab,
-      file: "lab.typ",
-      description: labels.templateLabBody,
-    },
-  ]);
+  const documentTitle = $derived.by(() => {
+    void locale;
+    if (openTemplate) return m.template_editing({ name: openTemplate });
+    return currentPath;
+  });
 
   const viewOptions = $derived([
     { value: "source", label: labels.viewSource },
@@ -279,7 +284,7 @@
       : (Array.from(labels.appName)[0] ?? ""),
   );
   const noteDirty = $derived(
-    currentPath !== "" &&
+    (currentPath !== "" || openTemplate !== "") &&
       (conflict || savePhase === "saving" || savePhase === "unsaved"),
   );
   const saveStateLabel = $derived(
@@ -292,7 +297,7 @@
           : labels.saveStateSaved,
   );
   const footerSave = $derived(
-    currentPath ? saveStateLabel : labels.saveStateSaved,
+    currentPath || openTemplate ? saveStateLabel : labels.saveStateSaved,
   );
 
   const hasError = $derived(diagnostics.some((d) => d.severity === "error"));
@@ -302,8 +307,54 @@
   }
 
   function currentOpen(): OpenNote | null {
+    if (openTemplate) {
+      return {
+        id: noteEpoch,
+        path: openIdentityPath(currentPath, openTemplate),
+        revision: noteRevision,
+      };
+    }
     if (!currentPath) return null;
     return { id: noteEpoch, path: currentPath, revision: noteRevision };
+  }
+
+  function commandStatus(error: unknown, fallback: string): string {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith("note-names-exhausted:")) {
+      return labels.noteNamesExhausted;
+    }
+    if (message.startsWith("template-names-exhausted:")) {
+      return labels.templateNamesExhausted;
+    }
+    if (message.startsWith("image-refused:")) return labels.imageRefused;
+    return `${fallback}: ${message}`;
+  }
+
+  function shippedTitle(stem: string): string {
+    switch (stem) {
+      case "lecture":
+        return labels.templateLecture;
+      case "problem-set":
+        return labels.templateProblemSet;
+      case "lab":
+        return labels.templateLab;
+      case "definitions":
+        return labels.templateDefinitions;
+      case "proof":
+        return labels.templateProof;
+      case "example":
+        return labels.templateExample;
+      case "review":
+        return labels.templateReview;
+      case "reading":
+        return labels.templateReading;
+      case "project":
+        return labels.templateProject;
+      case "formulas":
+        return labels.templateFormulas;
+      default:
+        return stem;
+    }
   }
 
   function currentTicket(): SaveTicket {
@@ -311,14 +362,14 @@
     sourceText = text;
     return {
       id: noteEpoch,
-      path: currentPath,
+      path: openIdentityPath(currentPath, openTemplate),
       revision: noteRevision,
       text,
     };
   }
 
   function scheduleAutosave() {
-    if (conflict || !currentPath) return;
+    if (conflict || (!currentPath && !openTemplate)) return;
     const ticket = currentTicket();
     autosave.schedule(ticket, (pending) => {
       void enqueueSave(pending, "auto");
@@ -341,7 +392,15 @@
     const phaseBefore = savePhase;
     savePhase = "saving";
     try {
-      await api.saveNote(ticket.path, ticket.text, origin === "force");
+      if (ticket.path.startsWith(TEMPLATE_PATH_PREFIX)) {
+        await api.saveTemplate(
+          ticket.path.slice(TEMPLATE_PATH_PREFIX.length),
+          ticket.text,
+          origin === "force",
+        );
+      } else {
+        await api.saveNote(ticket.path, ticket.text, origin === "force");
+      }
       const openNow = currentOpen();
       if (
         !shouldApplySaveResult(openNow, ticket, serial, saveSerial) ||
@@ -382,7 +441,7 @@
   }
 
   async function settleBeforeLeave(): Promise<boolean> {
-    if (!currentPath) return true;
+    if (!currentPath && !openTemplate) return true;
     if (leaveApproved) {
       leaveApproved = false;
       autosave.cancel();
@@ -414,10 +473,28 @@
     autosave.cancel();
     savePhase = "saved";
     currentPath = note.path;
+    openTemplate = "";
     sourceText = note.text;
     heldPlace = { ...EDITOR_PLACE_START };
     pendingJump = null;
     editor?.setText(note.text);
+  }
+
+  function applyLoadedTemplate(doc: { name: string; text: string }) {
+    noteEpoch += 1;
+    noteRevision = 0;
+    conflict = false;
+    reloadArmed = false;
+    saveFailed = false;
+    leaveApproved = false;
+    autosave.cancel();
+    savePhase = "saved";
+    currentPath = "";
+    openTemplate = doc.name;
+    sourceText = doc.text;
+    heldPlace = { ...EDITOR_PLACE_START };
+    pendingJump = null;
+    editor?.setText(doc.text);
   }
 
   function captureEditorPlace() {
@@ -443,10 +520,17 @@
   }
 
   async function runRender() {
-    if (!currentPath) return;
+    const template = openTemplate;
+    const notePath = currentPath;
+    if (!template && !notePath) return;
+    if (template && !rootName) {
+      setPages([]);
+      diagnostics = [];
+      return;
+    }
     const revision = guard.next();
     const source = editor?.getText() ?? sourceText;
-    const path = currentPath;
+    const path = template ? "" : notePath;
     rendering = true;
     try {
       const result = await api.renderNote(path, source, revision);
@@ -481,6 +565,7 @@
     autosave.cancel();
     savePhase = "saved";
     currentPath = "";
+    openTemplate = "";
     sourceText = "";
     heldPlace = { ...EDITOR_PLACE_START };
     pendingJump = null;
@@ -530,6 +615,7 @@
   async function openFolder() {
     const left = await settleBeforeLeave();
     if (!left) return;
+    const staying = openTemplate;
     try {
       const picked = await api.openWorkspace();
       if (!picked) return;
@@ -544,7 +630,13 @@
       pendingDelete = "";
       namingFolder = false;
       entryName = "";
-      clearOpenNote();
+      if (staying) {
+        setPages([]);
+        diagnostics = [];
+        await runRender();
+      } else {
+        clearOpenNote();
+      }
       await refreshTree();
       status = tree.length === 0 ? labels.clickNote : labels.workspaceReady;
     } catch (error) {
@@ -604,13 +696,13 @@
     }
   }
 
-  async function createFromTemplate(template: string) {
+  async function createFromTemplate(kind: string, name: string) {
     if (!rootName || templatePending) return;
     const left = await settleBeforeLeave();
     if (!left) return;
     templatePending = true;
     try {
-      const note = await api.createFromTemplate(selectedFolder, template);
+      const note = await api.createFromTemplate(selectedFolder, kind, name);
       if (!(await settleBeforeLeave())) return;
       await refreshTree();
       setPages([]);
@@ -619,9 +711,59 @@
       await runRender();
       status = `${labels.templateCreated}: ${note.path}`;
     } catch (error) {
-      status = `${labels.templateFailed}: ${String(error)}`;
+      status = commandStatus(error, labels.templateFailed);
     } finally {
       templatePending = false;
+    }
+  }
+
+  async function copyShippedTemplate(stem: string) {
+    if (templatePending) return;
+    const left = await settleBeforeLeave();
+    if (!left) return;
+    templatePending = true;
+    try {
+      const doc = await api.copyShippedTemplate(stem);
+      setPages([]);
+      diagnostics = [];
+      applyLoadedTemplate(doc);
+      await refreshTemplates();
+      await runRender();
+      status = "";
+    } catch (error) {
+      status = commandStatus(error, labels.templateFailed);
+    } finally {
+      templatePending = false;
+    }
+  }
+
+  async function editYourTemplate(name: string) {
+    if (templatePending) return;
+    const left = await settleBeforeLeave();
+    if (!left) return;
+    templatePending = true;
+    try {
+      const doc = await api.openTemplate(name);
+      setPages([]);
+      diagnostics = [];
+      applyLoadedTemplate(doc);
+      await runRender();
+      status = "";
+    } catch (error) {
+      status = `${labels.openFailed}: ${String(error)}`;
+    } finally {
+      templatePending = false;
+    }
+  }
+
+  async function refreshTemplates() {
+    try {
+      const list = await api.listTemplates();
+      shippedStems = list.shipped;
+      yourTemplates = list.yours;
+      templateFolderReady = list.folder_ready;
+    } catch (error) {
+      status = `${labels.templateFailed}: ${String(error)}`;
     }
   }
 
@@ -655,7 +797,7 @@
       applyLoadedNote(note);
       await runRender();
     } catch (error) {
-      status = `${labels.actionFailed}: ${String(error)}`;
+      status = commandStatus(error, labels.actionFailed);
     }
   }
 
@@ -692,7 +834,7 @@
   }
 
   async function closeNote() {
-    if (!currentPath) return;
+    if (!currentPath && !openTemplate) return;
     const left = await settleBeforeLeave();
     if (!left) return;
     clearOpenNote();
@@ -731,7 +873,13 @@
         return folder;
       });
       await refreshTree();
-      if (wasOpen && currentPath) await runRender();
+      if (wasOpen && currentPath) {
+        const note = await api.openNote(currentPath);
+        setPages([]);
+        diagnostics = [];
+        applyLoadedNote(note);
+        await runRender();
+      }
     } catch (error) {
       status = `${labels.actionFailed}: ${String(error)}`;
     }
@@ -832,7 +980,7 @@
   }
 
   async function saveNote() {
-    if (!currentPath) return;
+    if (!currentPath && !openTemplate) return;
     autosave.cancel();
     await enqueueSave(currentTicket(), "manual");
   }
@@ -846,6 +994,24 @@
   }
 
   async function reloadFromDisk() {
+    if (openTemplate) {
+      const name = openTemplate;
+      const epoch = noteEpoch;
+      autosave.cancel();
+      await saveChain;
+      if (epoch !== noteEpoch || openTemplate !== name) return;
+      try {
+        const doc = await api.openTemplate(name);
+        if (epoch !== noteEpoch || openTemplate !== name) return;
+        setPages([]);
+        diagnostics = [];
+        applyLoadedTemplate(doc);
+        await runRender();
+      } catch (error) {
+        status = `${labels.openFailed}: ${String(error)}`;
+      }
+      return;
+    }
     if (!currentPath) return;
     const path = currentPath;
     const epoch = noteEpoch;
@@ -865,13 +1031,44 @@
   }
 
   async function overwriteFromEditor() {
-    if (!currentPath) return;
+    if (!currentPath && !openTemplate) return;
     autosave.cancel();
     await enqueueSave(currentTicket(), "force");
   }
 
   async function onWindowFocus() {
-    if (!currentPath || conflict || phaseNow() === "saving") return;
+    if (conflict || phaseNow() === "saving") return;
+    if (openTemplate) {
+      const name = openTemplate;
+      const epoch = noteEpoch;
+      try {
+        const changed = await api.templateChangedOnDisk(name);
+        if (
+          epoch !== noteEpoch ||
+          openTemplate !== name ||
+          conflict ||
+          phaseNow() === "saving"
+        ) {
+          return;
+        }
+        if (changed) {
+          conflict = true;
+          reloadArmed = false;
+          autosave.cancel();
+        }
+      } catch (error) {
+        if (epoch !== noteEpoch || openTemplate !== name) return;
+        if (isExternalChange(error)) {
+          conflict = true;
+          reloadArmed = false;
+          autosave.cancel();
+          return;
+        }
+        status = `${labels.actionFailed}: ${String(error)}`;
+      }
+      return;
+    }
+    if (!currentPath) return;
     const path = currentPath;
     const epoch = noteEpoch;
     try {
@@ -924,6 +1121,10 @@
   });
 
   async function exportPdf() {
+    if (openTemplate) {
+      status = labels.pdfNeedsNote;
+      return;
+    }
     if (!currentPath || exporting) return;
     const path = currentPath;
     const source = editor?.getText() ?? sourceText;
@@ -964,6 +1165,7 @@
       const saved = await api.setLocale(next);
       locale = saved.locale === "en" ? "en" : "pl";
       applyLocale(locale);
+      await refreshTemplates();
     } catch (error) {
       status = `${labels.saveFailed}: ${String(error)}`;
     }
@@ -983,7 +1185,7 @@
 
   function onEditorChange(text: string) {
     sourceText = text;
-    if (!currentPath) return;
+    if (!currentPath && !openTemplate) return;
     noteRevision += 1;
     savePhase = "unsaved";
     if (!conflict) scheduleAutosave();
@@ -1067,7 +1269,7 @@
     const entries: { label: string; onclick: () => void }[] = [
       { label: labels.openFolder, onclick: () => void openFolder() },
     ];
-    if (currentPath) {
+    if (currentPath || openTemplate) {
       entries.push({
         label: labels.closeNote,
         onclick: () => void closeNote(),
@@ -1096,6 +1298,7 @@
 
   $effect(() => {
     void loadGreeting();
+    void refreshTemplates();
   });
 
   function editorAttachment(node: HTMLDivElement) {
@@ -1275,7 +1478,7 @@
     </div>
 
     <main class="stage">
-      {#if !currentPath}
+      {#if !currentPath && !openTemplate}
         <div class="start">
           <p class="start-date text-md">
             <time datetime={dateStamp}>{dateLine}</time>
@@ -1300,16 +1503,53 @@
             <h2 id="templates-heading" class="text-lg">
               {labels.templatesLabel}
             </h2>
+            <h3 class="text-md">{labels.templateGroupShipped}</h3>
             <div class="card-grid">
-              {#each templateChoices as template (template.id)}
-                <Card
-                  title={template.label}
-                  meta={template.file}
-                  description={template.description}
-                  onclick={rootName && !templatePending
-                    ? () => void createFromTemplate(template.id)
-                    : undefined}
-                />
+              {#each shippedStems as stem (stem)}
+                <Card title={shippedTitle(stem)}>
+                  {#snippet actions()}
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      label={labels.templateStartNote}
+                      disabled={!rootName || templatePending}
+                      onclick={() => void createFromTemplate("shipped", stem)}
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      label={labels.templateMakeCopy}
+                      disabled={templatePending}
+                      onclick={() => void copyShippedTemplate(stem)}
+                    />
+                  {/snippet}
+                </Card>
+              {/each}
+            </div>
+            <h3 class="text-md">{labels.templateGroupYours}</h3>
+            {#if !templateFolderReady}
+              <p class="muted">{labels.templateFolderUnavailable}</p>
+            {/if}
+            <div class="card-grid">
+              {#each yourTemplates as name (name)}
+                <Card title={name}>
+                  {#snippet actions()}
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      label={labels.templateStartNote}
+                      disabled={!rootName || templatePending}
+                      onclick={() => void createFromTemplate("user", name)}
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      label={labels.templateEditFile}
+                      disabled={templatePending}
+                      onclick={() => void editYourTemplate(name)}
+                    />
+                  {/snippet}
+                </Card>
               {/each}
             </div>
           </section>
@@ -1347,7 +1587,7 @@
               value={viewMode}
               onchange={(value) => setView(value as NoteView)}
             />
-            <h1 class="path-line text-lg">{currentPath}</h1>
+            <h1 class="path-line text-lg">{documentTitle}</h1>
           </div>
           <div class="start-actions">
             <p class={["save-state", savePhase, { conflict }]} role="status">

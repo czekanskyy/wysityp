@@ -49,8 +49,26 @@ export const api = {
   async listRecentNotes() {
     return unwrap(await commands.listRecentNotes());
   },
-  async createFromTemplate(parent: string, template: string) {
-    return unwrap(await commands.createFromTemplate(parent, template));
+  async createFromTemplate(parent: string, kind: string, name: string) {
+    return unwrap(await commands.createFromTemplate(parent, kind, name));
+  },
+  async listTemplates() {
+    return unwrap(await commands.listTemplates());
+  },
+  async copyShippedTemplate(name: string) {
+    return unwrap(await commands.copyShippedTemplate(name));
+  },
+  async openTemplate(name: string) {
+    return unwrap(await commands.openTemplate(name));
+  },
+  async saveTemplate(name: string, text: string, force: boolean) {
+    return unwrap(await commands.saveTemplate(name, text, force));
+  },
+  async templateChangedOnDisk(name: string) {
+    return unwrap(await commands.templateChangedOnDisk(name));
+  },
+  async saveNoteImage(path: string, fileName: string, bytes: number[]) {
+    return unwrap(await commands.saveNoteImage(path, fileName, bytes));
   },
   async openNote(path: string) {
     return unwrap(await commands.openNote(path));

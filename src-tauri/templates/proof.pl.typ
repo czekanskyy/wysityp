@@ -1,0 +1,6 @@
+= Tytuł dowodu
+
+== Twierdzenie
+
+== Dowód
+

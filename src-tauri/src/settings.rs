@@ -173,6 +173,13 @@ pub fn load_settings(path: &Path) -> AppResult<Settings> {
     Ok(settings_view(&load_file(path)?))
 }
 
+/// Read `locale` for a new note. A missing or unreadable file is an error
+/// and this function does not create or rewrite the settings file.
+pub fn load_settings_for_create(path: &Path) -> AppResult<Settings> {
+    let text = std::fs::read_to_string(path).map_err(|err| AppError::io(path, err))?;
+    Ok(settings_view(&parse_settings(&text)?))
+}
+
 pub fn set_locale(path: &Path, locale: &str) -> AppResult<Settings> {
     if !LOCALES.contains(&locale) {
         return Err(AppError::BadLocale(locale.to_string()));
@@ -664,6 +671,17 @@ mod tests {
         let path = dir.path().join("settings.json");
         set_locale(&path, "en").unwrap();
         assert_eq!(load_settings(&path).unwrap().locale, "en");
+    }
+
+    #[test]
+    fn a_create_does_not_write_settings_when_the_file_cannot_be_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        assert!(load_settings_for_create(&path).is_err());
+        assert!(!path.exists());
+        std::fs::write(&path, "{").unwrap();
+        assert!(load_settings_for_create(&path).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), b"{");
     }
 
     // covers: the language lives in one plain file a student can inspect

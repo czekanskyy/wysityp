@@ -1,0 +1,6 @@
+= Proof title
+
+== Statement
+
+== Proof
+
