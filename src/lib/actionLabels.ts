@@ -49,6 +49,7 @@ export function actionCopy(): ActionCopy {
     code_block: m.code_block(),
     insert_link: m.insert_link(),
     insert_table: m.insert_table(),
+    insert_image: m.insert_image(),
     body_text: m.body_text(),
     heading_1: m.heading_1(),
     heading_2: m.heading_2(),

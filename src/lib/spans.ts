@@ -1,4 +1,5 @@
 import { byteOffsetToUtf16 } from "./render";
+import { pathsMatch } from "./tabs";
 
 export type SpanKind =
   | "body"
@@ -1809,7 +1810,7 @@ export function editorDiagnostics(
   if (!accept || sentSource !== buffer) return [];
   const applied: PlanDiagnostic[] = [];
   for (const diagnostic of diagnostics) {
-    if (diagnostic.file !== "" && diagnostic.file !== notePath) continue;
+    if (!diagnosticApplies(diagnostic.file, notePath)) continue;
     const from = byteOffsetToUtf16(sentSource, diagnostic.start);
     const to = byteOffsetToUtf16(sentSource, diagnostic.end);
     applied.push({
@@ -1821,6 +1822,23 @@ export function editorDiagnostics(
     });
   }
   return applied;
+}
+
+/** A loose note's diagnostic names the file, while the tab key is absolute. */
+function diagnosticApplies(file: string, notePath: string): boolean {
+  if (file === "") return true;
+  const left = file.replaceAll("\\", "/");
+  const right = notePath.replaceAll("\\", "/");
+  if (left.toLowerCase() === right.toLowerCase()) return true;
+  if (notePath === "" || notePath.startsWith("template:")) {
+    return (
+      left === ".wysityp-buffer.typ" || left.endsWith("/.wysityp-buffer.typ")
+    );
+  }
+  const fileAbsolute = left.includes(":") || left.startsWith("/");
+  const noteAbsolute = right.includes(":") || right.startsWith("/");
+  if (fileAbsolute !== noteAbsolute) return pathsMatch(file, notePath);
+  return false;
 }
 
 function innermostBlock(

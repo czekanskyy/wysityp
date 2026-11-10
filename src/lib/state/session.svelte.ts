@@ -76,7 +76,7 @@ import {
   type TabKind,
   type TabModel,
 } from "../tabs";
-import { runFormat } from "../toolbarActions";
+import { canInsertImage, runFormat, runImage } from "../toolbarActions";
 import { m } from "../../paraglide/messages.js";
 import type {
   CommandItem,
@@ -906,6 +906,12 @@ export class Session {
         return false;
       case "language-en":
         void this.changeLocale("en");
+        return false;
+      case "insert-image":
+        if (this.editor && canInsertImage(this.editor)) {
+          runImage(this.editor);
+          this.editor.focus();
+        }
         return false;
       case "undo":
         this.editor?.undo();

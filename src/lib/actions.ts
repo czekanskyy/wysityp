@@ -41,6 +41,7 @@ export type LabelKey =
   | "code_block"
   | "insert_link"
   | "insert_table"
+  | "insert_image"
   | "body_text"
   | "heading_1"
   | "heading_2"
@@ -253,6 +254,12 @@ export const ACTION_SPECS: readonly ActionSpec[] = [
   formatSpec("code-block", "code_block", "codeBlock", "```"),
   formatSpec("link", "insert_link", "link", "#link(…)"),
   formatSpec("table", "insert_table", "table", "#table"),
+  {
+    id: "insert-image",
+    labelKey: "insert_image",
+    group: "format",
+    icon: "image",
+  },
   {
     id: "appearance",
     labelKey: "appearance_label",
