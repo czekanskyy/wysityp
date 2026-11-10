@@ -132,18 +132,30 @@ input:focus-visible {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-height: 0;
+  transition: grid-template-columns var(--motion-slow) var(--ease-standard);
 }
 
 .nav-column {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   background: var(--color-bg);
   border-inline-end: 1px solid var(--color-border);
 }
 
-.nav-column > nav.sidebar {
+.nav-rest {
+  display: flex;
+  flex-direction: column;
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  height: 100%;
+  min-height: 0;
+}
+
+.nav-rest > nav.sidebar {
   flex: 1;
   border-inline-end: 0;
 }
@@ -438,15 +450,19 @@ button.danger {
 
 .panes {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0fr);
   min-width: 0;
   min-height: 0;
   flex: 1;
+  transition: grid-template-columns var(--motion-mid) var(--ease-standard);
 }
 
-.panes.source,
-.panes.rendered {
-  grid-template-columns: 1fr;
+.panes.split {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.preview-pane {
+  overflow: hidden;
 }
 
 .panes.source .editor-pane,
@@ -555,6 +571,21 @@ button.danger {
   grid-template-columns: 2.5rem minmax(0, 1fr);
 }
 
+.nav-rail {
+  position: absolute;
+  z-index: 2;
+  top: 0.15rem;
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+.shell.nav-collapsed .nav-rail {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .nav-rail,
 .nav-collapse {
   border: 0;
@@ -579,12 +610,123 @@ button.danger {
   border-radius: 6px;
 }
 
+.stage-body,
+.welcome {
+  animation: cross-fade var(--motion-mid) var(--ease-enter);
+}
+
+.stage-body.tab-switch {
+  animation: tab-fade var(--motion-fast) var(--ease-standard);
+}
+
+@keyframes cross-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tab-fade {
+  from {
+    opacity: 0.62;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 .stage-body {
   min-width: 0;
   min-height: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  min-width: 0;
+  padding: 2px var(--space-2);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.editor-tools,
+.editor-end {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+}
+
+.editor-tools {
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.editor-end {
+  margin-inline-start: auto;
+  gap: var(--space-2);
+}
+
+.editor-sep {
+  width: 1px;
+  height: 1rem;
+  margin: 0 var(--space-1);
+  background: var(--color-border);
+  flex: none;
+}
+
+.table-wrap {
+  position: relative;
+}
+
+.table-pop {
+  position: absolute;
+  z-index: var(--z-menu);
+  top: calc(100% + 4px);
+  left: 0;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.table-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 14px);
+  gap: 3px;
+}
+
+button.table-cell {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 2px;
+  background: var(--color-surface);
+}
+
+button.table-cell.on {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.table-pop p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: end;
 }
 
 .tab-strip {
@@ -608,11 +750,30 @@ button.danger {
   border-radius: 0;
   background: transparent;
   color: var(--color-text-muted);
+  box-shadow: inset 0 -2px 0 transparent;
+  animation: tab-in var(--motion-mid) var(--ease-enter);
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-mid) var(--ease-standard);
 }
 
 .tab.active {
   background: var(--color-surface);
   color: var(--color-text);
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .tab-label {
@@ -674,6 +835,7 @@ button.danger {
 
 .save-word {
   opacity: 0;
+  transition: opacity var(--motion-mid) var(--ease-standard);
 }
 
 .save-slot[data-phase="unsaved"] .save-word,
@@ -725,6 +887,7 @@ button.danger {
 .recent-row {
   display: flex;
   align-items: baseline;
+  transition: background-color var(--motion-fast) var(--ease-standard);
   gap: var(--space-4);
   width: 100%;
   border: 0;

@@ -1,14 +1,34 @@
 <script lang="ts">
   import Button from "../ui/Button.svelte";
+  import EditorToolbar from "./EditorToolbar.svelte";
   import StatusBar from "./StatusBar.svelte";
   import TabStrip from "./TabStrip.svelte";
   import type { Session } from "../state/session.svelte";
 
   let { session }: { session: Session } = $props();
+
+  let fading = $state(false);
+  let seenTab: number | null = null;
+
+  $effect(() => {
+    const id = session.activeId;
+    if (seenTab === null) {
+      seenTab = id;
+      return;
+    }
+    if (id === seenTab) return;
+    seenTab = id;
+    fading = false;
+    const frame = requestAnimationFrame(() => {
+      fading = true;
+    });
+    return () => cancelAnimationFrame(frame);
+  });
 </script>
 
-<div class="stage-body">
+<div class={["stage-body", { "tab-switch": fading }]}>
   <TabStrip {session} />
+  <EditorToolbar {session} />
 
   {#if session.active?.conflict}
     <section class="conflict-banner" role="alert">
@@ -85,7 +105,7 @@
     <section
       class="pane preview-pane"
       aria-label={session.labels.preview}
-      hidden={session.viewMode !== "split"}
+      inert={session.viewMode !== "split"}
     >
       <div class="pages">
         {#each session.pageUrls as pageUrl, index (index)}

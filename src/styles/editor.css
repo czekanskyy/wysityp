@@ -1,4 +1,17 @@
-/* The note page. Source view keeps the code-editor chrome from basicSetup. */
+/* The note page. Source view keeps the code-editor chrome from basicSetup.
+   Typing and rendered marks stay still: motion is for chrome, not the text. */
+
+.cm-editor,
+.cm-editor .cm-line,
+.cm-editor .cm-content,
+.cm-math-chip,
+.cm-math-block,
+.cm-error-range,
+.cm-warning-range,
+.cm-error-note {
+  transition: none;
+  animation: none;
+}
 
 .cm-editor {
   height: 100%;

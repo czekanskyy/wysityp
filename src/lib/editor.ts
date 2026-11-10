@@ -38,6 +38,7 @@ import type {
   MathSnapshot,
   MathSvg,
 } from "./math";
+import { formatCmKeys, formatEdit, type FormatAction } from "./toolbarActions";
 import type { EditorPlace } from "./noteSafety";
 import {
   extensionForMime,
@@ -104,6 +105,13 @@ export interface EditorHandle {
   setPageColor(pageColor: NotePageColor): void;
   undo(): void;
   redo(): void;
+  replaceRange(
+    from: number,
+    to: number,
+    insert: string,
+    anchor: number,
+    head: number,
+  ): void;
 }
 
 export type EditorServices = {
@@ -846,6 +854,28 @@ export function structureResult(
   return { consume: edit !== null, edit };
 }
 
+function runFormat(action: FormatAction) {
+  return (view: EditorView): boolean => {
+    const range = view.state.selection.main;
+    const edit = formatEdit(
+      view.state.doc.toString(),
+      range.from,
+      range.to,
+      action,
+    );
+    const nextLength =
+      view.state.doc.length - (edit.to - edit.from) + edit.insert.length;
+    const limit = (position: number) =>
+      Math.max(0, Math.min(position, nextLength));
+    view.dispatch({
+      changes: { from: edit.from, to: edit.to, insert: edit.insert },
+      selection: { anchor: limit(edit.anchor), head: limit(edit.head) },
+      scrollIntoView: true,
+    });
+    return true;
+  };
+}
+
 function runStructure(key: "Enter" | "Backspace" | "Tab", shift: boolean) {
   return (view: EditorView): boolean => {
     const result = structureResult(view.state, key, shift, view.composing);
@@ -969,6 +999,14 @@ function editorExtensions(
         { key: "Tab", run: runStructure("Tab", false) },
         { key: "Shift-Tab", run: runStructure("Tab", true) },
       ]),
+    ),
+    Prec.high(
+      keymap.of(
+        formatCmKeys.map(({ action, key }) => ({
+          key,
+          run: runFormat(action),
+        })),
+      ),
     ),
     EditorView.inputHandler.of((view, from, to, text) => {
       if (text !== "$" || view.composing) return false;
@@ -1477,6 +1515,21 @@ export function createEditor(
     },
     redo: () => {
       redoCommand(view);
+    },
+    replaceRange: (from, to, insert, anchor, head) => {
+      const length = view.state.doc.length;
+      const start = Math.max(0, Math.min(from, length));
+      const end = Math.max(0, Math.min(to, length));
+      const lo = Math.min(start, end);
+      const hi = Math.max(start, end);
+      const nextLength = length - (hi - lo) + insert.length;
+      const limit = (position: number) =>
+        Math.max(0, Math.min(position, nextLength));
+      view.dispatch({
+        changes: { from: lo, to: hi, insert },
+        selection: { anchor: limit(anchor), head: limit(head) },
+        scrollIntoView: true,
+      });
     },
   };
 }

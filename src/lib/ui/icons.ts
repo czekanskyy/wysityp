@@ -165,6 +165,77 @@ export const icons = {
     path("M4 5l1.5-1v5"),
     path("M3.5 14.5a1.5 1.5 0 1 1 2.6 1L3.5 19H6.5"),
   ],
+  // Podkreślenie
+  underline: [path("M7 5v6a5 5 0 0 0 10 0V5"), path("M5 20h14")],
+  // Indeks górny
+  superscript: [
+    path("m4 8 8 10"),
+    path("m12 8-8 10"),
+    path("M16 5.5a2 2 0 1 1 3.5 1.4L16 10h4"),
+  ],
+  // Indeks dolny
+  subscript: [
+    path("m4 6 8 10"),
+    path("m12 6-8 10"),
+    path("M16 15.5a2 2 0 1 1 3.5 1.4L16 20h4"),
+  ],
+  // Zakreślenie
+  highlight: [
+    path("m9 11-5 5v3h3l5-5"),
+    path("m9 11 6-6 4 4-6 6z"),
+    path("M14 20h6"),
+  ],
+  // Kolor tekstu
+  textColor: [path("m6 16 6-12 6 12"), path("M8.5 11h7"), path("M4 20h16")],
+  // Lista terminów
+  termList: [
+    path("M4 6h7"),
+    path("M8 10h12"),
+    path("M4 14h7"),
+    path("M8 18h12"),
+  ],
+  // Zmniejsz wcięcie
+  outdent: [
+    path("M20 6H10"),
+    path("M20 12h-8"),
+    path("M20 18H10"),
+    path("m7 9-3 3 3 3"),
+  ],
+  // Zwiększ wcięcie
+  indent: [
+    path("M20 6H10"),
+    path("M20 12h-8"),
+    path("M20 18H10"),
+    path("m4 9 3 3-3 3"),
+  ],
+  // Wyrównanie
+  align: [
+    path("M4 6h16"),
+    path("M4 10h10"),
+    path("M4 14h16"),
+    path("M4 18h10"),
+  ],
+  // Symbol
+  symbol: [path("M5 19h4v-2a6 6 0 1 1 6 0v2h4")],
+  // Kształt
+  shape: [circle("8", "15", "5"), path("M13 4h7v7h-7z")],
+  // Przypis
+  footnote: [
+    path("M4 7h10"),
+    path("M4 12h10"),
+    path("M4 17h6"),
+    path("M18 4v5"),
+    path("M16.5 5.5 18 4"),
+  ],
+  // Odsyłacz
+  mention: [
+    circle("12", "12", "3.5"),
+    path("M15.5 12v1.5a2.5 2.5 0 0 0 5 0V12a8.5 8.5 0 1 0-3.5 6.9"),
+  ],
+  // Bloki
+  blocks: [rect("4", "4", "16", "16", "2"), path("M8 9h8"), path("M8 13h5")],
+  // Blok kodu
+  codeBlock: [sheet, path("m10 10-2 2 2 2"), path("m14 10 2 2-2 2")],
   // warning mark
   warning: [
     path(

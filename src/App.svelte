@@ -1,11 +1,13 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import AppearanceDialog from "./lib/ui/AppearanceDialog.svelte";
+  import CommandPalette from "./lib/ui/CommandPalette.svelte";
   import Icon from "./lib/ui/Icon.svelte";
   import Sidebar from "./lib/ui/Sidebar.svelte";
   import NavFollow from "./lib/shell/NavFollow.svelte";
   import NewNoteDialog from "./lib/shell/NewNoteDialog.svelte";
   import NoteStage from "./lib/shell/NoteStage.svelte";
+  import ShortcutSheet from "./lib/shell/ShortcutSheet.svelte";
   import Welcome from "./lib/shell/Welcome.svelte";
   import { createSession } from "./lib/state/session.svelte";
   import type { StartupAppearance } from "./lib/appearance";
@@ -35,16 +37,21 @@
 <div class={["shell", { "nav-collapsed": session.sidebarCollapsed }]}>
   <div class="workarea">
     <div class="nav-column">
-      {#if session.sidebarCollapsed}
-        <button
-          type="button"
-          class="nav-rail"
-          aria-label={session.labels.sidebarExpand}
-          onclick={() => session.toggleSidebar()}
-        >
-          {session.workspaceMark}
-        </button>
-      {:else}
+      <button
+        type="button"
+        class="nav-rail"
+        aria-label={session.labels.sidebarExpand}
+        aria-hidden={session.sidebarCollapsed ? undefined : "true"}
+        tabindex={session.sidebarCollapsed ? 0 : -1}
+        onclick={() => session.toggleSidebar()}
+      >
+        {session.workspaceMark}
+      </button>
+      <div
+        class="nav-rest"
+        inert={session.sidebarCollapsed}
+        aria-hidden={session.sidebarCollapsed ? "true" : undefined}
+      >
         <div class="nav-tools">
           <button
             type="button"
@@ -89,7 +96,7 @@
           }}
         />
         <NavFollow {session} />
-      {/if}
+      </div>
     </div>
 
     <main class="stage">
@@ -102,6 +109,41 @@
   </div>
 
   <NewNoteDialog {session} />
+  {#if session.palette !== "closed"}
+    {#key session.palette}
+      <CommandPalette
+        commands={session.palette === "notes"
+          ? session.goCommands
+          : session.commands}
+        label={session.palette === "notes"
+          ? session.actionCopy.go.label
+          : session.actionCopy.palette.label}
+        placeholder={session.palette === "notes"
+          ? session.actionCopy.go.placeholder
+          : session.actionCopy.palette.placeholder}
+        emptyText={session.palette === "notes"
+          ? session.actionCopy.go.empty
+          : session.actionCopy.palette.empty}
+        hints={session.actionCopy.palette.hints}
+        open={true}
+        onOpenChange={(open) => {
+          if (!open) session.closePalette();
+        }}
+        onRun={(id) => session.perform(id)}
+      />
+    {/key}
+  {/if}
+  <ShortcutSheet
+    rows={session.shortcutEntries}
+    label={session.actionCopy.sheet.label}
+    placeholder={session.actionCopy.sheet.placeholder}
+    emptyText={session.actionCopy.sheet.empty}
+    closeLabel={session.actionCopy.sheet.close}
+    open={session.shortcutsOpen}
+    onOpenChange={(open) => {
+      if (!open) session.closeShortcuts();
+    }}
+  />
   <AppearanceDialog
     open={session.appearanceOpen}
     restore={session.appearanceTrigger}

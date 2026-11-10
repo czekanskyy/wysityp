@@ -4,8 +4,21 @@
   import Kbd from "./Kbd.svelte";
   import type { MenuEntry, MenuItem } from "./types";
 
-  let { label, entries }: { label: string; entries: readonly MenuEntry[] } =
-    $props();
+  let {
+    label,
+    entries,
+    compact = false,
+    wide = false,
+    returnFocus = true,
+    onClose,
+  }: {
+    label: string;
+    entries: readonly MenuEntry[];
+    compact?: boolean;
+    wide?: boolean;
+    returnFocus?: boolean;
+    onClose?: () => void;
+  } = $props();
 
   let open = $state(false);
   let placed = $state(false);
@@ -41,9 +54,11 @@
   }
 
   function close(restore: boolean) {
+    const wasOpen = open;
     open = false;
     placed = false;
-    if (restore) triggerEl?.focus();
+    if (restore && returnFocus) triggerEl?.focus();
+    if (wasOpen) onClose?.();
   }
 
   function toggle() {
@@ -118,7 +133,7 @@
 <span class="menu-wrap">
   <button
     type="button"
-    class="btn ghost"
+    class={compact ? "menu-trigger" : "btn ghost"}
     aria-haspopup="menu"
     aria-expanded={open}
     title={label}
@@ -130,7 +145,7 @@
   </button>
   {#if open}
     <div
-      class="menu"
+      class={["menu", { wide }]}
       role="menu"
       tabindex="-1"
       style:top="{topPx}px"

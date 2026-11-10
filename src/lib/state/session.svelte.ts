@@ -7,11 +7,21 @@ import type {
   Settings,
   TreeNode,
 } from "../../bindings";
+import { actionCopy } from "../actionLabels";
+import {
+  folderNotes,
+  formatOf,
+  goToItems,
+  paletteCommands,
+  shortcutRows,
+  windowActionId,
+} from "../actions";
 import { api } from "../api";
 import {
   applyDocumentTheme,
   asPageColor,
   asTheme,
+  type AppTheme,
   type StartupAppearance,
 } from "../appearance";
 import {
@@ -66,8 +76,15 @@ import {
   type TabKind,
   type TabModel,
 } from "../tabs";
+import { canInsertImage, runFormat, runImage } from "../toolbarActions";
 import { m } from "../../paraglide/messages.js";
-import type { SegmentOptions, SidebarItem, SidebarSection } from "../ui";
+import type {
+  CommandItem,
+  NotePageColor,
+  SegmentOptions,
+  SidebarItem,
+  SidebarSection,
+} from "../ui";
 
 export type NewChoice = {
   kind: "blank" | "shipped" | "user";
@@ -98,6 +115,8 @@ export class Session {
   renderFont = $state(DEFAULT_RENDER_FONT);
   appearanceOpen = $state(false);
   appearanceTrigger = $state<HTMLElement | null>(null);
+  palette = $state<"closed" | "commands" | "notes">("closed");
+  shortcutsOpen = $state(false);
   rootName = $state("");
   tree = $state.raw<TreeNode[]>([]);
   openFolders = $state<string[]>([]);
@@ -297,6 +316,41 @@ export class Session {
       fontOtherLabel: m.font_other(),
       fontOtherHint: m.font_other_hint(),
     };
+  }
+
+  get actionCopy() {
+    void this.locale;
+    return actionCopy();
+  }
+
+  get commands(): CommandItem[] {
+    const copy = this.actionCopy;
+    return paletteCommands(copy.labels, copy.groups);
+  }
+
+  get goCommands(): CommandItem[] {
+    const copy = this.actionCopy;
+    return goToItems(
+      this.tabs.map((tab) => ({
+        id: tab.id,
+        title: tab.title,
+        key: tab.key,
+      })),
+      this.recentNotes,
+      folderNotes(this.tree),
+      copy.goGroups,
+    );
+  }
+
+  get shortcutEntries() {
+    const copy = this.actionCopy;
+    return shortcutRows().map((row) => ({
+      id: row.id,
+      label: copy.labels[row.labelKey],
+      group: copy.groups[row.group],
+      shortcut: row.shortcut,
+      mark: row.mark,
+    }));
   }
 
   get viewOptions(): SegmentOptions {
@@ -671,6 +725,209 @@ export class Session {
 
   closeAppearance(): void {
     this.appearanceOpen = false;
+    this.returnFocus();
+  }
+
+  openPalette(mode: "commands" | "notes"): void {
+    this.shortcutsOpen = false;
+    this.palette = this.palette === mode ? "closed" : mode;
+    if (this.palette === "closed") this.returnFocus();
+  }
+
+  closePalette(): void {
+    if (this.palette === "closed") return;
+    this.palette = "closed";
+    this.returnFocus();
+  }
+
+  openShortcuts(): void {
+    this.palette = "closed";
+    if (this.shortcutsOpen) {
+      this.shortcutsOpen = false;
+      this.returnFocus();
+      return;
+    }
+    this.shortcutsOpen = true;
+  }
+
+  closeShortcuts(): void {
+    if (!this.shortcutsOpen) return;
+    this.shortcutsOpen = false;
+    this.returnFocus();
+  }
+
+  /** A note that already has a path saves in place. A draft opens Save As. */
+  saveAs(): Promise<void> {
+    return this.saveActive();
+  }
+
+  setTheme(next: AppTheme): Promise<void> {
+    return this.run(async () => {
+      try {
+        this.applyAppearance(await api.setTheme(next));
+      } catch (error) {
+        this.appearanceFailed(error);
+      }
+    });
+  }
+
+  setPageColor(next: NotePageColor): Promise<void> {
+    return this.run(async () => {
+      try {
+        this.applyAppearance(await api.setPageColor(next));
+      } catch (error) {
+        this.appearanceFailed(error);
+      }
+    });
+  }
+
+  focusSearch(): void {
+    if (!this.rootName) {
+      this.status = this.labels.noFolder;
+      return;
+    }
+    if (this.sidebarCollapsed) this.sidebarCollapsed = false;
+    queueMicrotask(() => {
+      document.querySelector<HTMLInputElement>("input.sidebar-search")?.focus();
+    });
+  }
+
+  /**
+   * Run a palette action. Returns true when another overlay should stay up,
+   * so the palette does not also steal focus on the way out.
+   */
+  perform(id: string): boolean {
+    if (id === "show-palette") {
+      this.openPalette("commands");
+      return this.palette !== "closed";
+    }
+    if (id === "go-to-note") {
+      this.openPalette("notes");
+      return this.palette !== "closed";
+    }
+    if (id === "show-shortcuts") {
+      this.openShortcuts();
+      return this.shortcutsOpen;
+    }
+    if (id.startsWith("tab:")) {
+      const tabId = Number(id.slice(4));
+      if (Number.isInteger(tabId)) void this.focusTab(tabId);
+      return false;
+    }
+    if (id.startsWith("path:")) {
+      void this.openNote(decodeURIComponent(id.slice(5)));
+      return false;
+    }
+    const format = formatOf(id);
+    if (format && this.editor) {
+      runFormat(
+        this.editor,
+        format,
+        format === "table" ? { rows: 2, cols: 3 } : undefined,
+      );
+      this.editor.focus();
+      return false;
+    }
+    switch (id) {
+      case "new-note":
+        this.palette = "closed";
+        void this.requestNewNote();
+        return true;
+      case "open-note":
+        void this.openLoose();
+        return false;
+      case "open-folder":
+        void this.openFolder();
+        return false;
+      case "save":
+        void this.saveActive();
+        return false;
+      case "save-as":
+        void this.saveAs();
+        return false;
+      case "close-tab":
+        if (this.active) void this.closeTab(this.active.id);
+        return false;
+      case "next-tab":
+        void this.cycleTabs(false);
+        return false;
+      case "previous-tab":
+        void this.cycleTabs(true);
+        return false;
+      case "toggle-sidebar":
+        this.toggleSidebar();
+        return false;
+      case "view-page":
+        this.setView("rendered");
+        this.editor?.focus();
+        return false;
+      case "view-source":
+        this.setView("source");
+        this.editor?.focus();
+        return false;
+      case "view-split":
+        this.setView("split");
+        this.editor?.focus();
+        return false;
+      case "export-pdf":
+        void this.exportPdf();
+        return false;
+      case "search-notes":
+        this.palette = "closed";
+        this.focusSearch();
+        return true;
+      case "appearance":
+        this.palette = "closed";
+        this.openAppearance();
+        return true;
+      case "theme-system":
+        void this.setTheme("system");
+        return false;
+      case "theme-light":
+        void this.setTheme("light");
+        return false;
+      case "theme-dark":
+        void this.setTheme("dark");
+        return false;
+      case "page-white":
+        void this.setPageColor("white");
+        return false;
+      case "page-beige":
+        void this.setPageColor("beige");
+        return false;
+      case "page-graphite":
+        void this.setPageColor("graphite");
+        return false;
+      case "page-oled":
+        void this.setPageColor("oled");
+        return false;
+      case "language-pl":
+        void this.changeLocale("pl");
+        return false;
+      case "language-en":
+        void this.changeLocale("en");
+        return false;
+      case "insert-image":
+        if (this.editor && canInsertImage(this.editor)) {
+          runImage(this.editor);
+          this.editor.focus();
+        }
+        return false;
+      case "undo":
+        this.editor?.undo();
+        this.editor?.focus();
+        return false;
+      case "redo":
+        this.editor?.redo();
+        this.editor?.focus();
+        return false;
+      default:
+        return false;
+    }
+  }
+
+  private returnFocus(): void {
+    queueMicrotask(() => this.editor?.focus());
   }
 
   applyAppearance(saved: Settings): void {
@@ -808,33 +1065,23 @@ export class Session {
       }
       return;
     }
+    if (this.appearanceOpen) return;
+    const action = windowActionId(event);
+    if (action) {
+      const overlay = this.palette !== "closed" || this.shortcutsOpen;
+      const toggles =
+        action === "show-palette" ||
+        action === "go-to-note" ||
+        action === "show-shortcuts";
+      if (overlay && !toggles) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.perform(action);
+      return;
+    }
     if (event.key === "Escape" && this.pendingDelete) {
       event.preventDefault();
       this.closeDelete();
-      return;
-    }
-    if (!event.ctrlKey || event.altKey || event.metaKey) return;
-    if (event.code === "KeyN" && !event.shiftKey) {
-      event.preventDefault();
-      void this.requestNewNote();
-    } else if (event.code === "KeyO" && event.shiftKey) {
-      event.preventDefault();
-      void this.openFolder();
-    } else if (event.code === "KeyO" && !event.shiftKey) {
-      event.preventDefault();
-      void this.openLoose();
-    } else if (event.code === "KeyS" && !event.shiftKey) {
-      event.preventDefault();
-      void this.saveActive();
-    } else if (event.code === "KeyW" && !event.shiftKey) {
-      event.preventDefault();
-      if (this.active) void this.closeTab(this.active.id);
-    } else if (event.code === "KeyB" && !event.shiftKey) {
-      event.preventDefault();
-      this.toggleSidebar();
-    } else if (event.code === "Tab") {
-      event.preventDefault();
-      void this.cycleTabs(event.shiftKey);
     }
   }
 

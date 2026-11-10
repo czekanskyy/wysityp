@@ -9,6 +9,7 @@
     pressed?: boolean;
     disabled?: boolean;
     shortcut?: readonly string[];
+    tip?: string;
     tabindex?: number;
     onclick?: () => void;
   };
@@ -20,19 +21,20 @@
     pressed,
     disabled = false,
     shortcut,
+    tip,
     tabindex = 0,
     onclick,
   }: Props = $props();
 
   const keys = $derived(shortcut?.length ? shortcut.join("+") : "");
-  const tip = $derived(keys ? `${label} (${keys})` : label);
+  const titleText = $derived(tip ?? (keys ? `${label} (${keys})` : label));
 </script>
 
 <button
   type="button"
   class="ibtn {size}"
   aria-label={label}
-  title={tip}
+  title={titleText}
   aria-keyshortcuts={keys || undefined}
   aria-pressed={pressed === undefined ? undefined : pressed ? "true" : "false"}
   aria-disabled={disabled ? "true" : undefined}

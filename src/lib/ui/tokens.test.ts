@@ -61,6 +61,21 @@ const iconIds = [
   "strike",
   "numberedList",
   "warning",
+  "underline",
+  "superscript",
+  "subscript",
+  "highlight",
+  "textColor",
+  "termList",
+  "outdent",
+  "indent",
+  "align",
+  "symbol",
+  "shape",
+  "footnote",
+  "mention",
+  "blocks",
+  "codeBlock",
 ];
 
 describe("papier tokens", () => {
@@ -81,10 +96,13 @@ describe("papier tokens", () => {
   });
 
   it("records the three motion values as text", () => {
-    expect(base).toContain("--motion-fast: 90ms");
-    expect(base).toContain("--motion-pop: 160ms");
+    expect(base).toContain("--motion-fast: 120ms");
+    expect(base).toContain("--motion-mid: 180ms");
+    expect(base).toContain("--motion-pop: 180ms");
     expect(base).toContain("--motion-slow: 240ms");
+    expect(base).toContain("--ease-standard:");
     expect(base).toContain("--motion-fast: 0ms");
+    expect(base).toContain("--motion-mid: 0ms");
     expect(base).toContain("--motion-pop: 0ms");
     expect(base).toContain("--motion-slow: 0ms");
     expect(base).toContain("prefers-reduced-motion");
@@ -95,7 +113,7 @@ describe("papier tokens", () => {
 });
 
 describe("icons", () => {
-  it("has the 35 preview drawings", () => {
+  it("draws the shared icons, including the formatting toolbar", () => {
     expect(Object.keys(icons).sort()).toEqual([...iconIds].sort());
   });
 });

@@ -291,6 +291,52 @@ describe("editor diagnostics", () => {
     expect(applied[0]?.to).toBe("łódź".length);
   });
 
+  it("underlines a loose note when the diagnostic names only the file", () => {
+    const applied = editorDiagnostics(
+      [
+        {
+          file: "lecture.typ",
+          start: 0,
+          end: 1,
+          severity: "error",
+          message: "loose",
+          hints: [],
+        },
+        {
+          file: "other.typ",
+          start: 0,
+          end: 1,
+          severity: "error",
+          message: "elsewhere",
+          hints: [],
+        },
+      ],
+      sent,
+      sent,
+      "C:/Users/Ada/Desktop/lecture.typ",
+      true,
+    );
+    expect(applied.map((item) => item.message)).toEqual(["loose"]);
+    expect(
+      editorDiagnostics(
+        [
+          {
+            file: ".wysityp-buffer.typ",
+            start: 0,
+            end: 1,
+            severity: "warning",
+            message: "draft",
+            hints: [],
+          },
+        ],
+        sent,
+        sent,
+        "",
+        true,
+      ).map((item) => item.message),
+    ).toEqual(["draft"]);
+  });
+
   it("drops marks when the buffer moved on after the compile", () => {
     expect(
       editorDiagnostics(

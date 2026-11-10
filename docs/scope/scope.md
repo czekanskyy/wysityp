@@ -25,8 +25,8 @@ _These are recommendations to keep your build orderly, not requirements. Skip an
 | 12 | PDF export | Release 1 | in-progress |
 | 18 | App shell and start surface | Release 1 | done |
 | 19 | Theme and page colour | Release 1 | done |
-| 20 | Working editor chrome | Release 1 | planned |
-| 21 | Command palette and shortcut sheet | Release 1 | planned |
+| 20 | Working editor chrome | Release 1 | in-progress |
+| 21 | Command palette and shortcut sheet | Release 1 | in-progress |
 | 22 | Search screen | Release 1 | planned |
 | 23 | Tabs, loose notes and welcome page | Release 1 | in-progress |
 | 13 | Smart suggestions for Typst and math | Release 2 | planned |
@@ -189,15 +189,21 @@ Let the student set the interface theme and the note page colour apart from each
 - [x] Verify it: `/check verify theme and page colour`
 - [x] Test it: `/test theme and page colour`
 
-### 20. Working editor chrome · needs a decision
+### 20. Working editor chrome · in-progress
 Dress the views the app already has: the rendered page, the source, and the side by side view, plus Typst warnings and the save conflict path. Leave out toolbar controls for work the app cannot do yet.
 **Done when:** a student can switch those views, read a warning, and resolve a save conflict in the new chrome, in both languages and both themes, and no control promises an action that does not exist yet.
-- [ ] Design it (spec): `/architect working editor chrome`
+**Spec:** [0009. Toolbar, palette, and motion](../specs/0009-toolbar-palette-motion/index.md)
+**Code:** `src/lib/shell/EditorToolbar.svelte`, `src/lib/toolbarActions.ts`, `src/lib/editor.ts`, `src/styles/base.css`
+- [x] Design it (spec): `/architect working editor chrome`
+- [x] Build it: `/develop working editor chrome`
 
-### 21. Command palette and shortcut sheet · needs a decision
+### 21. Command palette and shortcut sheet · in-progress
 Reach the actions the app already has from the keyboard, through a command palette and a shortcut sheet. The export names two different palette shortcuts. The spec picks one, and both surfaces list only real actions.
 **Done when:** a student can open the palette, run an existing action, and open a sheet that shows the same shortcuts, in Polish and English.
-- [ ] Design it (spec): `/architect command palette and shortcut sheet`
+**Spec:** [0009. Toolbar, palette, and motion](../specs/0009-toolbar-palette-motion/index.md)
+**Code:** `src/lib/actions.ts`, `src/lib/ui/CommandPalette.svelte`, `src/lib/shell/ShortcutSheet.svelte`
+- [x] Design it (spec): `/architect command palette and shortcut sheet`
+- [x] Build it: `/develop command palette and shortcut sheet`
 
 ### 22. Search screen · needs a decision
 Restyle search to match the export. Search still finds text inside notes, with the path, line, and snippet it already returns. Replace, and a separate search of folder names or file names, wait.

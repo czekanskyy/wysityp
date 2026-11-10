@@ -10,7 +10,7 @@
 <script lang="ts">
   import Icon from "./Icon.svelte";
   import Kbd from "./Kbd.svelte";
-  import { commandMatches } from "./fold";
+  import { rankByFuzzy } from "./fold";
   import type { CommandItem } from "./types";
 
   type Props = {
@@ -21,7 +21,8 @@
     hints: readonly string[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onRun: (id: string) => void;
+    /** Return true to keep the palette open. */
+    onRun: (id: string) => boolean | void;
   };
 
   let {
@@ -44,7 +45,11 @@
   let inputEl = $state<HTMLInputElement | null>(null);
 
   const filtered = $derived(
-    commands.filter((command) => commandMatches(command.label, query)),
+    rankByFuzzy(commands, query, (command) =>
+      [command.label, command.group ?? "", ...(command.shortcut ?? [])].join(
+        " ",
+      ),
+    ),
   );
   const activeIndex = $derived(
     filtered.length === 0 ? 0 : Math.min(active, filtered.length - 1),
@@ -57,8 +62,8 @@
   }
 
   function run(command: CommandItem) {
-    onRun(command.id);
-    onOpenChange(false);
+    const stay = onRun(command.id);
+    if (stay !== true) onOpenChange(false);
   }
 
   function onKey(event: KeyboardEvent) {
@@ -95,6 +100,9 @@
       dialog.close();
     }
     wasOpen = open;
+    return () => {
+      if (dialog.open) dialog.close();
+    };
   });
 
   $effect(() => {
@@ -111,6 +119,9 @@
   bind:this={dialogEl}
   oncancel={onCancel}
   onkeydown={onKey}
+  onclick={(event) => {
+    if (event.target === dialogEl) onOpenChange(false);
+  }}
 >
   <div class="palette-query">
     <Icon id="search" />
