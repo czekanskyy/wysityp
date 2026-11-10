@@ -1,11 +1,13 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import AppearanceDialog from "./lib/ui/AppearanceDialog.svelte";
+  import CommandPalette from "./lib/ui/CommandPalette.svelte";
   import Icon from "./lib/ui/Icon.svelte";
   import Sidebar from "./lib/ui/Sidebar.svelte";
   import NavFollow from "./lib/shell/NavFollow.svelte";
   import NewNoteDialog from "./lib/shell/NewNoteDialog.svelte";
   import NoteStage from "./lib/shell/NoteStage.svelte";
+  import ShortcutSheet from "./lib/shell/ShortcutSheet.svelte";
   import Welcome from "./lib/shell/Welcome.svelte";
   import { createSession } from "./lib/state/session.svelte";
   import type { StartupAppearance } from "./lib/appearance";
@@ -102,6 +104,41 @@
   </div>
 
   <NewNoteDialog {session} />
+  {#if session.palette !== "closed"}
+    {#key session.palette}
+      <CommandPalette
+        commands={session.palette === "notes"
+          ? session.goCommands
+          : session.commands}
+        label={session.palette === "notes"
+          ? session.actionCopy.go.label
+          : session.actionCopy.palette.label}
+        placeholder={session.palette === "notes"
+          ? session.actionCopy.go.placeholder
+          : session.actionCopy.palette.placeholder}
+        emptyText={session.palette === "notes"
+          ? session.actionCopy.go.empty
+          : session.actionCopy.palette.empty}
+        hints={session.actionCopy.palette.hints}
+        open={true}
+        onOpenChange={(open) => {
+          if (!open) session.closePalette();
+        }}
+        onRun={(id) => session.perform(id)}
+      />
+    {/key}
+  {/if}
+  <ShortcutSheet
+    rows={session.shortcutEntries}
+    label={session.actionCopy.sheet.label}
+    placeholder={session.actionCopy.sheet.placeholder}
+    emptyText={session.actionCopy.sheet.empty}
+    closeLabel={session.actionCopy.sheet.close}
+    open={session.shortcutsOpen}
+    onOpenChange={(open) => {
+      if (!open) session.closeShortcuts();
+    }}
+  />
   <AppearanceDialog
     open={session.appearanceOpen}
     restore={session.appearanceTrigger}
