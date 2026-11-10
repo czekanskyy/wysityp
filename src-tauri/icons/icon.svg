@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>WYSITyp</title>
+  <!-- container: Papier ink blue -->
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="#2a4fbf" />
+  <!-- paper sheet with a folded top-right corner -->
+  <path
+    d="M252 168 H624 L800 344 V812 A52 52 0 0 1 748 864 H252 A52 52 0 0 1 200 812 V220 A52 52 0 0 1 252 168 Z"
+    fill="#fffdf9"
+  />
+  <path d="M624 168 L800 344 H676 A52 52 0 0 1 624 292 Z" fill="#c3cff0" />
+  <!-- a heading being typed -->
+  <rect x="288" y="428" width="240" height="124" rx="62" fill="#2a4fbf" />
+  <!-- caret -->
+  <rect x="568" y="380" width="76" height="220" rx="38" fill="#7c3aad" />
+  <!-- body line -->
+  <rect x="288" y="684" width="424" height="80" rx="40" fill="#2a4fbf" />
+</svg>

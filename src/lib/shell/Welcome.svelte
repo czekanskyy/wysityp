@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fileName } from "../tabs";
+  import AppIcon from "../ui/AppIcon.svelte";
   import Kbd from "../ui/Kbd.svelte";
   import type { Session } from "../state/session.svelte";
 
@@ -7,7 +8,10 @@
 </script>
 
 <div class="welcome">
-  <p class="welcome-mark">{session.labels.appName}</p>
+  <p class="welcome-mark">
+    <AppIcon size={32} />
+    <span>{session.labels.appName}</span>
+  </p>
   <ul class="welcome-actions">
     <li>
       <button
