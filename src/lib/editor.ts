@@ -80,7 +80,7 @@ export interface EditorHandle {
   getPlace(): EditorPlace;
   setText(text: string): void;
   restorePlace(place: EditorPlace): void;
-  setSelection(position: number): void;
+  setSelection(position: number, head?: number): void;
   focus(): void;
   destroy(): void;
   getState(): EditorState;
@@ -1342,11 +1342,12 @@ export function createEditor(
       applyScroll();
       requestAnimationFrame(applyScroll);
     },
-    setSelection: (position) => {
-      const clamped = clamp(position);
+    setSelection: (position, head) => {
+      const anchor = clamp(position);
+      const headPos = clamp(head ?? position);
       view.dispatch({
-        selection: { anchor: clamped },
-        effects: EditorView.scrollIntoView(clamped, { y: "nearest" }),
+        selection: { anchor, head: headPos },
+        effects: EditorView.scrollIntoView(headPos, { y: "nearest" }),
       });
     },
     focus: () => view.focus(),
@@ -1461,7 +1462,8 @@ export function createEditor(
     },
     insertCodeBlock: (lang) => {
       const range = view.state.selection.main;
-      const skeleton = codeBlockSkeleton(lang);
+      const selected = view.state.sliceDoc(range.from, range.to);
+      const skeleton = codeBlockSkeleton(lang, selected);
       view.dispatch({
         changes: { from: range.from, to: range.to, insert: skeleton.text },
         selection: { anchor: range.from + skeleton.cursor },

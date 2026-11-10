@@ -61,13 +61,20 @@ export function tableSkeleton(rows: number, cols: number): string {
   return lines.join("\n");
 }
 
-export function codeBlockSkeleton(lang?: string): {
+export function codeBlockSkeleton(
+  lang?: string,
+  selected = "",
+): {
   text: string;
   cursor: number;
 } {
   const clean = (lang ?? "").trim().replace(/[^\w+-]/g, "");
   const open = clean ? `\`\`\`${clean}\n` : "```\n";
-  return { text: `${open}\n\`\`\``, cursor: open.length };
+  const body = selected ? `${selected}\n` : "\n";
+  return {
+    text: `${open}${body}\`\`\``,
+    cursor: open.length + selected.length,
+  };
 }
 
 export function mathSkeleton(

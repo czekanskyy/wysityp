@@ -78,6 +78,10 @@ describe("classifySpans", () => {
       .filter((range) => range.className === "cm-enum-num")
       .map((range) => range.text);
     expect(numbers).toEqual(["1.", "2.", "3.", "1."]);
+    const bulletsShown = plan.replaces.filter(
+      (range) => range.className === "cm-bullet-mark",
+    );
+    expect(bulletsShown.map((range) => range.text)).toEqual(["•", "•", "•"]);
   });
 
   it("renders a quote and its attribution, and leaves other arguments as source", () => {
@@ -409,9 +413,21 @@ describe("structure keys", () => {
     expect(edit(empty, emptyCaret, "Enter")).toEqual({
       from: 0,
       to: 4,
-      insert: "",
-      selection: 0,
+      insert: "\n",
+      selection: 1,
     });
+  });
+
+  it("keeps the paragraph after an ended list out of the list", () => {
+    const source = "- łódź\n- ";
+    const exit = edit(source, source.length, "Enter");
+    expect(exit?.insert).toBe("\n");
+    const ended =
+      source.slice(0, exit!.from) + exit!.insert + source.slice(exit!.to);
+    const paragraph =
+      ended.slice(0, exit!.selection) + "akapit" + ended.slice(exit!.selection);
+    expect(edit(paragraph, paragraph.length, "Enter")).toBeNull();
+    expect(paragraph.startsWith("- łódź\n\nakapit")).toBe(true);
   });
 
   it("stays in a quote that has text and leaves an empty quote line", () => {

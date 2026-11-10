@@ -1482,11 +1482,18 @@ export function planDecorations(
       while (source.charCodeAt(markerFrom) === 32) markerFrom += 1;
       const markerTo = Math.min(span.to, markerFrom + span.marker.length);
       const number = numbers.get(span);
+      const bullet = span.kind === "bullet";
       replaces.push({
         from: span.from,
         to: markerTo,
-        text: span.kind === "enum" && number !== undefined ? `${number}.` : "",
-        className: span.kind === "enum" ? "cm-enum-num" : "",
+        text:
+          span.kind === "enum" && number !== undefined
+            ? `${number}.`
+            : bullet
+              ? "•"
+              : "",
+        className:
+          span.kind === "enum" ? "cm-enum-num" : bullet ? "cm-bullet-mark" : "",
       });
       const itemClass =
         span.kind === "bullet"
@@ -1952,7 +1959,14 @@ export function structureKey(
   if (span.kind === "bullet" || span.kind === "enum" || span.kind === "term") {
     if (!itemHasText(source, span)) {
       const content = markerContentStart(source, span);
-      return { from: span.from, to: content, insert: "", selection: span.from };
+      // A blank line has to stay above the caret. Otherwise the next
+      // sentence is a continuation and Enter puts the marker back.
+      return {
+        from: span.from,
+        to: content,
+        insert: "\n",
+        selection: span.from + 1,
+      };
     }
     let indent = 0;
     while (source.charCodeAt(span.from + indent) === 32) indent += 1;

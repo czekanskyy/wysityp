@@ -6953,7 +6953,9 @@ dependencies = [
  "typst-svg",
  "typst-syntax",
  "typst-utils",
+ "webview2-com",
  "whoami",
+ "windows",
 ]
 
 [[package]]
