@@ -166,7 +166,10 @@ function openMenu(at, items, { cls = "", node = null } = {}) {
     document.addEventListener("mousedown", outside, true);
   }, 0);
   document.addEventListener("keydown", key, true);
-  if (at && at.setAttribute) at.setAttribute("aria-expanded", "true");
+  if (at && at.setAttribute) {
+    at.setAttribute("aria-expanded", "true");
+    at.classList.add("menu-open");
+  }
   curMenu = {
     m,
     at,
@@ -181,7 +184,10 @@ function closeMenu() {
   if (!curMenu) return;
   curMenu.off();
   curMenu.m.remove();
-  if (curMenu.at && curMenu.at.setAttribute) curMenu.at.setAttribute("aria-expanded", "false");
+  if (curMenu.at && curMenu.at.setAttribute) {
+    curMenu.at.setAttribute("aria-expanded", "false");
+    curMenu.at.classList.remove("menu-open");
+  }
   curMenu = null;
 }
 
@@ -789,7 +795,7 @@ const TAG_COLORS = [
   ["teal", "Morski"],
 ];
 function syncTagsBar(n) {
-  if (E && E.id === S.active && S.notes[S.active] === n) $(".top-end", E.root).innerHTML = tagsBar(n) + `<button class="wt-btn ghost sm" data-act="exportPdf" title="${esc(tip("exportPdf"))}">${icon("pdf", "sm")}PDF</button>`;
+  if (E && E.id === S.active && S.notes[S.active] === n) $(".top-end", E.head).innerHTML = tagsBar(n) + `<button class="wt-btn ghost sm" data-act="exportPdf" title="${esc(tip("exportPdf"))}">${icon("pdf", "sm")}PDF</button>`;
   persist();
 }
 /* Centred dialog: the note's tags on top, then one box that filters the list or creates a new tag with a colour. */

@@ -15,12 +15,20 @@
         <div class="sb-resize" id="sbResize" title="Przeciągnij, aby zmienić szerokość. Podwójne kliknięcie przywraca domyślną."></div>
         <button class="sb-edge" id="sbEdge" data-act="toggleSidebar" aria-controls="sb"></button>
         <main class="main">
-          <div class="tabs" id="tabs"></div>
-          <div id="view" style="flex: 1; min-height: 0; display: flex; flex-direction: column"></div>
+          <div class="top" id="top">
+            <div class="tabs" id="tabs"></div>
+            <div class="top-head" id="head"></div>
+          </div>
+          <div class="mid">
+            <div id="view" style="flex: 1; min-height: 0; display: flex; flex-direction: column"></div>
+            <div class="rail" id="rail"></div>
+          </div>
           <div class="dock" id="dock">
             <section class="problems" id="problems" aria-label="Problemy" inert></section>
             <footer class="status" id="status"></footer>
           </div>
+          <div class="edge-hint eh-top" aria-hidden="true"></div>
+          <div class="edge-hint eh-left" aria-hidden="true"></div>
           <div class="dock-hint" aria-hidden="true"></div>
         </main>
       </div>

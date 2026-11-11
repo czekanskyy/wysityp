@@ -160,6 +160,13 @@ kbd { font-family: var(--font-ui); }
 .deco-icons .wt-ibtn[aria-checked="true"] { background: var(--color-accent-soft); box-shadow: inset 0 0 0 1.5px var(--color-accent); }
 
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-surface); position: relative; }
+/* The top panel holds the tabs and, for a note, its breadcrumb and toolbar. The right rail holds the view bar of the page. */
+.top { flex: none; display: flex; flex-direction: column; }
+.mid { flex: 1; min-height: 0; display: flex; }
+#view { min-width: 0; }
+.rail { flex: none; display: flex; }
+.rail:empty, .shell:has(.editor[data-view="source"]) .rail { display: none; }
+.edge-hint { display: none; }
 
 /* ---------- Tabs: rounded, always sharing the full width ---------- */
 .tabs { flex: none; display: flex; align-items: center; gap: 4px; height: 2.5rem; padding: 0 4px 0 6px; background: var(--color-bg); border-bottom: 1px solid var(--color-border); }
@@ -826,7 +833,7 @@ html:not([data-ui="float"]) .float-only { display: none; }
 .src-prev { margin: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface-raised); font: var(--src-size)/1.6 var(--src-font); font-variant-ligatures: var(--src-lig, none); white-space: pre; overflow: auto; }
 
 /* ---------- Start page: full screen, without tabs and status bar ---------- */
-.main.home-mode #tabs, .main.home-mode #dock, .main.home-mode .dock-hint { display: none; }
+.main.home-mode .top, .main.home-mode #dock, .main.home-mode .dock-hint, .main.home-mode .eh-top { display: none; }
 .home-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .home-back { gap: 6px; }
 .home-back .cnt { min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px; border-radius: 9px; background: var(--color-surface-sunken); color: var(--color-text-muted); font: 600 11px/18px var(--font-ui); text-align: center; }
@@ -921,33 +928,58 @@ html[data-ui="float"][data-theme="dark"] {
   --glass-shadow: inset 0 1px 0 rgb(255 255 255 / .04), 0 0 0 1px var(--glass-line), 0 8px 18px rgb(0 0 0 / .5), 0 1px 3px rgb(0 0 0 / .3);
   --card-shadow: 0 0 0 1px var(--glass-line), 0 2px 8px rgb(0 0 0 / .3);
 }
-html[data-ui="float"] :is(.shell > .sb, .sb-edge, .tabs, .vtb, .dock, .float-tb, .tab-peek, .wt-menu, .pop, .dlg, .toast, .diag-box) { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+html[data-ui="float"] :is(.top, .shell > .sb, .vtb, .dock, .float-tb, .tab-peek, .wt-menu, .pop, .dlg, .toast, .diag-box) { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
 
-/* Window: sidebar, tabs and the note sit as separate cards over a Mica-like backdrop. */
-html[data-ui="float"] .shell { background: var(--mica); }
-html[data-ui="float"] .main { padding: 8px; gap: 6px; background: transparent; }
-html[data-ui="float"] .shell > .sb { height: auto; margin: 8px 0 8px 8px; border-right: 0; border-radius: var(--glass-r); background: var(--glass-noise), var(--glass-bg); box-shadow: var(--glass-shadow); transition: width .32s var(--spring-soft), margin .32s var(--spring-soft), opacity .2s ease, box-shadow .2s; }
-html[data-ui="float"] .shell.no-sb .sb { margin-left: 0; opacity: 0; box-shadow: none; }
-html[data-ui="float"] .sb .foot { border-top-color: var(--glass-line); }
-html[data-ui="float"] .sb-edge { left: calc(var(--sb-w) + 8px); border: 0; border-radius: 0 6px 6px 0; background: var(--glass-noise), var(--glass-bg-strong); box-shadow: var(--glass-shadow); transition: left .32s var(--spring-soft), color .12s, width .12s; }
-html[data-ui="float"] .tabs { border: 0; border-radius: var(--glass-r); background: var(--glass-noise), var(--glass-bg); box-shadow: var(--glass-shadow); }
+/* Window: four glass panels around the note, over a Mica-like backdrop.
+   Pinned, a panel docks and takes room: top and bottom span the whole width, left and right fill the height between them.
+   Unpinned, it floats over the note and slides in from its edge. The floating left panel keeps room for the top and bottom panels. */
+html[data-ui="float"] .shell { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr) auto; padding: 8px; background: var(--mica); }
+html[data-ui="float"] :is(.main, .mid) { display: contents; }
+html[data-ui="float"] :is(.top, .shell > .sb, .dock, .vtb) { border: 0; border-radius: var(--glass-r); background: var(--glass-noise), var(--glass-bg); box-shadow: var(--card-shadow); }
+html[data-ui="float"] .top { grid-area: 1 / 1 / 2 / -1; z-index: 32; margin-bottom: 8px; transition: transform .36s var(--spring-soft), opacity .2s ease; }
+html[data-ui="float"] .tabs { border: 0; background: transparent; }
+html[data-ui="float"] .top-head:not(:empty) { border-top: 1px solid var(--glass-line); }
 html[data-ui="float"] .tab.active { border-color: transparent; box-shadow: var(--card-shadow); }
-html[data-ui="float"] #view { border-radius: var(--glass-r); overflow: hidden; background: var(--color-surface); box-shadow: var(--card-shadow); }
+html[data-ui="float"] .shell > .sb { grid-area: 2 / 1; z-index: 31; width: var(--sb-w); height: auto; margin-right: 8px; transition: transform .36s var(--spring-soft), opacity .2s ease; }
+html[data-ui="float"] .sb .foot { border-top-color: var(--glass-line); }
+html[data-ui="float"] .sb-resize { grid-area: 2 / 1; justify-self: end; width: 8px; margin: 0; }
+html[data-ui="float"] .shell.no-sb .sb-resize { display: block; }
+html[data-ui="float"] .sb-edge { display: none; }
+html[data-ui="float"] #view { grid-area: 2 / 2; border-radius: var(--glass-r); overflow: hidden; background: var(--color-surface); box-shadow: var(--card-shadow); }
+html[data-ui="float"] .rail { grid-area: 2 / 3; position: relative; z-index: 25; }
+html[data-ui="float"] .dock { grid-area: 3 / 1 / 4 / -1; position: relative; margin-top: 8px; overflow: hidden; transition: transform .4s var(--spring), opacity .22s ease; }
+html[data-ui="float"] .wt-ibtn.pin[aria-pressed="true"], html[data-ui="float"] .status .st-pin[aria-pressed="true"] { color: var(--color-accent-text); }
 
-/* View bar: a frosted column floating on the right edge, over the page. It slides away and comes back near the edge. */
-html[data-ui="float"] .vtb { position: absolute; right: 10px; top: 50%; width: auto; max-height: calc(100% - 20px); padding: 5px 3px; border: 0; border-radius: var(--glass-r); background: var(--glass-noise), var(--glass-bg); box-shadow: var(--glass-shadow); transform: translateY(-50%); transition: transform .36s var(--spring-soft), opacity .2s ease; }
-html[data-ui="float"][data-vtb-auto] .pane-page:not(.vtb-show) .vtb:not(:has([aria-expanded="true"], :focus-visible)) { transform: translate(calc(100% + 18px), -50%); opacity: 0; pointer-events: none; transition: transform .26s cubic-bezier(.7, 0, 1, .5), opacity .18s ease .06s; }
-html[data-ui="float"][data-vtb-auto] .pane-page::after { content: ""; position: absolute; right: 4px; top: 50%; width: 4px; height: 44px; margin-top: -22px; border-radius: 2px; background: color-mix(in srgb, var(--color-text) 24%, transparent); pointer-events: none; transition: opacity .2s; }
-html[data-ui="float"][data-vtb-auto] .pane-page.vtb-show::after, html[data-ui="float"][data-vtb-auto] .pane-page:has(.vtb [aria-expanded="true"])::after { opacity: 0; }
+/* Unpinned: the panel leaves the grid and floats over the note with a deeper shadow. Without a grid area it is placed against the window, not its old cell. */
+html[data-ui="float"][data-top-auto] .top { grid-area: auto; position: absolute; top: 8px; left: 8px; right: 8px; margin: 0; box-shadow: var(--glass-shadow); }
+html[data-ui="float"][data-sb-auto] .shell > .sb { grid-area: auto; position: absolute; left: 8px; top: calc(8px + var(--top-off, 0px)); bottom: calc(8px + var(--dock-off, 0px)); margin: 0; box-shadow: var(--glass-shadow); }
+html[data-ui="float"][data-sb-auto] .shell .sb-resize { display: none; }
+html[data-ui="float"][data-status-auto] .dock { grid-area: auto; position: absolute; left: 8px; right: 8px; bottom: 8px; margin: 0; box-shadow: var(--glass-shadow); }
+html[data-ui="float"][data-vtb-auto] .vtb { position: absolute; right: 10px; top: 50%; max-height: calc(100% - 20px); padding: 5px 3px; box-shadow: var(--glass-shadow); transform: translateY(-50%); transition: transform .36s var(--spring-soft), opacity .2s ease; }
+html[data-ui="float"]:not([data-vtb-auto]) .rail { display: flex; }
+html[data-ui="float"]:not([data-vtb-auto]) .vtb { width: 44px; margin-left: 8px; padding: 6px 0; }
 
-/* Bottom bar: a frosted bar floating over the note. The problems list unfolds upwards out of it. */
-html[data-ui="float"] .dock { position: absolute; left: 16px; right: 16px; bottom: 16px; border-radius: var(--glass-r); overflow: hidden; background: var(--glass-noise), var(--glass-bg); box-shadow: var(--glass-shadow); transition: transform .4s var(--spring), opacity .22s ease; }
+/* Hidden until the pointer nears the edge. A panel with focus from the keyboard, a typed search or an open menu stays out. */
+html[data-ui="float"][data-top-auto] .shell:not(.top-show) .top:not(:has(input:focus, :focus-visible, .menu-open)) { transform: translateY(calc(-100% - 16px)); opacity: 0; pointer-events: none; transition: transform .26s cubic-bezier(.7, 0, 1, .5), opacity .18s ease .06s; }
+html[data-ui="float"][data-sb-auto] .shell:not(.sb-show) > .sb:not(:has(input:focus, :focus-visible, .menu-open)) { transform: translateX(calc(-100% - 16px)); opacity: 0; pointer-events: none; transition: transform .26s cubic-bezier(.7, 0, 1, .5), opacity .18s ease .06s; }
+html[data-ui="float"][data-status-auto] .shell:not(.dock-show) .dock:not(.pb-open):not(:has(:focus-visible)) { transform: translateY(calc(100% + 16px)); opacity: 0; pointer-events: none; transition: transform .28s cubic-bezier(.7, 0, 1, .5), opacity .18s ease .08s; }
+html[data-ui="float"][data-vtb-auto] .rail:not(.vtb-show) .vtb:not(:has([aria-expanded="true"], :focus-visible)) { transform: translate(calc(100% + 18px), -50%); opacity: 0; pointer-events: none; transition: transform .26s cubic-bezier(.7, 0, 1, .5), opacity .18s ease .06s; }
+
+/* Small handles in the window margin show where a hidden panel waits. */
+html[data-ui="float"] :is(.edge-hint, .dock-hint) { position: absolute; z-index: 19; border-radius: 2px; background: color-mix(in srgb, var(--color-text) 24%, transparent); pointer-events: none; transition: opacity .2s; }
+html[data-ui="float"][data-top-auto] .eh-top { display: block; top: 2px; left: 50%; width: 48px; height: 4px; margin-left: -24px; }
+html[data-ui="float"][data-sb-auto] .eh-left { display: block; left: 2px; top: calc(50% + (var(--top-off, 0px) - var(--dock-off, 0px)) / 2); width: 4px; height: 48px; margin-top: -24px; }
+html[data-ui="float"][data-status-auto] .dock-hint { display: block; bottom: 2px; left: 50%; width: 48px; height: 4px; margin-left: -24px; }
+html[data-ui="float"][data-vtb-auto] .rail:has(.vtb)::after { content: ""; position: absolute; right: 4px; top: 50%; width: 4px; height: 44px; margin-top: -22px; border-radius: 2px; background: color-mix(in srgb, var(--color-text) 24%, transparent); pointer-events: none; transition: opacity .2s; }
+html[data-ui="float"] .shell.top-show .eh-top, html[data-ui="float"] .shell.sb-show .eh-left, html[data-ui="float"] .shell.dock-show .dock-hint, html[data-ui="float"] .shell:has(.dock.pb-open) .dock-hint { opacity: 0; }
+html[data-ui="float"][data-vtb-auto] .rail.vtb-show::after, html[data-ui="float"][data-vtb-auto] .rail:has(.vtb [aria-expanded="true"])::after { opacity: 0; }
+
+/* Bottom bar. The problems list unfolds upwards out of it. */
 html[data-ui="float"] .dock.pb-open { background: var(--glass-noise), var(--glass-bg-strong); }
 html[data-ui="float"] .dock:not(.pb-open):has(> .status[hidden]) { display: none; }
 html[data-ui="float"] .status { height: 2.2rem; padding: 0 6px; border-top: 0; background: transparent; }
 html[data-ui="float"] .status button:hover { background: color-mix(in srgb, var(--color-text) 8%, transparent); }
 html[data-ui="float"] .status .st-pin { margin-left: 2px; padding: 0 5px; color: var(--color-text-faint); }
-html[data-ui="float"] .status .st-pin[aria-pressed="true"] { color: var(--color-accent-text); }
 html[data-ui="float"] .problems { background: transparent; transition: height .42s var(--spring-soft), visibility 0s .42s; }
 html[data-ui="float"] .dock.pb-open .problems { border-top: 0; border-bottom: 1px solid var(--glass-line); transition: height .42s var(--spring-soft); }
 html[data-ui="float"] .dock.dragging .problems { transition: none; }
@@ -955,12 +987,7 @@ html[data-ui="float"] .dock.pb-open .problems > :not(.pb-resize) { animation: do
 html[data-ui="float"] .pb-h { border-bottom-color: var(--glass-line); }
 html[data-ui="float"] .pb-file:hover, html[data-ui="float"] .pb-row:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
 @keyframes dock-rise { from { opacity: 0; transform: translateY(8px); } }
-html[data-ui="float"][data-status-auto] .main:not(.dock-show) .dock:not(.pb-open):not(:has(:focus-visible)) { transform: translateY(calc(100% + 22px)); opacity: 0; pointer-events: none; transition: transform .28s cubic-bezier(.7, 0, 1, .5), opacity .18s ease .08s; }
-html[data-ui="float"][data-status-auto] .dock-hint { display: block; position: absolute; left: 50%; bottom: 11px; z-index: 19; width: 48px; height: 4px; margin-left: -24px; border-radius: 2px; background: color-mix(in srgb, var(--color-text) 24%, transparent); pointer-events: none; transition: opacity .2s; }
-html[data-ui="float"][data-status-auto] .main.dock-show .dock-hint, html[data-ui="float"][data-status-auto] .main:has(.dock.pb-open) .dock-hint { opacity: 0; }
-html[data-ui="float"]:not([data-status-auto]) .editor > .diag-box { bottom: 56px; }
-html[data-ui="float"] .toasts { bottom: 66px; }
-html[data-ui="float"]:not([data-status-auto]) :is(.st-main, .st-nav, .st-pv) { padding-bottom: 64px; }
+html[data-ui="float"] .toasts { bottom: 58px; }
 html[data-ui="float"][data-status-auto] .toasts { bottom: 24px; }
 
 /* Popups, menus, toasts and other floating bits */
@@ -981,7 +1008,7 @@ html[data-ui="float"] .diag-box { background: var(--glass-noise), color-mix(in s
 @keyframes glass-pop { from { opacity: 0; transform: scale(.97); } }
 @keyframes toast-slide { from { opacity: 0; transform: translateX(32px); } }
 @media (prefers-reduced-motion: reduce) {
-  .problems, html[data-ui="float"] :is(.dock, .vtb, .problems, .sb, .sb-edge) { transition-duration: .01s !important; }
+  .problems, html[data-ui="float"] :is(.top, .dock, .vtb, .problems, .sb) { transition-duration: .01s !important; }
   html[data-ui="float"] :is(.dlg, .pop, .wt-menu, .toast, .tab-peek, .float-tb, .diag-box), html[data-ui="float"] .dock.pb-open .problems > * { animation-duration: .01s !important; }
 }
 
@@ -1002,17 +1029,17 @@ html[data-ui="float"] .diag-box { background: var(--glass-noise), color-mix(in s
 .ui-pv.fixed .st { left: 0; right: 0; bottom: 0; height: 11px; background: var(--color-bg); border-top: 1px solid var(--color-border); }
 .ui-pv.float { background: radial-gradient(110% 80% at 0% 0%, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 62%), var(--color-surface-sunken); }
 .ui-pv.float :is(.t, .sd, .vb, .st) { border: 0; border-radius: 3px; background: color-mix(in srgb, var(--color-surface-raised) 82%, transparent); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-text) 12%, transparent), 0 2px 5px rgb(0 0 0 / .14); }
-.ui-pv.float .sd { left: 4px; top: 4px; bottom: 4px; width: calc(22% - 2px); }
-.ui-pv.float .t { left: calc(22% + 6px); right: 4px; top: 4px; height: 9px; }
-.ui-pv.float .pg { top: 19px; }
-.ui-pv.float .vb { right: 8px; top: 32px; width: 7px; height: 30px; }
-.ui-pv.float .st { left: calc(22% + 10px); right: 8px; bottom: 7px; height: 9px; }
+.ui-pv.float .t { left: 4px; right: 4px; top: 4px; height: 12px; }
+.ui-pv.float .sd { left: 4px; top: 19px; bottom: 18px; width: calc(22% - 2px); }
+.ui-pv.float .pg { top: 24px; }
+.ui-pv.float .vb { right: 8px; top: 34px; width: 7px; height: 26px; }
+.ui-pv.float .st { left: 4px; right: 4px; bottom: 4px; height: 9px; }
 
 /* Responsive shell */
 @media (max-width: 760px) {
   .shell .sb { position: absolute; z-index: 40; height: 100%; box-shadow: var(--shadow-lg); }
   .shell.no-sb .sb { box-shadow: none; }
-  html[data-ui="float"] .shell .sb { top: 0; bottom: 0; }
+  html[data-ui="float"] .shell .sb { left: 8px; top: calc(8px + var(--top-off, 0px)); bottom: calc(8px + var(--dock-off, 0px)); height: auto; margin: 0; box-shadow: var(--glass-shadow); }
   .topbar .wt-tag { display: none; }
   .wt-toolbar { grid-template-columns: auto minmax(0, 1fr) auto; }
   .pg-scroll { padding: 56px 12px 32px; }

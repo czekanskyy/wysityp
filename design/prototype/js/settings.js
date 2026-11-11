@@ -31,7 +31,7 @@ const PC_SWATCH = {
 };
 const UI_STYLES = [
   ["fixed", "Stały", "Paski przy krawędziach okna, pełne tła. Spokojne, krótkie animacje."],
-  ["float", "Pływający", "Matowe szkło jak w Windows 11. Panele unoszą się nad tłem, paski same się chowają."],
+  ["float", "Pływający", "Matowe szkło jak w Windows 11. Cztery panele wokół notatki: przypięte zajmują miejsce, odpięte chowają się przy krawędzi."],
 ];
 const ACCENTS = [
   ["blue", "#2f62d0", "Niebieski"],
@@ -130,8 +130,11 @@ const ST_SECTIONS = {
       ).join("")}</div>
       ${
         st.ui_style === "float"
-          ? stCard([
-              ["Ukrywaj dolny pasek", "Pasek wysuwa się, gdy zbliżysz kursor do dolnej krawędzi. Przypinasz go też przyciskiem na samym pasku.", stSw("status_autohide")],
+          ? `<p class="muted" style="margin:0;font-size:12px">Przypięty panel zajmuje miejsce przy krawędzi okna. Odpięty unosi się nad notatką i chowa. Każdy panel ma też własną pinezkę.</p>` +
+            stCard([
+              ["Ukrywaj górny panel", "Karty, ścieżka i pasek narzędzi wysuwają się przy górnej krawędzi okna.", stSw("top_autohide")],
+              ["Ukrywaj panel boczny", "Lista notatek wysuwa się przy lewej krawędzi i unosi nad notatką.", stSw("sb_autohide")],
+              ["Ukrywaj dolny pasek", "Pasek stanu wysuwa się przy dolnej krawędzi okna.", stSw("status_autohide")],
               ["Ukrywaj pasek widoku strony", "Zoom i dopasowanie strony wysuwają się przy prawej krawędzi podglądu.", stSw("vtb_autohide")],
             ])
           : ""
@@ -281,6 +284,7 @@ function settingsView() {
     persist();
     draw();
     if (k === "status_bar") renderStatus();
+    if (k.endsWith("_autohide")) syncPins();
   };
   node.addEventListener("click", async (e) => {
     const t = e.target.closest("[data-sec],[data-seg],[data-sw],[data-step],[data-sel],[data-pc],[data-accent],[data-uistyle],[data-st],[data-rec]");

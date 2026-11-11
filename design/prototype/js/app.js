@@ -92,6 +92,8 @@ const DEFAULTS = {
   toolbar: "compact",
   status_bar: true,
   ui_style: "fixed",
+  top_autohide: false,
+  sb_autohide: false,
   status_autohide: false,
   vtb_autohide: true,
   autosave: true,
@@ -138,6 +140,8 @@ function applySettings() {
   r.dataset.accent = st.accent;
   // Two looks: "fixed" keeps bars on the window edges, "float" puts glass bars and dialogs over the content.
   r.dataset.ui = st.ui_style === "float" ? "float" : "fixed";
+  r.toggleAttribute("data-top-auto", !!st.top_autohide);
+  r.toggleAttribute("data-sb-auto", !!st.sb_autohide);
   r.toggleAttribute("data-status-auto", !!st.status_autohide);
   r.toggleAttribute("data-vtb-auto", !!st.vtb_autohide);
   r.lang = st.locale;
@@ -364,6 +368,7 @@ function buildSidebar() {
         <span class="mark" aria-hidden="true">W</span><span class="name">WYSITyp</span>
         <button class="wt-ibtn sm" data-act="home" title="Strona startowa">${icon("home")}</button>
         <button class="wt-ibtn sm" data-act="newNote" title="${esc(tip("newNote"))}">${icon("plus")}</button>
+        ${pinBtn("sbPin", "wt-ibtn sm")}
       </div>
       <div class="sb-find" id="sbFind" role="search"></div>
     </div>
@@ -504,6 +509,7 @@ function renderTabs() {
     <div class="tab-act">
       <button class="wt-ibtn sm" data-act="newNote" title="${esc(tip("newNote"))}" aria-label="Nowa notatka">${icon("plus")}</button>
       <button class="wt-ibtn sm" data-act="tabsMenu" title="Więcej działań na kartach">${icon("more")}</button>
+      ${pinBtn("topPin", "wt-ibtn sm")}
     </div>`;
   const a = $(`.tab[data-tab="${CSS.escape(S.active)}"]`);
   if (a) a.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -762,6 +768,8 @@ function renderView() {
   closeFloat();
   const t = S.active;
   $(".main").classList.toggle("home-mode", t === "home");
+  $("#head").replaceChildren();
+  $("#rail").replaceChildren();
   let node;
   if (t === "home") node = S.ws ? homeView() : welcomeView();
   else if (t === "settings") node = settingsView();
@@ -949,7 +957,7 @@ function vtbHtml() {
     ${b("pvOutside", "surround", "Tło wokół strony w kolorze strony")}
     ${b("pvRound", "corner", "Zaokrąglone rogi strony")}
     <span class="wt-sep float-only"></span>
-    ${b("pvPin", "pin", "Przypnij pasek widoku", "float-only")}
+    ${pinBtn("pvPin", "wt-ibtn sm", "")}
   </div>`;
 }
 function pvState() {
@@ -959,18 +967,12 @@ function pvState() {
 const PG_PAD = 20,
   FIT_PAD = 14;
 const floatUi = () => S.settings.ui_style === "float";
-/* A pinned floating bar covers the content under it, so the page leaves room for it. */
-function dockReserve() {
-  if (!floatUi() || S.settings.status_autohide || !S.settings.status_bar) return 0;
-  const s = $("#status");
-  return s && !s.hidden ? s.offsetHeight + 16 : 0;
-}
 function pageZoom() {
   const st = pvState();
   const sc = E.panePage;
   const pad = st.fit === "page" ? FIT_PAD : PG_PAD;
   const w = sc.clientWidth - 2 * pad,
-    h = sc.clientHeight - 2 * FIT_PAD - dockReserve();
+    h = sc.clientHeight - 2 * FIT_PAD;
   let z = st.zoom || 1;
   if (st.fit === "width") z = w / PAGE_W;
   else if (st.fit === "page") z = Math.min(w / PAGE_W, h / PAGE_H);
@@ -992,37 +994,31 @@ function applyPageView(onlyFit = false) {
   E.zoom = z;
   E.pagePane.style.setProperty("--pz", z.toFixed(4));
   const slide = st.fit === "page";
-  const res = dockReserve();
   E.ed.dataset.slide = slide ? "1" : "0";
   if (slide) {
-    const gap = Math.max(2 * FIT_PAD, sc.clientHeight - res - PAGE_H * z);
+    const gap = Math.max(2 * FIT_PAD, sc.clientHeight - PAGE_H * z);
     E.page.style.gap = gap + "px";
-    sc.style.padding = `${gap / 2}px ${FIT_PAD}px ${gap / 2 + res}px`;
+    sc.style.padding = `${gap / 2}px ${FIT_PAD}px`;
   } else {
     E.page.style.gap = "";
-    sc.style.padding = `${PG_PAD}px ${PG_PAD}px ${PG_PAD + res + 8}px`;
+    sc.style.padding = `${PG_PAD}px ${PG_PAD}px ${PG_PAD + 8}px`;
   }
-  sc.style.scrollPaddingBottom = res + "px";
   if (Math.abs(old - z) > 0.001 && rel) sc.scrollTop = rel * sc.scrollHeight;
   E.ed.dataset.out = S.pv.outside;
   E.ed.dataset.round = S.pv.round ? "1" : "0";
-  const vtb = $(".vtb", E.pagePane);
+  const vtb = E.vtb;
   if (!vtb) return;
   $(".vtb-pct", vtb).textContent = Math.round(z * 100) + "%";
   $('[data-act="pvFitWidth"]', vtb).setAttribute("aria-pressed", st.fit === "width");
   $('[data-act="pvFitPage"]', vtb).setAttribute("aria-pressed", st.fit === "page");
   $('[data-act="pvOutside"]', vtb).setAttribute("aria-pressed", S.pv.outside === "page");
   $('[data-act="pvRound"]', vtb).setAttribute("aria-pressed", S.pv.round);
-  const pin = $('[data-act="pvPin"]', vtb);
-  pin.setAttribute("aria-pressed", !S.settings.vtb_autohide);
-  pin.title = S.settings.vtb_autohide ? "Przypnij pasek widoku" : "Ukrywaj pasek widoku automatycznie";
-  pin.innerHTML = icon(S.settings.vtb_autohide ? "pin" : "pinOff");
   updatePageNo();
 }
 /* Which page sits in the middle of the pane, shown at the top of the view bar. */
 function updatePageNo() {
   if (!E || !E.pagePane) return;
-  const lab = $(".vtb-pg", E.pagePane);
+  const lab = $(".vtb-pg", E.vtb);
   if (!lab) return;
   const sheets = [...E.page.children];
   const r = E.panePage.getBoundingClientRect();
@@ -1095,6 +1091,8 @@ function editorView(id) {
     panePage: $(".pg-scroll", root),
     pagePane: $(".pane-page", root),
     tb: $(".wt-toolbar", root),
+    vtb: $(".vtb", root),
+    head: $("#head"),
     diag: $(".diag-box", root),
     banners: $(".banners", root),
     ed: $(".editor", root),
@@ -1123,6 +1121,9 @@ function editorView(id) {
     { passive: true },
   );
   E.ta.value = n.source;
+  /* The breadcrumb and the toolbar live in the top panel, next to the tabs; the view bar lives in the right rail. */
+  E.head.replaceChildren($(".topbar", root), E.tb);
+  $("#rail").replaceChildren(E.vtb);
   const ro = new ResizeObserver(() => {
     fitToolbar();
     applyPageView(true);
@@ -1152,19 +1153,21 @@ function editorView(id) {
 }
 /* The floating view bar hides at the right edge and slides in when the pointer comes near it. */
 function bindVtbReveal(ed) {
-  const pane = ed.pagePane;
+  const pane = ed.pagePane,
+    rail = $("#rail");
   let t = 0;
   const show = (on, ms = 450) => {
     clearTimeout(t);
-    if (on) pane.classList.add("vtb-show");
-    else t = setTimeout(() => pane.classList.remove("vtb-show"), ms);
+    if (on) rail.classList.add("vtb-show");
+    else t = setTimeout(() => rail.classList.remove("vtb-show"), ms);
   };
   pane.addEventListener("mousemove", (e) => {
     if (!floatUi() || !S.settings.vtb_autohide) return;
-    const r = pane.getBoundingClientRect();
-    show(r.right - e.clientX < 96 || !!e.target.closest(".vtb"));
+    show(pane.getBoundingClientRect().right - e.clientX < 96);
   });
   pane.addEventListener("mouseleave", () => show(false));
+  ed.vtb.addEventListener("mouseenter", () => show(true));
+  ed.vtb.addEventListener("mouseleave", () => show(false));
   ed.peekVtb = () => {
     show(true);
     show(false, 1200);
@@ -1367,7 +1370,7 @@ function blockAtLine(ln) {
   return $$(".blk", E.page).find((b) => ln >= +b.dataset.s && ln <= +b.dataset.e);
 }
 function updateParaLabel(ta) {
-  const lab = $(".dd-l", E.root);
+  const lab = $(".dd-l", E.head);
   if (!lab) return;
   const v = ta.value;
   const s = v.lastIndexOf("\n", ta.selectionStart - 1) + 1;
@@ -1731,7 +1734,7 @@ function setView(v) {
   E.ed.classList.remove("fade");
   void E.ed.offsetWidth;
   E.ed.classList.add("fade");
-  $$(".wt-seg button", E.root).forEach((b) => b.setAttribute("aria-checked", b.dataset.act === "view" + v[0].toUpperCase() + v.slice(1)));
+  $$(".wt-seg button", E.head).forEach((b) => b.setAttribute("aria-checked", b.dataset.act === "view" + v[0].toUpperCase() + v.slice(1)));
   applyPageView();
   renderStatus();
   if (v !== "page") setTimeout(() => E && E.ta.focus({ preventScroll: true }), 0);
@@ -1901,7 +1904,7 @@ function renderStatus() {
     s.dataset.save = sum.cls ? "unsaved" : "saved";
     s.innerHTML = `<span class="si save"><span class="save-dot"></span>${sum.cls ? sum.text : "Wszystko zapisane"}</span>
       <span class="si path">${esc(WS() ? WS().path : "Brak otwartego folderu")}</span><span class="gap"></span>${proto}
-      <span class="si">Typst 0.13.1</span><span class="si">${S.settings.locale === "pl" ? "Polski" : "English"}</span>${problemsBtn()}${pinBtn()}`;
+      <span class="si">Typst 0.13.1</span><span class="si">${S.settings.locale === "pl" ? "Polski" : "English"}</span>${problemsBtn()}${pinBtn("statusPin", "st-pin")}`;
     renderProblems();
     return;
   }
@@ -1913,7 +1916,7 @@ function renderStatus() {
     <button class="caret" data-act="gotoLine" title="Przejdź do wiersza">Wr ${E && E.caret ? E.caret.ln + 1 : 1}, kol ${E && E.caret ? E.caret.col : 1}</button>
     <span class="si">${words} ${words === 1 ? "słowo" : words % 10 >= 2 && words % 10 <= 4 && (words % 100 < 10 || words % 100 >= 20) ? "słowa" : "słów"}</span>
     ${proto}
-    <span class="si">Typst 0.13.1</span>${problemsBtn()}${pinBtn()}`;
+    <span class="si">Typst 0.13.1</span>${problemsBtn()}${pinBtn("statusPin", "st-pin")}`;
   renderProblems();
 }
 
@@ -1940,27 +1943,69 @@ function problemsBtn() {
   const label = total ? `${icon("error", "sm")}${total} ${plErr(total)}` : `${icon("check", "sm")}Bez błędów`;
   return `<button class="pb-btn ${total ? "err-cnt" : "ok-cnt"}" data-act="problems" aria-expanded="${open}" title="${open ? "Zwiń" : "Rozwiń"} panel problemów (${esc(keyOf("problems"))})">${label}${icon(open ? "chevronDown" : "chevronUp", "sm")}</button>`;
 }
-function pinBtn() {
-  const on = !S.settings.status_autohide;
-  return `<button class="st-pin float-only" data-act="statusPin" aria-pressed="${on}" title="${on ? "Ukrywaj pasek automatycznie" : "Przypnij pasek, żeby był zawsze widoczny"}" aria-label="Przypnij dolny pasek">${icon(on ? "pin" : "pinOff", "sm")}</button>`;
+/* Each floating panel has a pin. Pinned, it docks and takes room; unpinned, it floats over the note and hides at its edge. */
+const PINS = {
+  topPin: ["top_autohide", "górny panel", "top-show"],
+  sbPin: ["sb_autohide", "panel boczny", "sb-show"],
+  statusPin: ["status_autohide", "dolny pasek", "dock-show"],
+  pvPin: ["vtb_autohide", "pasek widoku", "vtb-show"],
+};
+function pinBtn(act, cls, size = "sm") {
+  const [key, what] = PINS[act];
+  const on = !S.settings[key];
+  const title = on ? `Odepnij ${what}: schowa się przy krawędzi okna` : `Przypnij ${what}, żeby był zawsze widoczny`;
+  return `<button class="${cls} pin float-only" data-act="${act}" data-size="${size}" aria-pressed="${on}" title="${title}" aria-label="Przypnij ${what}">${icon(on ? "pin" : "pinOff", size)}</button>`;
 }
-/* A floating bar set to hide comes back when the pointer nears the bottom edge. */
-function bindDock() {
-  const main = $(".main"),
+function syncPins() {
+  for (const act in PINS) $$(`[data-act="${act}"]`).forEach((b) => (b.outerHTML = pinBtn(act, b.className.replace(" pin float-only", ""), b.dataset.size)));
+}
+function togglePin(act) {
+  const [key, , cls] = PINS[act];
+  S.settings[key] = !S.settings[key];
+  applySettings();
+  persist();
+  syncPins();
+  /* A panel you just unpinned stays out until the pointer leaves it, so it does not vanish under the cursor. */
+  (act === "pvPin" ? $("#rail") : $("#shell")).classList.toggle(cls, S.settings[key]);
+  if (S.active === "settings") renderView();
+}
+/* Unpinned floating panels come back when the pointer nears their edge of the window, and hide again shortly after it leaves.
+   The left panel answers only between the top and bottom panels, so a corner reveals one panel, not two. */
+function bindEdges() {
+  const shell = $("#shell"),
+    top = $("#top"),
+    sb = $("#sb"),
     dock = $("#dock");
-  let t = 0;
-  const show = (on) => {
-    clearTimeout(t);
-    if (on) main.classList.add("dock-show");
-    else t = setTimeout(() => main.classList.remove("dock-show"), 500);
-  };
-  main.addEventListener("mousemove", (e) => {
-    if (!floatUi() || !S.settings.status_autohide) return;
-    const r = main.getBoundingClientRect();
-    const reach = main.classList.contains("dock-show") ? dock.offsetHeight + 28 : 36;
-    show(r.bottom - e.clientY < reach);
+  /* The left panel keeps room for the top and bottom panels even while they hide. */
+  const off = (p) => (p.offsetHeight ? p.offsetHeight + 8 : 0);
+  const ro = new ResizeObserver(() => {
+    shell.style.setProperty("--top-off", off(top) + "px");
+    shell.style.setProperty("--dock-off", off(dock) + "px");
   });
-  main.addEventListener("mouseleave", () => show(false));
+  ro.observe(top);
+  ro.observe(dock);
+  const timers = {};
+  const show = (cls, on) => {
+    clearTimeout(timers[cls]);
+    if (on) return shell.classList.add(cls);
+    if (!shell.classList.contains(cls)) return;
+    timers[cls] = setTimeout(() => {
+      /* An open menu or popup keeps its panel out. */
+      if ($("#layer").childElementCount) return show(cls, false);
+      shell.classList.remove(cls);
+    }, 450);
+  };
+  const parts = [
+    ["top_autohide", "top-show", top, (e, r, out) => e.clientY - r.top < (out ? top.offsetHeight + 24 : 28)],
+    ["sb_autohide", "sb-show", sb, (e, r, out) => e.clientX - r.left < (out ? sb.offsetWidth + 24 : 24) && e.clientY > r.top + off(top) && e.clientY < r.bottom - off(dock)],
+    ["status_autohide", "dock-show", dock, (e, r, out) => r.bottom - e.clientY < (out ? dock.offsetHeight + 28 : 36)],
+  ];
+  shell.addEventListener("mousemove", (e) => {
+    if (!floatUi()) return;
+    const r = shell.getBoundingClientRect();
+    for (const [key, cls, el, near] of parts) if (S.settings[key]) show(cls, el.contains(e.target) || near(e, r, shell.classList.contains(cls)));
+  });
+  shell.addEventListener("mouseleave", () => parts.forEach(([, cls]) => show(cls, false)));
 }
 function renderStatusProblems() {
   const b = $("#status .pb-btn");
@@ -2238,7 +2283,7 @@ function renameInline(id) {
     renderSidebar();
     renderTabs();
     renderStatus();
-    if (E && E.id === id) $(".crumbs", E.root).outerHTML = crumbsHtml(id);
+    if (E && E.id === id) $(".crumbs", E.head).outerHTML = crumbsHtml(id);
   };
   inp.addEventListener("keydown", (e) => {
     e.stopPropagation();
@@ -2419,19 +2464,11 @@ function run(id, ctx = {}) {
       return zoomStep(-1);
     case "pvZoomMenu":
       return zoomMenu(a);
-    case "pvPin":
-      S.settings.vtb_autohide = !S.settings.vtb_autohide;
-      applySettings();
-      persist();
-      if (E && E.pagePane) E.pagePane.classList.toggle("vtb-show", !S.settings.vtb_autohide);
-      return;
+    case "topPin":
+    case "sbPin":
     case "statusPin":
-      S.settings.status_autohide = !S.settings.status_autohide;
-      applySettings();
-      persist();
-      renderStatus();
-      $(".main").classList.toggle("dock-show", S.settings.status_autohide);
-      return;
+    case "pvPin":
+      return togglePin(id);
     case "uiStyle":
       S.settings.ui_style = floatUi() ? "fixed" : "float";
       applySettings();
@@ -2457,6 +2494,7 @@ function run(id, ctx = {}) {
     case "shortcuts":
       return openShortcuts();
     case "toggleSidebar":
+      if (floatUi()) return togglePin("sbPin");
       S.sidebar = !S.sidebar;
       renderRail();
       return persist();
@@ -2565,7 +2603,7 @@ function run(id, ctx = {}) {
     case "tagRm": {
       const n = S.notes[S.active];
       n.tags = n.tags.filter((t) => t !== arg);
-      $(".top-end", E.root).innerHTML = tagsBar(n) + `<button class="wt-btn ghost sm" data-act="exportPdf" title="${esc(tip("exportPdf"))}">${icon("pdf", "sm")}PDF</button>`;
+      $(".top-end", E.head).innerHTML = tagsBar(n) + `<button class="wt-btn ghost sm" data-act="exportPdf" title="${esc(tip("exportPdf"))}">${icon("pdf", "sm")}PDF</button>`;
       return persist();
     }
     case "goDiag": {
@@ -2834,7 +2872,7 @@ function boot() {
   buildSidebar();
   bindSearch();
   bindProblems();
-  bindDock();
+  bindEdges();
   renderAll();
   window.addEventListener("beforeunload", persist);
 }
