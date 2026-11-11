@@ -107,6 +107,12 @@ const DEFAULTS = {
   pdf_open: false,
   packages_online: true,
   drafts_dir: "~/Dokumenty/WYSITyp/Szkice",
+  ai_enabled: false,
+  ai_provider: "anthropic",
+  ai_model: "claude-sonnet-5-5",
+  ai_url: "http://localhost:11434",
+  ai_note_ctx: true,
+  ai_sel_ctx: true,
   keys: {},
 };
 const SOURCE_FONTS = {
@@ -193,6 +199,9 @@ function freshState() {
     view: null,
     sec: { root: true, loose: true, drafts: true },
     settingsSection: "appearance",
+    ai: { open: false, w: 380 },
+    aiKey: false, // only whether a key is stored; the key itself lives in the Windows Credential Manager
+    aiOffline: false,
     search: { open: false, q: "", rep: "", showRep: false, case: false, word: false, re: false, accent: false, current: false, loose: true },
   };
 }
@@ -207,6 +216,7 @@ function loadState() {
     S.search = { ...f.search, ...(saved.st.search || {}), open: false };
     S.pv = { ...f.pv, ...(saved.st.pv || {}) };
     S.problems = { ...f.problems, ...(saved.st.problems || {}) };
+    S.ai = { ...f.ai, ...(saved.st.ai || {}) };
     S.tagDefs = { ...f.tagDefs, ...(saved.st.tagDefs || {}) };
     if (!S.settings.restore_tabs) {
       S.tabs = [];
@@ -776,6 +786,7 @@ function renderView() {
   else if (S.notes[t]) node = editorView(t);
   else node = homeView();
   v.replaceChildren(node);
+  aiNoteSwitch();
   if (E) {
     applyPageView();
     requestAnimationFrame(() => E && E.restoreScroll && E.restoreScroll());
@@ -1072,7 +1083,7 @@ function editorView(id) {
   const st = S.settings;
   const root = el(`<div class="ed-wrap" style="flex:1;min-height:0;display:flex;flex-direction:column">
     <div class="topbar">${crumbsHtml(id)}<div class="top-end">${tagsBar(n)}
-      <button class="wt-btn ghost sm" data-act="exportPdf" title="${esc(tip("exportPdf"))}">${icon("pdf", "sm")}PDF</button></div></div>
+      <button class="wt-btn ghost sm" data-act="exportPdf" title="${esc(tip("exportPdf"))}">${icon("pdf", "sm")}PDF</button>${aiTopBtn()}</div></div>
     ${toolbarHtml()}
     <div class="banners"></div>
     <div class="editor" data-view="${view()}" style="--split:${(S.split || 0.5) * 100}%">
@@ -1301,7 +1312,8 @@ function renderDiag() {
   if (!d) return;
   const more = E.r.diags.length > 1 ? ` (+${E.r.diags.length - 1})` : "";
   E.diag.innerHTML = `<span class="ic">${icon("error", "sm")}</span><div><b>Wiersz ${d.line + 1}, kolumna ${d.col + 1}${more}</b> – ${esc(d.msg)}<div class="muted" style="margin-top:2px">Strona pokazuje resztę notatki. Źródło na dysku zostaje bez zmian.</div></div>
-    <button class="wt-btn secondary sm" data-act="goDiag">Przejdź</button>`;
+    <div class="acts">${aiOn() ? `<button class="wt-btn ghost sm" data-act="aiFix" title="Poproś asystenta o poprawkę">${icon("sparkle", "sm")}Napraw</button>` : ""}<button class="wt-btn secondary sm" data-act="goDiag">Przejdź</button></div>`;
+  aiDiagChanged();
 }
 let pageRaf = 0;
 function schedulePage() {
@@ -2112,7 +2124,8 @@ function showFloat(blk, sel) {
   const text = sel.toString();
   const f = el(`<div class="float-tb" role="toolbar" aria-label="Formatuj zaznaczenie">
     ${["bold", "italic", "underline", "highlight", "code", "inlineMath", "link"].map((a) => `<button class="wt-ibtn sm" data-f="${a}" title="${esc(tip(a))}">${icon(ACT[a].icon)}</button>`).join("")}
-    <span class="wt-sep"></span><button class="wt-btn ghost sm" data-f="edit">${icon("code", "sm")}Edytuj źródło</button></div>`);
+    <span class="wt-sep"></span><button class="wt-btn ghost sm" data-f="edit">${icon("code", "sm")}Edytuj źródło</button>
+    <button class="wt-btn ghost sm ai-ask" data-f="ai" title="Zapytaj asystenta o zaznaczenie (${keyOf("aiPanel")})">${icon("sparkle", "sm")}Zapytaj</button></div>`);
   document.body.appendChild(f);
   const fw = f.offsetWidth;
   f.style.left = Math.max(8, Math.min(window.innerWidth - fw - 8, r.left + r.width / 2 - fw / 2)) + "px";
@@ -2121,6 +2134,10 @@ function showFloat(blk, sel) {
   f.addEventListener("click", (e) => {
     const b = e.target.closest("[data-f]");
     if (!b) return;
+    if (b.dataset.f === "ai") {
+      closeFloat();
+      return aiOpen({ sel: text });
+    }
     const s = +blk.dataset.s,
       en = +blk.dataset.e;
     const src = E.ta.value.split("\n").slice(s, en + 1).join("\n");
@@ -2498,6 +2515,14 @@ function run(id, ctx = {}) {
       return focusSearch(true);
     case "settings":
       return settingsOpen() ? closeSettings() : openSettings();
+    case "aiPanel":
+      return toggleAi();
+    case "aiFix":
+      return aiOpen({ quick: "fix" });
+    case "aiOffline":
+      S.aiOffline = !S.aiOffline;
+      persist();
+      return renderAi();
     case "shortcuts":
       return openShortcuts();
     case "toggleSidebar":
@@ -2610,7 +2635,7 @@ function run(id, ctx = {}) {
     case "tagRm": {
       const n = S.notes[S.active];
       n.tags = n.tags.filter((t) => t !== arg);
-      $(".top-end", E.head).innerHTML = tagsBar(n) + `<button class="wt-btn ghost sm" data-act="exportPdf" title="${esc(tip("exportPdf"))}">${icon("pdf", "sm")}PDF</button>`;
+      $(".top-end", E.head).innerHTML = tagsBar(n) + `<button class="wt-btn ghost sm" data-act="exportPdf" title="${esc(tip("exportPdf"))}">${icon("pdf", "sm")}PDF</button>` + aiTopBtn();
       return persist();
     }
     case "goDiag": {
@@ -2634,6 +2659,7 @@ function run(id, ctx = {}) {
         { label: ACT.simConflict.label, icon: "warning", run: () => run("simConflict") },
         { label: ACT.simSaveFail.label, icon: "error", run: () => run("simSaveFail") },
         { label: "Pokaż ekran powitalny (zamknij folder)", icon: "home", disabled: !S.ws, run: () => closeWorkspace() },
+        { label: "Asystent bez sieci", icon: "globe", check: !!S.aiOffline, run: () => run("aiOffline") },
         { sep: true },
         { label: ACT.resetProto.label, icon: "undo", danger: true, run: () => run("resetProto") },
       ]);
@@ -2880,6 +2906,8 @@ function boot() {
   bindSearch();
   bindProblems();
   bindEdges();
+  bindAiResize();
   renderAll();
+  renderAi();
   window.addEventListener("beforeunload", persist);
 }

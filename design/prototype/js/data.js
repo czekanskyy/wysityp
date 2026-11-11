@@ -428,6 +428,7 @@ const ACTIONS = [
   { id: "goto", label: "Przejdź do notatki", group: "Aplikacja", icon: "file", key: "Ctrl+P" },
   { id: "search", label: "Szukaj w notatkach", group: "Aplikacja", icon: "search", key: "Ctrl+Shift+F" },
   { id: "settings", label: "Ustawienia", group: "Aplikacja", icon: "settings", key: "Ctrl+," },
+  { id: "aiPanel", label: "Asystent AI", group: "Aplikacja", icon: "sparkle", key: "Ctrl+L" },
   { id: "shortcuts", label: "Skróty klawiszowe", group: "Aplikacja", icon: "keyboard", key: "Ctrl+/" },
   { id: "toggleSidebar", label: "Pokaż lub schowaj pasek boczny", group: "Aplikacja", icon: "panel", key: "Ctrl+Alt+B" },
   { id: "toggleTheme", label: "Przełącz motyw jasny / ciemny", group: "Aplikacja", icon: "moon", key: "" },

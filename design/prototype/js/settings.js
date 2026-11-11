@@ -14,6 +14,7 @@ const ST_NAV = [
   { id: "packages", label: "Pakiety Typst", icon: "package" },
   { id: "files", label: "Pliki i foldery", icon: "folder" },
   { grp: "Inne" },
+  { id: "ai", label: "Asystent AI", icon: "sparkle" },
   { id: "privacy", label: "Prywatność", icon: "shield" },
   { id: "about", label: "O programie", icon: "info" },
 ];
@@ -212,7 +213,7 @@ const ST_SECTIONS = {
       <p class="muted" style="margin:0;font-size:12px">Eksport nie czyta koloru strony ani fontów edytora. Kartka jest biała, jak na wydruku.</p>
     </section>`,
   packages: () => `
-    <h2>Pakiety Typst</h2><p class="lead">Jedyne połączenie z siecią w aplikacji: pobranie pakietu, gdy notatka pierwszy raz go importuje.</p>
+    <h2>Pakiety Typst</h2><p class="lead">Pobranie pakietu, gdy notatka pierwszy raz go importuje. Poza włączonym asystentem AI to jedyne połączenie z siecią.</p>
     <section class="st-sec">
       ${stCard([["Pobieraj pakiety z sieci", "Wyłączone: import nowego pakietu pokaże błąd, a pobrane wcześniej działają dalej.", stSw("packages_online")]])}
     </section>
@@ -231,9 +232,46 @@ const ST_SECTIONS = {
     <h2>Prywatność</h2><p class="lead">WYSITyp działa offline i niczego o Tobie nie zbiera.</p>
     <section class="st-sec">${stCard([
       ["Telemetria", "Brak. Aplikacja nie wysyła statystyk, raportów błędów ani identyfikatorów.", `<span class="wt-tag" style="--fg:var(--tag-green-fg);--bg:var(--tag-green-bg)">wyłączona na stałe</span>`],
-      ["Połączenia sieciowe", "Tylko pobranie pakietu Typst przy pierwszym imporcie i tylko, gdy jesteś online.", `<button class="wt-btn ghost sm" data-st="goPkg">Ustawienia pakietów</button>`],
+      ["Połączenia sieciowe", "Pobranie pakietu Typst przy pierwszym imporcie, tylko gdy jesteś online.", `<button class="wt-btn ghost sm" data-st="goPkg">Ustawienia pakietów</button>`],
+      ["Asystent AI", S.settings.ai_enabled ? "Włączony. Wysyła pytanie i dołączony kontekst do wybranego dostawcy, tylko po naciśnięciu Enter." : "Wyłączony. Gdy go włączysz, wyśle pytanie i dołączony kontekst do wybranego dostawcy.", `<button class="wt-btn ghost sm" data-st="goAi">Ustawienia asystenta</button>`],
       ["Twoje notatki", "Zostają zwykłymi plikami .typ na Twoim dysku. Bez konta i chmury.", ""],
     ])}</section>`,
+  ai: () => {
+    const pv = S.settings.ai_provider;
+    const p = AI_PROVIDERS[pv];
+    return `
+    <h2>Asystent AI</h2><p class="lead">Rozmowa z modelem AI o otwartej notatce. Domyślnie wyłączony. Łączy się przez internet z Twoim kluczem API i wysyła notatkę tylko wtedy, gdy o coś zapytasz.</p>
+    <section class="st-sec">${stCard([["Włącz asystenta", `Panel po prawej (${keyOf("aiPanel")}), przycisk w górnym pasku i „Zapytaj” przy zaznaczeniu na stronie.`, stSw("ai_enabled")]])}</section>
+    <section class="st-sec"><h3>Połączenie</h3>
+      ${stRow("Dostawca", stSeg("ai_provider", [["anthropic", "Anthropic"], ["openai", "Zgodny z OpenAI"], ["local", "Lokalny"]]))}
+      ${
+        pv === "anthropic"
+          ? stRow("Model", stSel("ai_model", SEL_OPTS.ai_model), "Sonnet wystarcza na co dzień. Opus jest wolniejszy i droższy, ale lepiej radzi sobie z dowodami i długimi notatkami.")
+          : stRow("Adres serwera", `<input class="wt-input" data-aiurl value="${esc(S.settings.ai_url)}" spellcheck="false" style="max-width:320px">`, pv === "local" ? "Ollama albo inny serwer na tym komputerze. Notatki nie wychodzą do internetu." : "Serwer zgodny z API OpenAI, na przykład uczelniany.")
+      }
+      ${
+        p.key
+          ? stRow(
+              "Klucz API",
+              S.aiKey
+                ? `<span class="wt-tag" style="--fg:var(--tag-green-fg);--bg:var(--tag-green-bg)">zapisany</span><button class="wt-btn ghost sm" data-st="aiKey">Zmień…</button><button class="wt-btn ghost sm" data-st="aiKeyDel">Usuń</button>`
+                : `<button class="wt-btn secondary sm" data-st="aiKey">${icon("plus", "sm")}Dodaj klucz…</button>`,
+              "Klucz trzymamy w Menedżerze poświadczeń Windows. Nie trafia do pliku ustawień ani do notatek.",
+            )
+          : ""
+      }
+    </section>
+    <section class="st-sec"><h3>Co wysyłamy</h3>
+      ${stCard([
+        ["Dołączaj otwartą notatkę", "Źródło notatki idzie razem z pytaniem. Przy każdej wiadomości możesz je odpiąć.", stSw("ai_note_ctx")],
+        ["Dołączaj zaznaczenie", "Zaznaczony tekst trafia do pytania jako osobny fragment.", stSw("ai_sel_ctx")],
+      ])}
+      <p class="muted" style="margin:0;font-size:12px">Asystent nie zmienia notatki sam. Każda zmiana to propozycja: widzisz ją jako różnicę i zatwierdzasz. ${kbd("Ctrl+Z")} w źródle cofa ją jak zwykłą edycję.</p>
+    </section>
+    <section class="st-sec"><h3>Rozmowy</h3>
+      ${stRow("Historia", '<span class="muted">Tylko w pamięci, do zamknięcia aplikacji. Rozmów nie zapisujemy na dysku.</span>')}
+    </section>`;
+  },
   about: () => `
     <h2>O programie</h2>
     <section class="st-sec">${stCard([
@@ -318,6 +356,7 @@ function settingsView() {
     draw();
     if (k === "status_bar") renderStatus();
     if (k.endsWith("_autohide")) syncPins();
+    if (k.startsWith("ai_")) renderAi();
   };
   node.addEventListener("click", async (e) => {
     const t = e.target.closest("[data-sec],[data-seg],[data-sw],[data-step],[data-sel],[data-pc],[data-accent],[data-uistyle],[data-st],[data-rec]");
@@ -385,6 +424,19 @@ function settingsView() {
       }
       case "goPkg":
         return openSettings("packages");
+      case "goAi":
+        return openSettings("ai");
+      case "aiKey":
+        return aiKeyDlg(draw);
+      case "aiKeyDel": {
+        const ok = await confirmDlg({ title: "Usunąć klucz API?", text: "Klucz zniknie z Menedżera poświadczeń. Asystent przestanie działać, dopóki nie dodasz nowego.", ok: "Usuń", danger: true });
+        if (!ok) return;
+        S.aiKey = false;
+        persist();
+        draw();
+        renderAi();
+        return toast("Usunięto klucz API.", { type: "ok" });
+      }
       case "draftsDir":
         return toast("Tu otworzy się systemowe okno wyboru folderu.", { type: "info" });
       case "json":
@@ -394,6 +446,11 @@ function settingsView() {
       case "upd":
         return toast("Najnowsze wydania są na stronie projektu. Aplikacja nie sprawdza ich sama.", { type: "info" });
     }
+  });
+  node.addEventListener("change", (e) => {
+    if (!("aiurl" in e.target.dataset)) return;
+    S.settings.ai_url = e.target.value.trim() || DEFAULTS.ai_url;
+    persist();
   });
   node.addEventListener("input", (e) => {
     if (e.target.id !== "kF") return;
