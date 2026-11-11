@@ -562,9 +562,7 @@ function openShortcuts() {
   inp.addEventListener("input", draw);
   $("[data-k=edit]", d.dlg).addEventListener("click", () => {
     d.close();
-    S.settingsSection = "keys";
-    activate("settings");
-    renderView();
+    openSettings("keys");
   });
   draw();
 }

@@ -111,7 +111,7 @@ kbd { font-family: var(--font-ui); }
 .sb .body { grid-template-columns: minmax(0, 1fr); }
 .sb .brand { display: flex; align-items: center; gap: 8px; height: 28px; padding-left: 2px; }
 .sb .brand .mark { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: var(--radius-sm); background: var(--color-accent); color: var(--color-on-accent); font: 700 14px var(--font-prose); }
-.sb .brand .name { flex: 1; min-width: 0; font-weight: 650; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb .brand .name { flex: 1 0 auto; font-weight: 650; font-size: 14px; white-space: nowrap; }
 .sb-find { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .sf-line { display: flex; align-items: center; gap: 2px; }
 .sf-tw { flex: none; width: 18px; }
@@ -132,13 +132,16 @@ kbd { font-family: var(--font-ui); }
 .root-row:hover .root-btn .badge, .root-row:focus-within .root-btn .badge { visibility: hidden; }
 .wt-row .tw .wt-ico { transition: transform .12s; }
 .wt-row[aria-expanded="true"] > .tw .wt-ico { transform: rotate(90deg); }
-.wt-tree { display: grid; gap: 1px; margin-top: 2px; }
-.wt-tree .grp { display: grid; gap: 1px; }
+/* Every tree column shrinks with the sidebar. A long name fades out at the right edge; the note count stays in view. */
+.wt-tree { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; margin-top: 2px; }
+.wt-tree .grp { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; }
 .wt-tree .grp:not(:first-child), .wt-tree .grp + .wt-row { margin-top: 6px; }
-.wt-tree .kids { position: relative; display: grid; gap: 1px; }
+.wt-tree .kids { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; }
 .wt-tree .kids::before { content: ""; position: absolute; top: 0; bottom: 2px; left: calc(10.5px + (var(--level) - 1) * 16px); width: 1px; background: var(--color-border); pointer-events: none; }
 .wt-tree .wt-row.folder { font-weight: 500; }
 .wt-tree .wt-row .badge { color: var(--color-text-faint); }
+.sb .wt-row .lbl { text-overflow: clip; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 20px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 20px), transparent); }
+.sb .wt-row .badge { flex: none; min-width: 14px; text-align: right; }
 .empty-tree { padding: 8px; font-size: 12px; color: var(--color-text-muted); line-height: 1.5; }
 .loose-hint { font-size: 11px; color: var(--color-text-faint); margin-left: auto; }
 .sb .foot { gap: 4px; padding: 6px 8px; }
@@ -320,7 +323,12 @@ kbd { font-family: var(--font-ui); }
 .vtb .wt-ibtn[aria-pressed="true"] { background: var(--color-accent-soft); color: var(--color-accent-soft-text); }
 .vtb-pct { flex: none; width: 38px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--color-text); font: 600 10.5px var(--font-ui); font-variant-numeric: tabular-nums; cursor: pointer; }
 .vtb-pct:hover, .vtb-pct[aria-expanded="true"] { background: var(--color-hover); }
-.vtb-pg { flex: none; padding: 2px 0 4px; font: 600 10.5px var(--font-ui); font-variant-numeric: tabular-nums; color: var(--color-text-muted); cursor: default; }
+/* Page counter as a slanted fraction: this page top left, the page count bottom right.
+   Docked, it sits at the foot of the bar; floating, it heads the bar with some room below. */
+.vtb-pg { position: relative; flex: none; width: 34px; height: 30px; margin-top: auto; padding: 0; font: 600 11px/1 var(--font-ui); font-variant-numeric: tabular-nums; color: var(--color-text-muted); cursor: default; }
+.vtb-pg::before { content: ""; position: absolute; left: 50%; top: 50%; width: 1px; height: 26px; background: var(--color-text-faint); transform: translate(-50%, -50%) rotate(38deg); }
+.vtb-pg .n { position: absolute; left: 4px; top: 2px; color: var(--color-text); }
+.vtb-pg .d { position: absolute; right: 4px; bottom: 2px; }
 html:not([data-ui="float"]) .float-only { display: none; }
 .wt-note h1 { font-size: 1.76em; }
 .wt-note h2 { font-size: 1.41em; }
@@ -750,6 +758,12 @@ html:not([data-ui="float"]) .float-only { display: none; }
 .settings { flex: 1; min-height: 0; display: grid; grid-template-columns: 232px minmax(0, 1fr) 456px; background: var(--color-bg); color: var(--color-text); font: 13px var(--font-ui); animation: fade-in .14s; }
 @media (max-width: 1240px) { .settings { grid-template-columns: 220px minmax(0, 1fr) 360px; } }
 @media (max-width: 1040px) { .settings { grid-template-columns: 220px minmax(0, 1fr); } .settings > .st-pv { display: none; } }
+/* Settings open as a large modal with a slim margin all round; the window behind dims and blurs. */
+.scrim.st-scrim { align-items: stretch; padding: 28px; -webkit-backdrop-filter: blur(8px) saturate(110%); backdrop-filter: blur(8px) saturate(110%); }
+.st-modal { flex: 1; display: flex; width: 100%; max-width: 1560px; min-height: 0; border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: var(--color-bg); box-shadow: var(--shadow-lg); overflow: hidden; animation: pop-in .16s ease-out; }
+.st-modal > .settings { flex: 1; min-width: 0; animation: none; }
+.st-nav .back .esc { margin-left: auto; padding: 1px 5px; border: 1px solid var(--color-border); border-radius: 4px; font: 500 10.5px var(--font-ui); color: var(--color-text-faint); }
+@media (max-width: 760px) { .scrim.st-scrim { padding: 12px; } }
 .st-nav { background: var(--color-surface-sunken); border-right: 1px solid var(--color-border); padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; overflow: auto; }
 .st-nav button { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--color-text); font: 13px var(--font-ui); cursor: pointer; text-align: left; }
 .st-nav button:hover { background: var(--color-hover); }
@@ -957,6 +971,7 @@ html[data-ui="float"][data-top-auto] .top { grid-area: 1 / 2 / -1 / 3; position:
 html[data-ui="float"][data-sb-auto] .shell > .sb { grid-area: auto; position: absolute; left: 8px; top: calc(8px + var(--top-off, 0px)); bottom: calc(8px + var(--dock-off, 0px)); margin: 0; box-shadow: var(--glass-shadow); }
 html[data-ui="float"][data-sb-auto] .shell .sb-resize { display: none; }
 html[data-ui="float"][data-status-auto] .dock { grid-area: 1 / 2 / -1 / 3; position: absolute; left: 0; right: 0; bottom: 0; margin: 0; box-shadow: var(--glass-shadow); }
+html[data-ui="float"][data-vtb-auto] .vtb-pg { order: -1; margin: 4px 0 10px; }
 html[data-ui="float"][data-vtb-auto] .vtb { position: absolute; right: 10px; top: 50%; max-height: calc(100% - 20px); padding: 5px 3px; box-shadow: var(--glass-shadow); transform: translateY(-50%); transition: transform .36s var(--spring-soft), opacity .2s ease; }
 html[data-ui="float"]:not([data-vtb-auto]) .rail { display: flex; }
 html[data-ui="float"]:not([data-vtb-auto]) .vtb { width: 44px; margin-left: 8px; padding: 6px 0; }
@@ -992,26 +1007,32 @@ html[data-ui="float"] .pb-file:hover, html[data-ui="float"] .pb-row:hover { back
 html[data-ui="float"] .toasts { bottom: 58px; }
 html[data-ui="float"][data-status-auto] .toasts { bottom: 24px; }
 
-/* Popups, menus, toasts and other floating bits */
-html[data-ui="float"] :is(.float-tb, .tab-peek, .wt-menu, .pop, .dlg) { background: var(--glass-noise), var(--glass-bg-strong); border-color: transparent; border-radius: var(--glass-r); box-shadow: var(--glass-shadow); }
+/* Popups, menus, toasts and other floating bits wear the same acrylic as the panels: see-through, blurred and grained. */
+html[data-ui="float"] :is(.float-tb, .tab-peek, .wt-menu, .pop, .dlg) { background: var(--glass-noise), var(--glass-bg); border-color: transparent; border-radius: var(--glass-r); box-shadow: var(--glass-shadow); }
 html[data-ui="float"] .dlg { animation: glass-in .28s var(--spring-soft); }
 html[data-ui="float"] .pop { animation: glass-pop .22s var(--spring-soft); transform-origin: top center; }
 html[data-ui="float"] :is(.dlg-f, .pop-f) { background: var(--glass-tint); border-top-color: var(--glass-line); }
 html[data-ui="float"] .dlg-h + .dlg-b, html[data-ui="float"] .dlg :is(hr, .wt-hr) { border-color: var(--glass-line); }
-html[data-ui="float"] .pop-arrow { background: var(--glass-bg-strong); border-color: var(--glass-line); }
+/* Only the half of the arrow outside the popover is drawn, so the see-through glass is not tinted twice. */
+html[data-ui="float"] .pop-arrow { background: var(--glass-bg-strong); border-color: var(--glass-line); clip-path: polygon(0 0, 100% 0, 0 100%); }
 html[data-ui="float"] .wt-menu { animation: glass-pop .18s var(--spring-soft); transform-origin: top left; }
 html[data-ui="float"] .float-tb { animation: glass-pop .2s var(--spring-soft); transform-origin: bottom center; }
 html[data-ui="float"] .tab-peek { animation: glass-in .24s var(--spring-soft); }
 html[data-ui="float"] .scrim:not(.clear) { background: color-mix(in srgb, var(--color-overlay) 70%, transparent); animation: fade-in .2s ease-out; }
-html[data-ui="float"] .toast { background: var(--glass-noise), color-mix(in srgb, var(--t) 9%, var(--glass-bg-strong)); border-color: transparent; border-radius: var(--glass-r); box-shadow: var(--glass-shadow), inset 3px 0 0 color-mix(in srgb, var(--t) 70%, transparent); animation: toast-slide .38s var(--spring); }
+/* The settings modal: nearly solid glass, so its many controls stay easy to read over the blurred window. */
+html[data-ui="float"] .scrim.st-scrim { background: var(--color-overlay); }
+html[data-ui="float"] .st-modal { border: 0; border-radius: calc(var(--glass-r) + 4px); background: var(--glass-noise), var(--glass-bg-strong); box-shadow: var(--glass-shadow); animation: glass-in .28s var(--spring-soft); }
+html[data-ui="float"] .st-modal .settings { background: transparent; }
+html[data-ui="float"] .st-modal :is(.st-nav, .st-pv) { background: var(--glass-tint); border-color: var(--glass-line); }
+html[data-ui="float"] .toast { background: var(--glass-noise), color-mix(in srgb, var(--t) 9%, var(--glass-bg)); border-color: transparent; border-radius: var(--glass-r); box-shadow: var(--glass-shadow), inset 3px 0 0 color-mix(in srgb, var(--t) 70%, transparent); animation: toast-slide .38s var(--spring); }
 html[data-ui="float"] .toast.out { transform: translateX(24px) scale(.98); transition: opacity .2s, transform .24s ease-in; }
-html[data-ui="float"] .diag-box { background: var(--glass-noise), color-mix(in srgb, var(--color-danger) 10%, var(--glass-bg-strong)); border-color: color-mix(in srgb, var(--color-danger) 45%, transparent); border-radius: var(--glass-r); animation: glass-in .28s var(--spring-soft); }
+html[data-ui="float"] .diag-box { background: var(--glass-noise), color-mix(in srgb, var(--color-danger) 10%, var(--glass-bg)); border-color: color-mix(in srgb, var(--color-danger) 45%, transparent); border-radius: var(--glass-r); animation: glass-in .28s var(--spring-soft); }
 @keyframes glass-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 @keyframes glass-pop { from { opacity: 0; transform: scale(.97); } }
 @keyframes toast-slide { from { opacity: 0; transform: translateX(32px); } }
 @media (prefers-reduced-motion: reduce) {
   .problems, html[data-ui="float"] :is(.top, .dock, .vtb, .problems, .sb) { transition-duration: .01s !important; }
-  html[data-ui="float"] :is(.dlg, .pop, .wt-menu, .toast, .tab-peek, .float-tb, .diag-box), html[data-ui="float"] .dock.pb-open .problems > * { animation-duration: .01s !important; }
+  html[data-ui="float"] :is(.dlg, .pop, .wt-menu, .toast, .tab-peek, .float-tb, .diag-box, .st-modal), html[data-ui="float"] .dock.pb-open .problems > * { animation-duration: .01s !important; }
 }
 
 /* Settings: the two UI styles with a small drawing of each */

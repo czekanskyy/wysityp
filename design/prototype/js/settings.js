@@ -262,10 +262,42 @@ function settingsPreview() {
     <p class="cap">Źródło</p>
     <pre class="src-prev">${hl.map((l, i) => (S.settings.line_numbers ? `<span style="color:var(--color-text-faint);display:inline-block;width:2ch;text-align:right;margin-right:12px">${i + 1}</span>` : "") + l).join("\n")}</pre>`;
 }
+/* Settings open as a large modal over the whole window: the window dims and blurs behind it.
+   A click outside, Esc, the close button or the settings shortcut closes it. The note behind is redrawn on close if a setting changed. */
+let stDlg = null,
+  stDirty = false;
+function settingsOpen() {
+  return !!stDlg;
+}
+function openSettings(sec) {
+  if (sec) S.settingsSection = sec;
+  if (stDlg) return redrawSettings(!sec);
+  const box = el(`<div class="st-modal" role="dialog" aria-modal="true" aria-label="Ustawienia"></div>`);
+  box.appendChild(settingsView());
+  stDirty = false;
+  stDlg = openDialog(box, {
+    onClose: () => {
+      stDlg = null;
+      renderSbFoot();
+      if (stDirty) renderView();
+    },
+  });
+  box.parentElement.classList.add("st-scrim");
+  renderSbFoot();
+}
+function closeSettings() {
+  if (stDlg) stDlg.close(null);
+}
+function redrawSettings(keepScroll = true) {
+  if (!stDlg) return;
+  const top = $(".st-main", stDlg.dlg).scrollTop;
+  stDlg.dlg.replaceChildren(settingsView());
+  if (keepScroll) $(".st-main", stDlg.dlg).scrollTop = top;
+}
 function settingsView() {
   const node = el(`<div class="settings">
     <nav class="st-nav" aria-label="Sekcje ustawień">
-      <button class="back" data-st="back">${icon("arrowLeft", "sm")}Wróć do notatek</button>
+      <button class="back" data-st="back" title="Zamknij ustawienia (Esc)">${icon("close", "sm")}Zamknij<span class="esc">Esc</span></button>
       ${ST_NAV.map((n) => (n.grp ? `<div class="grp">${n.grp}</div>` : `<button data-sec="${n.id}" ${S.settingsSection === n.id ? 'aria-current="page"' : ""}>${icon(n.icon, "sm")}${n.label}</button>`)).join("")}
     </nav>
     <div class="st-main"></div>
@@ -279,6 +311,7 @@ function settingsView() {
     if (keepScroll) main.scrollTop = top;
   };
   const set = (k, v) => {
+    stDirty = true;
     S.settings[k] = v;
     applySettings();
     persist();
@@ -330,15 +363,12 @@ function settingsView() {
     }
     if (d.rec) return recordKey(t, d.rec, draw);
     switch (d.st) {
-      case "back": {
-        const prev = S.tabs.filter((x) => x !== "settings");
-        await closeTab("settings");
-        if (S.active === "settings") activate(prev[prev.length - 1] || "home");
-        return;
-      }
+      case "back":
+        return closeSettings();
       case "reset":
         return run("resetProto");
       case "keysReset":
+        stDirty = true;
         S.settings.keys = {};
         persist();
         return draw();
@@ -354,8 +384,7 @@ function settingsView() {
         return toast("Wyczyszczono pamięć pakietów (2,7 MB).", { type: "ok" });
       }
       case "goPkg":
-        S.settingsSection = "packages";
-        return renderView();
+        return openSettings("packages");
       case "draftsDir":
         return toast("Tu otworzy się systemowe okno wyboru folderu.", { type: "info" });
       case "json":

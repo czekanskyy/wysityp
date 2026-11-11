@@ -161,7 +161,7 @@ function applySettings() {
 }
 darkMq.addEventListener("change", () => {
   applySettings();
-  if (S.active === "settings") renderView();
+  redrawSettings();
 });
 
 /* ---------- State ---------- */
@@ -219,7 +219,7 @@ function loadState() {
     n.phase = "saved";
   }
   // The start page is a full-screen view, never a tab.
-  S.tabs = S.tabs.filter((t) => t === "settings" || S.notes[t]);
+  S.tabs = S.tabs.filter((t) => S.notes[t]);
   if (S.active !== "home" && !S.tabs.includes(S.active)) S.active = S.tabs[0] || "home";
 }
 let persistT = 0;
@@ -346,9 +346,12 @@ function renderAll() {
 }
 
 /* ---------- Sidebar shell: collapse and the edge handle ---------- */
+/* The narrowest sidebar still shows the whole name next to the mark and the head buttons. */
+const SB_MIN = 240;
 function renderRail() {
   const shell = $("#shell");
   shell.classList.toggle("no-sb", !S.sidebar);
+  S.sbw = Math.max(SB_MIN, S.sbw);
   shell.style.setProperty("--sb-w", S.sbw + "px");
   const b = $("#sbEdge");
   b.setAttribute("aria-expanded", S.sidebar);
@@ -434,7 +437,7 @@ function renderSidebar() {
 function renderSbFoot() {
   const th = S.settings.theme;
   $("#sbFoot").innerHTML = `
-    <button class="wt-ibtn" data-act="settings" title="${esc(tip("settings"))}" aria-pressed="${S.active === "settings"}">${icon("settings")}</button>
+    <button class="wt-ibtn" data-act="settings" title="${esc(tip("settings"))}" aria-pressed="${settingsOpen()}">${icon("settings")}</button>
     <span class="grow"></span>
     <button class="wt-ibtn" data-act="cycleTheme" title="Motyw: ${THEME_LABEL[th]}. Kliknij, aby przełączyć na ${THEME_LABEL[THEME_CYCLE[th]]}.">${icon(THEME_ICON[th])}</button>`;
 }
@@ -463,7 +466,7 @@ function bindSidebarResize() {
       w0 = S.sbw;
     const z = UI_ZOOM[S.settings.ui_size] || 1;
     const move = (ev) => {
-      S.sbw = Math.max(200, Math.min(440, w0 + (ev.clientX - x0) / z));
+      S.sbw = Math.max(SB_MIN, Math.min(440, w0 + (ev.clientX - x0) / z));
       $("#shell").style.setProperty("--sb-w", S.sbw + "px");
     };
     const up = () => {
@@ -485,12 +488,10 @@ function bindSidebarResize() {
 /* ---------- Tabs ---------- */
 function tabLabel(t) {
   if (t === "home") return S.ws ? "Start" : "Witaj";
-  if (t === "settings") return "Ustawienia";
   return S.notes[t].title;
 }
 function tabIcon(t) {
   if (t === "home") return `<span class="kind">${icon("home", "sm")}</span>`;
-  if (t === "settings") return `<span class="kind">${icon("settings", "sm")}</span>`;
   return itemIcon(t);
 }
 function renderTabs() {
@@ -499,7 +500,7 @@ function renderTabs() {
       const active = S.active === t;
       const n = S.notes[t];
       const cls = [active ? "active" : "", t === S.preview ? "preview" : "", n && (n.phase === "unsaved" || n.phase === "failed") ? "dirty" : "", n && n.phase === "conflict" ? "dirty conflict" : "", n && n.errs ? "err" : ""].join(" ");
-      const title = t === "home" ? "Strona startowa" : t === "settings" ? "Ustawienia" : notePath(t);
+      const title = t === "home" ? "Strona startowa" : notePath(t);
       return `<div class="tab ${cls}" data-tab="${t}" role="tab" aria-selected="${active}" draggable="true" title="${esc(title)}${t === S.preview ? " – podgląd (kliknij dwukrotnie, aby przypiąć)" : ""}">
         ${tabIcon(t)}<span class="lbl">${esc(tabLabel(t))}</span>
         <span class="x" data-close="${t}" title="Zamknij (${keyOf("closeTab")})"><span class="tdot"></span>${icon("close", "sm")}</span></div>`;
@@ -695,7 +696,7 @@ async function closeTab(t, { force = false } = {}) {
   const i = S.tabs.indexOf(t);
   if (i < 0) return;
   S.tabs.splice(i, 1);
-  if (t !== "settings") S.closed.push(t);
+  S.closed.push(t);
   if (S.preview === t) S.preview = null;
   if (S.active === t) {
     if (E && E.editing) E.editing = null;
@@ -772,7 +773,6 @@ function renderView() {
   $("#rail").replaceChildren();
   let node;
   if (t === "home") node = S.ws ? homeView() : welcomeView();
-  else if (t === "settings") node = settingsView();
   else if (S.notes[t]) node = editorView(t);
   else node = homeView();
   v.replaceChildren(node);
@@ -946,7 +946,6 @@ const ZOOMS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2
 function vtbHtml() {
   const b = (act, ic, label, cls = "") => `<button class="wt-ibtn sm ${cls}" data-act="${act}" title="${label}" aria-label="${label}">${icon(ic)}</button>`;
   return `<div class="vtb" role="toolbar" aria-orientation="vertical" aria-label="Widok strony" data-keep>
-    <span class="vtb-pg" title="Strona 1 z 1">1/1</span>
     ${b("pvFitWidth", "fitWidth", "Strona na pełną szerokość")}
     ${b("pvFitPage", "fitPage", "Pokaż całą stronę")}
     <span class="wt-sep"></span>
@@ -958,6 +957,7 @@ function vtbHtml() {
     ${b("pvRound", "corner", "Zaokrąglone rogi strony")}
     <span class="wt-sep float-only"></span>
     ${pinBtn("pvPin", "wt-ibtn sm", "")}
+    <span class="vtb-pg" title="Strona 1 z 1" aria-label="Strona 1 z 1"><span class="n">1</span><span class="d">1</span></span>
   </div>`;
 }
 function pvState() {
@@ -1030,8 +1030,10 @@ function updatePageNo() {
     const d = cy < b.top ? b.top - cy : cy > b.bottom ? cy - b.bottom : 0;
     if (d < best) (best = d), (cur = i + 1);
   });
-  lab.textContent = `${cur}/${sheets.length}`;
+  $(".n", lab).textContent = cur;
+  $(".d", lab).textContent = sheets.length;
   lab.title = `Strona ${cur} z ${sheets.length}`;
+  lab.setAttribute("aria-label", lab.title);
 }
 function setPageFit(fit) {
   const st = pvState();
@@ -1967,7 +1969,7 @@ function togglePin(act) {
   syncPins();
   /* A panel you just unpinned stays out until the pointer leaves it, so it does not vanish under the cursor. */
   (act === "pvPin" ? $("#rail") : $("#shell")).classList.toggle(cls, S.settings[key]);
-  if (S.active === "settings") renderView();
+  redrawSettings();
 }
 /* Unpinned floating panels come back when the pointer nears their edge of the window, and hide again shortly after it leaves.
    The left panel answers only between the top and bottom panels, so a corner reveals one panel, not two. */
@@ -2147,7 +2149,7 @@ function openWorkspace(ws) {
   if (S.ws === ws) return activate("home");
   S.ws = ws;
   S.recentWs = [ws, ...S.recentWs.filter((w) => w !== ws)];
-  S.tabs = S.tabs.filter((t) => t === "settings" || inOpenScope(t));
+  S.tabs = S.tabs.filter((t) => inOpenScope(t));
   S.active = "home";
   S.tagFilter = null;
   renderAll();
@@ -2479,7 +2481,7 @@ function run(id, ctx = {}) {
       applySettings();
       persist();
       renderStatus();
-      if (S.active === "settings") renderView();
+      redrawSettings();
       return toast(floatUi() ? "Styl pływający: szklane paski i okna nad treścią." : "Styl stały: paski przy krawędziach okna.", { type: "info", ms: 2600 });
     case "pvOutside":
       S.pv.outside = S.pv.outside === "page" ? "theme" : "page";
@@ -2495,7 +2497,7 @@ function run(id, ctx = {}) {
     case "replace":
       return focusSearch(true);
     case "settings":
-      return activate("settings");
+      return settingsOpen() ? closeSettings() : openSettings();
     case "shortcuts":
       return openShortcuts();
     case "toggleSidebar":
@@ -2508,14 +2510,14 @@ function run(id, ctx = {}) {
       applySettings();
       persist();
       renderSbFoot();
-      if (S.active === "settings") renderView();
+      redrawSettings();
       return toast(`Motyw: ${S.settings.theme === "dark" ? "ciemny" : "jasny"}`, { type: "info" });
     case "cycleTheme":
       S.settings.theme = THEME_CYCLE[S.settings.theme] || "system";
       applySettings();
       renderSbFoot();
       persist();
-      if (S.active === "settings") renderView();
+      redrawSettings();
       return;
     case "home":
       if (S.active === "home" && S.tabs.length) return backToTabs();
