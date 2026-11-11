@@ -161,8 +161,12 @@ function freshState() {
     trees: clone(Object.fromEntries(Object.entries(WORKSPACES).map(([k, w]) => [k, w.tree]))),
     collapsed: ["f-fiz", "f-an-c"],
     deco: clone(DECO_DEFAULTS),
-    tabs: ["home", "n-w7", "n-lab2"],
+    tabs: ["n-w7", "n-lab2"],
     active: "n-w7",
+    lastTab: "n-w7",
+    tagDefs: clone(TAGS),
+    pv: { split: { fit: "width", zoom: 1 }, page: { fit: null, zoom: 1 }, outside: "theme", round: true },
+    problems: { open: false, h: 200 },
     preview: null,
     closed: [],
     sidebar: true,
@@ -188,8 +192,11 @@ function loadState() {
     const f = freshState();
     S = { ...f, ...saved.st, settings: { ...f.settings, ...saved.st.settings, keys: { ...(saved.st.settings || {}).keys } } };
     S.search = { ...f.search, ...(saved.st.search || {}), open: false };
+    S.pv = { ...f.pv, ...(saved.st.pv || {}) };
+    S.problems = { ...f.problems, ...(saved.st.problems || {}) };
+    S.tagDefs = { ...f.tagDefs, ...(saved.st.tagDefs || {}) };
     if (!S.settings.restore_tabs) {
-      S.tabs = ["home"];
+      S.tabs = [];
       S.active = "home";
     }
   }
@@ -198,8 +205,9 @@ function loadState() {
     n.disk = n.source;
     n.phase = "saved";
   }
-  S.tabs = S.tabs.filter((t) => t === "home" || t === "settings" || S.notes[t]);
-  if (!S.tabs.includes(S.active)) S.active = S.tabs[0] || "home";
+  // The start page is a full-screen view, never a tab.
+  S.tabs = S.tabs.filter((t) => t === "settings" || S.notes[t]);
+  if (S.active !== "home" && !S.tabs.includes(S.active)) S.active = S.tabs[0] || "home";
 }
 let persistT = 0;
 function persist() {
@@ -485,13 +493,71 @@ function renderTabs() {
     .join("");
   $("#tabs").innerHTML = `<div class="tabs-scroll" role="tablist">${html || '<div class="tabs-none">Brak otwartych kart</div>'}</div>
     <div class="tab-act">
+      <button class="wt-ibtn sm" data-act="newNote" title="${esc(tip("newNote"))}" aria-label="Nowa notatka">${icon("plus")}</button>
       <button class="wt-ibtn sm" data-act="tabsMenu" title="Więcej działań na kartach">${icon("more")}</button>
     </div>`;
   const a = $(`.tab[data-tab="${CSS.escape(S.active)}"]`);
   if (a) a.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
+/* Hover preview of a tab: the first page of the note, like a taskbar thumbnail. */
+let peekT = 0,
+  peekCur = null,
+  peekMute = null;
+function hidePeek() {
+  clearTimeout(peekT);
+  peekCur = null;
+  $$(".tab-peek").forEach((p) => p.remove());
+}
+function showPeek(tab) {
+  const id = tab.dataset.tab;
+  const n = S.notes[id];
+  if (!n || !tab.isConnected) return hidePeek();
+  const r = TY.render(n.source);
+  const dirty = n.phase === "unsaved" || n.phase === "failed" || n.phase === "conflict";
+  let p = $(".tab-peek");
+  if (!p) {
+    p = el('<div class="tab-peek" role="tooltip"></div>');
+    document.body.appendChild(p);
+  }
+  p.innerHTML = `<div class="pk-h">${itemIcon(id)}<span class="t">${esc(n.title)}</span>${dirty ? '<span class="pk-dot" title="Niezapisane zmiany"></span>' : ""}</div>
+    <div class="pk-sheet"><div class="pg-sheet paper-scope pk-page"><article class="wt-note" lang="pl">${r.html.slice(0, 18).join("") || '<p class="muted">Pusta notatka</p>'}</article></div></div>
+    <div class="pk-f"><span class="p">${esc(notePath(id))}</span>${r.diags.length ? `<span class="e">${icon("error", "sm")}${r.diags.length}</span>` : ""}</div>`;
+  const tr = tab.getBoundingClientRect();
+  const w = p.offsetWidth;
+  p.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, tr.left + tr.width / 2 - w / 2)) + "px";
+  p.style.top = tr.bottom + 6 + "px";
+}
 function bindTabs() {
   const tabs = $("#tabs");
+  tabs.addEventListener("mouseover", (e) => {
+    const t = e.target.closest(".tab");
+    const id = t ? t.dataset.tab : null;
+    if (id === peekCur) return;
+    clearTimeout(peekT);
+    if (!t || !S.notes[id] || id === peekMute || t.classList.contains("dragging")) {
+      if (id !== peekMute) peekMute = null;
+      if (peekCur) hidePeek();
+      return;
+    }
+    peekMute = null;
+    peekCur = id;
+    if ($(".tab-peek")) showPeek(t);
+    else peekT = setTimeout(() => showPeek(t), 600);
+  });
+  tabs.addEventListener("mouseleave", () => {
+    peekMute = null;
+    hidePeek();
+  });
+  for (const ev of ["mousedown", "dragstart", "wheel", "contextmenu"])
+    tabs.addEventListener(
+      ev,
+      (e) => {
+        const t = e.target.closest && e.target.closest(".tab");
+        peekMute = t ? t.dataset.tab : null;
+        hidePeek();
+      },
+      { passive: true },
+    );
   tabs.addEventListener("click", (e) => {
     const x = e.target.closest("[data-close]");
     if (x) return closeTab(x.dataset.close);
@@ -577,7 +643,9 @@ function openNote(id, { preview = false, line = null } = {}) {
   if (line != null) setTimeout(() => goToLine(line, 0), 30);
 }
 function activate(t) {
-  if (!S.tabs.includes(t)) S.tabs.push(t);
+  hidePeek();
+  if (t !== "home" && !S.tabs.includes(t)) S.tabs.push(t);
+  if (t !== "home") S.lastTab = t;
   if (S.active === t && $("#view").childElementCount) {
     renderTabs();
     return;
@@ -628,8 +696,14 @@ async function closeMany(list) {
   for (const t of list) await closeTab(t);
 }
 function cycleTab(d) {
+  if (!S.tabs.length) return;
   const i = S.tabs.indexOf(S.active);
-  activate(S.tabs[(i + d + S.tabs.length) % S.tabs.length]);
+  activate(S.tabs[i < 0 ? (d > 0 ? 0 : S.tabs.length - 1) : (i + d + S.tabs.length) % S.tabs.length]);
+}
+/* Leave the full-screen start page for the tab used last. */
+function backToTabs() {
+  if (!S.tabs.length) return;
+  activate(S.tabs.includes(S.lastTab) ? S.lastTab : S.tabs[S.tabs.length - 1]);
 }
 function tabMenu(t, at) {
   const others = S.tabs.filter((x) => x !== t);
@@ -678,13 +752,22 @@ function renderView() {
   E = null;
   closeFloat();
   const t = S.active;
+  $(".main").classList.toggle("home-mode", t === "home");
   let node;
   if (t === "home") node = S.ws ? homeView() : welcomeView();
   else if (t === "settings") node = settingsView();
   else if (S.notes[t]) node = editorView(t);
   else node = homeView();
   v.replaceChildren(node);
-  if (E) requestAnimationFrame(() => E && E.restoreScroll && E.restoreScroll());
+  if (E) {
+    applyPageView();
+    requestAnimationFrame(() => E && E.restoreScroll && E.restoreScroll());
+  }
+}
+function backBtn() {
+  if (!S.tabs.length) return "";
+  const n = S.tabs.length;
+  return `<button class="wt-btn secondary sm home-back" data-act="backToTabs" title="Wróć do ostatniej karty (Esc)">${icon("arrowLeft", "sm")}Wróć do kart<span class="cnt">${n}</span></button>`;
 }
 
 /* ---------- Home ---------- */
@@ -700,8 +783,11 @@ function cardHtml(id) {
     ${n.tags && n.tags.length ? `<div class="tagrow">${n.tags.map((t) => tagHtml(t)).join("")}</div>` : ""}
     <span class="act"><button class="wt-ibtn sm" data-act="cardMenu" data-arg="${id}" title="Więcej">${icon("more")}</button></span></div>`;
 }
+function tagColor(t) {
+  return (S.tagDefs && S.tagDefs[t]) || TAGS[t] || "gray";
+}
 function tagHtml(t, extra = "") {
-  const c = TAGS[t] || "gray";
+  const c = tagColor(t);
   return `<span class="wt-tag ${extra}" style="--fg:var(--tag-${c}-fg);--bg:var(--tag-${c}-bg)">${esc(t)}</span>`;
 }
 function homeView() {
@@ -712,7 +798,7 @@ function homeView() {
   const d = new Date().toLocaleDateString("pl-PL", { weekday: "long", day: "numeric", month: "long" });
   return el(`<div class="home"><div class="home-in">
     <header>
-      <p class="eyebrow">${esc(d)} · ${esc(WS().name)}</p>
+      <div class="home-top"><p class="eyebrow">${esc(d)} · ${esc(WS().name)}</p>${backBtn()}</div>
       <h1>${greeting()}. Co dziś notujemy?</h1>
       <div class="btns">
         <button class="wt-btn primary" data-act="newNote">${icon("plus", "sm")}Nowa notatka ${kbd(keyOf("newNote"))}</button>
@@ -733,7 +819,7 @@ function homeView() {
     <section>
       <div class="sec-h"><h2>Ostatnio otwierane</h2>
         <div class="tagrow">${[`<button class="wt-tag${S.tagFilter ? "" : " sel"}" style="--fg:var(--color-text-muted);--bg:var(--color-surface-sunken)" data-act="homeTag" data-arg="">Wszystkie</button>`, ...used.map((t) => {
-          const c = TAGS[t] || "gray";
+          const c = tagColor(t);
           return `<button class="wt-tag${S.tagFilter === t ? " sel" : ""}" style="--fg:var(--tag-${c}-fg);--bg:var(--tag-${c}-bg)" data-act="homeTag" data-arg="${esc(t)}">${esc(t)}</button>`;
         })].join("")}</div>
       </div>
@@ -745,7 +831,7 @@ function homeView() {
 /* ---------- Welcome (no folder) ---------- */
 function welcomeView() {
   const loose = Object.keys(S.notes).filter((id) => S.notes[id].loose);
-  return el(`<div class="welcome"><div class="welcome-in">
+  return el(`<div class="welcome">${S.tabs.length ? `<div class="welcome-back">${backBtn()}</div>` : ""}<div class="welcome-in">
     <div class="brand"><span class="mark">W</span><div><h1>WYSITyp</h1><p class="sub">Piszesz na stronie, która renderuje się na bieżąco. Notatki zostają zwykłymi plikami Typst.</p></div></div>
     <div class="act-list">
       <button class="act-row" data-act="newNote">${icon("plus")}<span class="l">Nowa notatka</span>${kbd(keyOf("newNote"))}</button>
@@ -781,29 +867,144 @@ function tagsBar(n) {
 function tbBtn(id, cls = "") {
   return `<button class="wt-ibtn sm ${cls}" data-act="${id}" data-keep title="${esc(tip(id))}" aria-label="${esc(ACT[id].label)}">${icon(ACT[id].icon)}</button>`;
 }
+/* Toolbar sections, left to right. When space runs out, whole sections move into the ⋯ menu,
+   lowest `prio` first: insert, lists, maths, paragraph style, and character formatting last. */
+const TB_SECS = [
+  { id: "para", prio: 4, label: "Styl akapitu", items: ["tbPara"] },
+  { id: "chars", prio: 5, label: "Formatowanie znaków", items: ["bold", "italic", "underline", "strike", "super", "sub", "code", "highlight", "color", "clear"] },
+  { id: "lists", prio: 2, label: "Listy i akapity", items: ["bullet", "numbered", "term", "quote", "outdent", "indent", "tbAlign"] },
+  { id: "math", prio: 3, label: "Matematyka i bloki", items: ["inlineMath", "blockMath", "tbBlocks"] },
+  { id: "insert", prio: 1, label: "Wstawianie", items: ["symbol", "table", "image", "shape", "link", "footnote", "pagebreak", "outline"] },
+];
+/* Shown only with the full toolbar; the compact one keeps them in the ⋯ menu. */
+const TB_FULL = new Set(["super", "sub", "term", "outdent", "indent", "footnote", "pagebreak", "outline"]);
+function tbItem(id) {
+  const fo = TB_FULL.has(id) ? "full-only" : "";
+  if (id === "tbPara") return `<button class="dd" data-act="tbPara" data-keep title="Styl akapitu"><span class="dd-l">Zwykły akapit</span>${icon("chevronDown", "sm")}</button>`;
+  if (id === "tbBlocks") return `<button class="dd sm" data-act="tbBlocks" data-keep title="Wstaw blok: definicja, twierdzenie, dowód…">${icon("blocks", "sm")}<span>Bloki</span>${icon("chevronDown", "sm")}</button>`;
+  if (id === "tbAlign") return `<button class="wt-ibtn sm" data-act="tbAlign" data-keep title="Wyrównanie" aria-label="Wyrównanie">${icon("align")}</button>`;
+  if (id === "color") return `<button class="wt-ibtn sm" data-act="color" data-keep title="${esc(tip("color"))}" aria-label="Kolor tekstu">${icon("textColor")}</button>`;
+  return tbBtn(id, fo);
+}
 function toolbarHtml() {
   const v = view();
-  const sep = (c = "") => `<span class="wt-sep ${c}"></span>`;
   return `<div class="wt-toolbar${S.settings.toolbar === "full" ? " full" : ""}" role="toolbar" aria-label="Formatowanie">
-    <div class="items">
-      ${tbBtn("undo")}${tbBtn("redo")}${sep()}
-      <button class="dd" data-act="tbPara" data-keep title="Styl akapitu"><span class="dd-l">Zwykły akapit</span>${icon("chevronDown", "sm")}</button>${sep()}
-      ${tbBtn("bold")}${tbBtn("italic")}${tbBtn("underline")}${tbBtn("strike", "opt")}${tbBtn("super", "full-only")}${tbBtn("sub", "full-only")}${tbBtn("code")}${tbBtn("highlight")}
-      <button class="wt-ibtn sm" data-act="color" data-keep title="${esc(tip("color"))}">${icon("textColor")}</button>${tbBtn("clear", "opt")}${sep()}
-      ${tbBtn("bullet")}${tbBtn("numbered")}${tbBtn("term", "full-only")}${tbBtn("quote", "opt")}${tbBtn("outdent", "full-only")}${tbBtn("indent", "full-only")}
-      <button class="wt-ibtn sm opt2" data-act="tbAlign" data-keep title="Wyrównanie">${icon("align")}</button>${sep()}
-      ${tbBtn("inlineMath")}${tbBtn("blockMath")}
-      <button class="dd sm" data-act="tbBlocks" data-keep title="Wstaw blok: definicja, twierdzenie, dowód…">${icon("blocks", "sm")}<span>Bloki</span>${icon("chevronDown", "sm")}</button>${sep()}
-      ${tbBtn("symbol")}${tbBtn("table")}${tbBtn("image", "opt")}${tbBtn("shape")}${tbBtn("link", "opt2")}${tbBtn("footnote", "full-only")}${tbBtn("pagebreak", "full-only")}${tbBtn("outline", "full-only")}
-      <button class="wt-ibtn sm compact-only" data-act="tbMore" data-keep title="Więcej narzędzi">${icon("more")}</button>
-    </div>
-    <div class="end">
+    <div class="tb-l">${tbBtn("undo")}${tbBtn("redo")}</div>
+    <div class="tb-mid"><div class="mid-in">
+      ${TB_SECS.map((sec) => `<div class="tb-sec" data-sec="${sec.id}" data-prio="${sec.prio}" role="group" aria-label="${esc(sec.label)}">${sec.items.map(tbItem).join("")}</div>`).join("")}
+      <button class="wt-ibtn sm tb-more" data-act="tbMore" data-keep title="Więcej narzędzi" aria-label="Więcej narzędzi">${icon("more")}</button>
+    </div></div>
+    <div class="tb-r">
       <div class="wt-seg icons" role="radiogroup" aria-label="Widok">
         <button role="radio" aria-checked="${v === "source"}" data-act="viewSource" title="${esc(tip("viewSource"))}">${icon("code", "sm")}</button>
         <button role="radio" aria-checked="${v === "split"}" data-act="viewSplit" title="${esc(tip("viewSplit"))}">${icon("split", "sm")}</button>
         <button role="radio" aria-checked="${v === "page"}" data-act="viewPage" title="${esc(tip("viewPage"))}">${icon("eye", "sm")}</button>
       </div>
     </div></div>`;
+}
+/* Hide whole sections, least important first, until the middle fits between undo/redo and the view switch. */
+function fitToolbar() {
+  if (!E || !E.tb || !E.tb.isConnected) return;
+  const tb = E.tb;
+  const mid = $(".tb-mid", tb),
+    inn = $(".mid-in", tb),
+    more = $(".tb-more", tb);
+  const secs = $$(".tb-sec", tb);
+  secs.forEach((x) => (x.hidden = false));
+  const compact = !tb.classList.contains("full");
+  more.hidden = !compact;
+  const order = [...secs].sort((a, b) => a.dataset.prio - b.dataset.prio);
+  let k = 0;
+  while (inn.offsetWidth > mid.clientWidth + 0.5 && k < order.length) {
+    order[k++].hidden = true;
+    more.hidden = false;
+  }
+  E.tbHidden = order.slice(0, k).map((x) => x.dataset.sec);
+}
+
+/* ---------- Floating view toolbar over the page (split and page views) ---------- */
+const PAGE_W = 794,
+  PAGE_H = 1123;
+const ZOOMS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+function vtbHtml() {
+  return `<div class="vtb" role="toolbar" aria-label="Widok strony" data-keep>
+    <button class="wt-ibtn sm" data-act="pvFitWidth" title="Strona na pełną szerokość" aria-label="Strona na pełną szerokość">${icon("fitWidth")}</button>
+    <button class="wt-ibtn sm" data-act="pvFitPage" title="Pokaż całą stronę" aria-label="Pokaż całą stronę">${icon("fitPage")}</button>
+    <span class="wt-sep"></span>
+    <button class="wt-ibtn sm" data-act="pvZoomOut" title="Pomniejsz (Ctrl+kółko)" aria-label="Pomniejsz">${icon("minus")}</button>
+    <button class="vtb-pct" data-act="pvZoomMenu" title="Powiększenie" aria-haspopup="menu">100%</button>
+    <button class="wt-ibtn sm" data-act="pvZoomIn" title="Powiększ (Ctrl+kółko)" aria-label="Powiększ">${icon("plus")}</button>
+    <span class="wt-sep"></span>
+    <button class="wt-ibtn sm" data-act="pvOutside" title="Tło wokół strony w kolorze strony" aria-label="Tło wokół strony w kolorze strony">${icon("surround")}</button>
+    <button class="wt-ibtn sm" data-act="pvRound" title="Zaokrąglone rogi strony" aria-label="Zaokrąglone rogi strony">${icon("corner")}</button>
+  </div>`;
+}
+function pvState() {
+  return S.pv[view() === "page" ? "page" : "split"];
+}
+function pageZoom() {
+  const st = pvState();
+  const sc = E.panePage;
+  const w = sc.clientWidth - 48,
+    h = sc.clientHeight - 72;
+  let z = st.zoom || 1;
+  if (st.fit === "width") z = w / PAGE_W;
+  else if (st.fit === "page") z = Math.min(w / PAGE_W, h / PAGE_H);
+  return Math.max(0.25, Math.min(3, z));
+}
+/* Zoom, outside colour and corners; `onlyFit` skips work when nothing depends on the pane size. */
+function applyPageView(onlyFit = false) {
+  if (!E || !E.pagePane) return;
+  const st = pvState();
+  if (onlyFit && !st.fit) return;
+  if (!E.panePage.clientWidth) return;
+  const z = pageZoom();
+  const sc = E.panePage;
+  const old = E.zoom || z;
+  const rel = sc.scrollHeight > sc.clientHeight ? sc.scrollTop / sc.scrollHeight : 0;
+  E.zoom = z;
+  E.pagePane.style.setProperty("--pz", z.toFixed(4));
+  if (Math.abs(old - z) > 0.001 && rel) sc.scrollTop = rel * sc.scrollHeight;
+  E.ed.dataset.out = S.pv.outside;
+  E.ed.dataset.round = S.pv.round ? "1" : "0";
+  const vtb = $(".vtb", E.pagePane);
+  if (!vtb) return;
+  $(".vtb-pct", vtb).textContent = Math.round(z * 100) + "%";
+  $('[data-act="pvFitWidth"]', vtb).setAttribute("aria-pressed", st.fit === "width");
+  $('[data-act="pvFitPage"]', vtb).setAttribute("aria-pressed", st.fit === "page");
+  $('[data-act="pvOutside"]', vtb).setAttribute("aria-pressed", S.pv.outside === "page");
+  $('[data-act="pvRound"]', vtb).setAttribute("aria-pressed", S.pv.round);
+}
+function setPageFit(fit) {
+  const st = pvState();
+  st.fit = st.fit === fit ? null : fit;
+  if (!st.fit && E) st.zoom = E.zoom || 1;
+  persist();
+  applyPageView();
+}
+function setPageZoom(z) {
+  const st = pvState();
+  st.fit = null;
+  st.zoom = Math.max(0.25, Math.min(3, z));
+  persist();
+  applyPageView();
+}
+function zoomStep(d) {
+  if (!E) return;
+  const z = E.zoom || 1;
+  const next = d > 0 ? ZOOMS.find((x) => x > z + 0.005) : [...ZOOMS].reverse().find((x) => x < z - 0.005);
+  if (next) setPageZoom(next);
+}
+function zoomMenu(a) {
+  const z = E ? Math.round((E.zoom || 1) * 100) : 100;
+  const st = pvState();
+  openMenu(a, [
+    { head: "Powiększenie" },
+    ...[50, 75, 100, 125, 150, 200].map((p) => ({ label: p + "%", check: !st.fit && z === p, run: () => setPageZoom(p / 100) })),
+    { sep: true },
+    { icon: "fitWidth", label: "Strona na pełną szerokość", check: st.fit === "width", run: () => setPageFit("width") },
+    { icon: "fitPage", label: "Pokaż całą stronę", check: st.fit === "page", run: () => setPageFit("page") },
+  ]);
 }
 function editorView(id) {
   const n = S.notes[id];
@@ -815,7 +1016,7 @@ function editorView(id) {
     <div class="banners"></div>
     <div class="editor" data-view="${view()}">
       <div class="pane pane-src"><div class="code${st.wrap ? " wrap" : ""}${st.line_numbers ? "" : " no-ln"}"><pre aria-hidden="true"></pre><textarea spellcheck="${st.spellcheck}" autocomplete="off" autocapitalize="off" wrap="${st.wrap ? "soft" : "off"}" aria-label="Źródło Typst"></textarea></div></div>
-      <div class="pane pane-page"><article class="wt-note" lang="pl"></article></div>
+      <div class="pane pane-page">${vtbHtml()}<div class="pg-scroll"><div class="pg-sheet paper-scope"><article class="wt-note" lang="pl"></article></div></div></div>
       <div class="diag-box" hidden></div>
     </div></div>`);
   E = {
@@ -825,7 +1026,9 @@ function editorView(id) {
     pre: $("pre", root),
     page: $(".wt-note", root),
     paneSrc: $(".pane-src", root),
-    panePage: $(".pane-page", root),
+    panePage: $(".pg-scroll", root),
+    pagePane: $(".pane-page", root),
+    tb: $(".wt-toolbar", root),
     diag: $(".diag-box", root),
     banners: $(".banners", root),
     ed: $(".editor", root),
@@ -843,6 +1046,21 @@ function editorView(id) {
   E.paneSrc.addEventListener("scroll", () => (n.scroll = [E.paneSrc.scrollTop, E.panePage.scrollTop]), { passive: true });
   E.panePage.addEventListener("scroll", () => (n.scroll = [E.paneSrc.scrollTop, E.panePage.scrollTop]), { passive: true });
   E.ta.value = n.source;
+  const ro = new ResizeObserver(() => {
+    fitToolbar();
+    applyPageView(true);
+  });
+  ro.observe(E.tb);
+  ro.observe(E.pagePane);
+  E.panePage.addEventListener(
+    "wheel",
+    (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      zoomStep(e.deltaY < 0 ? 1 : -1);
+    },
+    { passive: false },
+  );
   bindSource();
   bindPage();
   recompute();
@@ -890,6 +1108,7 @@ function schedulePage() {
   pageRaf = requestAnimationFrame(() => {
     if (E && !E.editing) renderPage();
     if (E) renderDiag();
+    if (E) renderStatusProblems();
   });
 }
 function lineOfIndex(text, idx) {
@@ -1188,7 +1407,7 @@ function startEdit(blk, caret = null) {
     setTimeout(() => {
       if (!E || !E.editing || E.bta !== ta) return;
       if (document.activeElement === ta) return;
-      if (document.activeElement && document.activeElement.closest && document.activeElement.closest(".wt-toolbar,.float-tb")) return;
+      if (document.activeElement && document.activeElement.closest && document.activeElement.closest(".wt-toolbar,.float-tb,.vtb")) return;
       if ($("#layer").childElementCount || $(".wt-menu")) return;
       commitEdit();
     }, 150);
@@ -1317,6 +1536,7 @@ function setView(v) {
   void E.ed.offsetWidth;
   E.ed.classList.add("fade");
   $$(".wt-seg button", E.root).forEach((b) => b.setAttribute("aria-checked", b.dataset.act === "view" + v[0].toUpperCase() + v.slice(1)));
+  applyPageView();
   renderStatus();
   if (v !== "page") setTimeout(() => E && E.ta.focus({ preventScroll: true }), 0);
 }
@@ -1485,20 +1705,126 @@ function renderStatus() {
     s.dataset.save = sum.cls ? "unsaved" : "saved";
     s.innerHTML = `<span class="si save"><span class="save-dot"></span>${sum.cls ? sum.text : "Wszystko zapisane"}</span>
       <span class="si path">${esc(WS() ? WS().path : "Brak otwartego folderu")}</span><span class="gap"></span>${proto}
-      <span class="si">Typst 0.13.1</span><span class="si">${S.settings.locale === "pl" ? "Polski" : "English"}</span>`;
+      <span class="si">Typst 0.13.1</span><span class="si">${S.settings.locale === "pl" ? "Polski" : "English"}</span>${problemsBtn()}`;
+    renderProblems();
     return;
   }
   s.dataset.save = n.phase;
-  const errs = E && E.id === t ? E.r.diags.length : n.errs || 0;
   const words = TY.wordCount(n.source);
   s.innerHTML = `<button class="save" data-act="save" title="${esc(tip("save"))}"><span class="save-dot"></span>${PHASE[n.phase]}</button>
     <button class="path" data-act="copyPath" data-arg="${t}" title="Kopiuj ścieżkę">${esc(notePath(t))}</button>
     <span class="gap"></span>
-    ${errs ? `<button class="err-cnt" data-act="goDiag" title="Przejdź do błędu">${icon("error", "sm")}${errs} ${errs === 1 ? "błąd" : "błędy"}</button>` : `<span class="si ok-cnt">${icon("check", "sm")}Bez błędów</span>`}
     <button class="caret" data-act="gotoLine" title="Przejdź do wiersza">Wr ${E && E.caret ? E.caret.ln + 1 : 1}, kol ${E && E.caret ? E.caret.col : 1}</button>
     <span class="si">${words} ${words === 1 ? "słowo" : words % 10 >= 2 && words % 10 <= 4 && (words % 100 < 10 || words % 100 >= 20) ? "słowa" : "słów"}</span>
     ${proto}
-    <span class="si">Typst 0.13.1</span>`;
+    <span class="si">Typst 0.13.1</span>${problemsBtn()}`;
+  renderProblems();
+}
+
+/* ---------- Problems panel (like VS Code's) ---------- */
+const diagCache = new WeakMap();
+function diagsOf(id) {
+  const n = S.notes[id];
+  if (E && E.id === id && E.r) return E.r.diags;
+  const c = diagCache.get(n);
+  if (c && c.src === n.source) return c.d;
+  const d = TY.render(n.source).diags;
+  diagCache.set(n, { src: n.source, d });
+  return d;
+}
+function problemsList() {
+  return S.tabs.filter((t) => S.notes[t]).map((t) => ({ id: t, diags: diagsOf(t) }));
+}
+function plErr(k) {
+  return k === 1 ? "błąd" : k % 10 >= 2 && k % 10 <= 4 && (k % 100 < 10 || k % 100 >= 20) ? "błędy" : "błędów";
+}
+function problemsBtn() {
+  const total = problemsList().reduce((a, g) => a + g.diags.length, 0);
+  const open = S.problems.open;
+  const label = total ? `${icon("error", "sm")}${total} ${plErr(total)}` : `${icon("check", "sm")}Bez błędów`;
+  return `<button class="pb-btn ${total ? "err-cnt" : "ok-cnt"}" data-act="problems" aria-expanded="${open}" title="${open ? "Zwiń" : "Rozwiń"} panel problemów (${esc(keyOf("problems"))})">${label}${icon(open ? "chevronDown" : "chevronUp", "sm")}</button>`;
+}
+function renderStatusProblems() {
+  const b = $("#status .pb-btn");
+  if (b) b.outerHTML = problemsBtn();
+  renderProblems();
+}
+function renderProblems() {
+  const p = $("#problems");
+  if (!p) return;
+  p.hidden = !S.problems.open;
+  if (p.hidden) return;
+  p.style.height = S.problems.h + "px";
+  const list = problemsList();
+  const withErr = list.filter((g) => g.diags.length);
+  const total = withErr.reduce((a, g) => a + g.diags.length, 0);
+  const closed = new Set($$(".pb-grp.closed", p).map((g) => g.dataset.id));
+  const keep = $(".pb-list", p) ? $(".pb-list", p).scrollTop : 0;
+  p.innerHTML = `<div class="pb-resize" title="Przeciągnij, aby zmienić wysokość"></div>
+    <div class="pb-h"><span class="t">Problemy</span><span class="cnt${total ? " on" : ""}">${total}</span>
+      <span class="sc">w otwartych notatkach (${list.length})</span><span class="grow"></span>
+      <button class="wt-ibtn xs" data-act="problems" title="Zwiń panel (${esc(keyOf("problems"))})" aria-label="Zwiń panel">${icon("chevronDown", "sm")}</button></div>
+    <div class="pb-list" role="tree">${
+      withErr.length
+        ? withErr
+            .map(
+              (g) => `<div class="pb-grp${closed.has(g.id) ? " closed" : ""}" data-id="${g.id}">
+          <button class="pb-file" data-act="pbFile" role="treeitem">${icon("chevronDown", "sm")}${itemIcon(g.id)}<span class="nm">${esc(S.notes[g.id].title)}</span><span class="p">${esc(notePath(g.id))}</span><span class="pb-n">${g.diags.length}</span></button>
+          ${g.diags.map((d, i) => `<button class="pb-row" data-act="pbGo" data-arg="${g.id}:${i}" role="treeitem">${icon("error", "sm")}<span class="pb-msg">${esc(d.msg)}</span><span class="loc">Wr ${d.line + 1}, kol ${d.col + 1}</span></button>`).join("")}
+        </div>`,
+            )
+            .join("")
+        : `<div class="pb-none">${icon("check", "sm")}${list.length ? "Brak problemów w otwartych notatkach." : "Brak otwartych notatek."}</div>`
+    }</div>`;
+  $(".pb-list", p).scrollTop = keep;
+}
+function toggleProblems() {
+  S.problems.open = !S.problems.open;
+  persist();
+  renderStatus();
+}
+function goProblem(id, i) {
+  const d = diagsOf(id)[i];
+  if (!d) return;
+  if (S.active !== id) openNote(id);
+  setTimeout(() => {
+    if (!E || E.id !== id) return;
+    if (view() === "page") goToLine(d.line, d.col);
+    else selectRange(d.line, d.col, 1);
+  }, 40);
+}
+function bindProblems() {
+  const p = $("#problems");
+  p.addEventListener("mousedown", (e) => {
+    const h = e.target.closest(".pb-resize");
+    if (!h || e.button !== 0) return;
+    e.preventDefault();
+    const z = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom")) || 1;
+    const y0 = e.clientY,
+      h0 = p.offsetHeight;
+    const max = () => Math.max(120, $(".main").clientHeight - 160);
+    h.classList.add("drag");
+    document.body.style.cursor = "row-resize";
+    const move = (ev) => {
+      S.problems.h = Math.round(Math.max(90, Math.min(max(), h0 + (y0 - ev.clientY) / z)));
+      p.style.height = S.problems.h + "px";
+    };
+    const up = () => {
+      h.classList.remove("drag");
+      document.body.style.cursor = "";
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", up);
+      persist();
+    };
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", up);
+  });
+  p.addEventListener("dblclick", (e) => {
+    if (!e.target.closest(".pb-resize")) return;
+    S.problems.h = 200;
+    p.style.height = "200px";
+    persist();
+  });
 }
 function renderStatusCaret() {
   const c = $("#status .caret");
@@ -1549,8 +1875,7 @@ function openWorkspace(ws) {
   if (S.ws === ws) return activate("home");
   S.ws = ws;
   S.recentWs = [ws, ...S.recentWs.filter((w) => w !== ws)];
-  S.tabs = S.tabs.filter((t) => t === "home" || t === "settings" || inOpenScope(t));
-  if (!S.tabs.includes("home")) S.tabs.unshift("home");
+  S.tabs = S.tabs.filter((t) => t === "settings" || inOpenScope(t));
   S.active = "home";
   S.tagFilter = null;
   renderAll();
@@ -1850,9 +2175,36 @@ function run(id, ctx = {}) {
   switch (id) {
     // app
     case "palette":
-      return openPalette(">");
     case "goto":
       return openPalette("");
+    case "backToTabs":
+      return backToTabs();
+    case "problems":
+      return toggleProblems();
+    case "pbGo": {
+      const [nid, i] = arg.split(":");
+      return goProblem(nid, +i);
+    }
+    case "pbFile":
+      return a.parentElement.classList.toggle("closed");
+    case "pvFitWidth":
+      return setPageFit("width");
+    case "pvFitPage":
+      return setPageFit("page");
+    case "pvZoomIn":
+      return zoomStep(1);
+    case "pvZoomOut":
+      return zoomStep(-1);
+    case "pvZoomMenu":
+      return zoomMenu(a);
+    case "pvOutside":
+      S.pv.outside = S.pv.outside === "page" ? "theme" : "page";
+      persist();
+      return applyPageView();
+    case "pvRound":
+      S.pv.round = !S.pv.round;
+      persist();
+      return applyPageView();
     case "search":
     case "find":
       return focusSearch();
@@ -1881,6 +2233,7 @@ function run(id, ctx = {}) {
       if (S.active === "settings") renderView();
       return;
     case "home":
+      if (S.active === "home" && S.tabs.length) return backToTabs();
       return activate("home");
     case "newNote":
       return newNoteDlg(arg === "" ? { where: "root" } : { tpl: arg });
@@ -1966,7 +2319,7 @@ function run(id, ctx = {}) {
       ]);
     // editor chrome
     case "tagAdd":
-      return tagMenu(a);
+      return tagDlg();
     case "tagRm": {
       const n = S.notes[S.active];
       n.tags = n.tags.filter((t) => t !== arg);
@@ -2098,9 +2451,9 @@ function run(id, ctx = {}) {
     case "footnote":
       return wrapSel("#footnote[", "]", "Treść przypisu");
     case "symbol":
-      return symbolsPop(a || $('[data-act="symbol"]'));
+      return symbolsDlg();
     case "table":
-      return tablePop(a || $('[data-act="table"]'));
+      return tableDlg();
     case "codeBlock":
       return insertBlock("```python\n\n```", 10);
     case "image":
@@ -2108,7 +2461,7 @@ function run(id, ctx = {}) {
     case "shape":
       return shapesDlg();
     case "reference":
-      return refMenu(a || $('[data-act="tbMore"]') || $(".wt-toolbar"));
+      return refMenu(a || $('[data-act="tbMore"]:not([hidden])') || $(".wt-toolbar .tb-mid"));
     case "date":
       return insertText(activeTA(), todayPl());
     case "pagebreak":
@@ -2177,6 +2530,10 @@ function bindKeys() {
       e.preventDefault();
       return;
     }
+    if (e.key === "Escape" && S.active === "home" && S.tabs.length && !(e.target.matches && e.target.matches("input,textarea,select"))) {
+      e.preventDefault();
+      return backToTabs();
+    }
     if (window.recordingKey) return;
     const combo = comboOf(e);
     if (!combo || !/Ctrl|Alt/.test(combo)) return;
@@ -2234,6 +2591,7 @@ function boot() {
   bindKeys();
   buildSidebar();
   bindSearch();
+  bindProblems();
   renderAll();
   window.addEventListener("beforeunload", persist);
 }

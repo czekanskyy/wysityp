@@ -236,7 +236,7 @@ function confirmDlg({ title, text, ok = "OK", alt = null, cancel = "Anuluj", dan
   return new Promise((resolve) => {
     let val = null;
     const d = openDialog(
-      `<div class="dlg-h"><h2>${esc(title)}</h2></div>
+      `${dlgHead(danger ? "warning" : "info", title, "", { close: false, tone: danger ? "danger" : "" })}
       <div class="dlg-b"><p>${esc(text)}</p></div>
       <div class="dlg-f">${alt ? `<button class="wt-btn ghost" data-v="alt" style="margin-right:auto">${esc(alt)}</button>` : ""}
         <button class="wt-btn secondary" data-v="">${esc(cancel)}</button>
@@ -252,6 +252,19 @@ function confirmDlg({ title, text, ok = "OK", alt = null, cancel = "Anuluj", dan
     });
   });
 }
+
+/* ---------- Shared dialog parts ----------
+   Every dialog opens with the same head: a tinted icon, a title, an optional muted line and a close button.
+   The foot holds an optional hint on the left and the buttons on the right. */
+function dlgHead(ic, title, sub = "", { close = true, tone = "" } = {}) {
+  return `<div class="dlg-h"><span class="dlg-ic${tone ? " " + tone : ""}" aria-hidden="true">${icon(ic)}</span>
+    <div class="dlg-t"><h2>${esc(title)}</h2>${sub ? `<p>${sub}</p>` : ""}</div>
+    ${close ? `<button class="wt-ibtn sm" data-close title="Zamknij (Esc)" aria-label="Zamknij">${icon("close")}</button>` : ""}</div>`;
+}
+function dlgFoot(hint, buttons) {
+  return `<div class="dlg-f">${hint ? `<span class="hint">${hint}</span>` : ""}${buttons}</div>`;
+}
+const BTN_CANCEL = '<button class="wt-btn secondary" data-close>Anuluj</button>';
 
 /* ---------- Command palette ---------- */
 function fuzzy(q, s) {
@@ -274,11 +287,89 @@ function fold(s) {
   for (const ch of s) o += FOLD[ch] || (ch.charCodeAt(0) > 127 ? ch.normalize("NFD")[0] : ch);
   return o;
 }
-function paletteItems(raw) {
-  const mode = /^[>@#:]/.test(raw) ? raw[0] : "";
-  const q = (mode ? raw.slice(1) : raw).trim();
+/* Modes: universal by default; a leading > ? @ # : switches mode, the character disappears and Backspace on an empty field goes back. */
+const PAL_MODES = {
+  "": { icon: "sparkle", name: "", ph: "Szukaj notatek, nagłówków i poleceń…", label: "Szukaj notatki lub polecenia" },
+  ">": { icon: "terminal", name: "Polecenia", ph: "Wpisz nazwę polecenia…", label: "Polecenia" },
+  "?": { icon: "search", name: "W treści", ph: "Szukaj słowa we wszystkich notatkach…", label: "Szukaj w treści notatek" },
+  "@": { icon: "heading", name: "Nagłówki", ph: "Przejdź do nagłówka w tej notatce…", label: "Nagłówki" },
+  "#": { icon: "tag", name: "Tagi", ph: "Pokaż notatki z tagiem…", label: "Tagi" },
+  ":": { icon: "lineNum", name: "Wiersz", ph: "Numer wiersza, np. 12 albo 12:4", label: "Przejdź do wiersza" },
+};
+const PAL_SWITCH = [
+  [">", "Polecenia", "Uruchom dowolne polecenie aplikacji"],
+  ["?", "Szukaj w treści", "Słowo we wszystkich notatkach"],
+  ["@", "Nagłówki", "Przejdź do nagłówka w tej notatce"],
+  ["#", "Tagi", "Notatki z wybranym tagiem"],
+  [":", "Przejdź do wiersza", "Numer wiersza w źródle"],
+];
+function palNotes() {
+  return [...new Set([...S.recent, ...wsNotes(), ...S.loose, ...S.drafts])].filter((id) => S.notes[id] && inOpenScope(id));
+}
+function palCommands() {
+  return ACTIONS.filter((a) => a.group !== "Prototyp").map((a) => ({ icon: a.icon, label: a.label, sub: a.group, key: keyOf(a.id), run: () => run(a.id) }));
+}
+function palTags() {
+  const ids = [...wsNotes(), ...S.loose, ...S.drafts].filter((id) => S.notes[id]);
+  const tags = [...new Set([...Object.keys(S.tagDefs || {}), ...ids.flatMap((id) => S.notes[id].tags || [])])];
+  return tags.map((t) => {
+    const c = tagColor(t);
+    const k = ids.filter((id) => (S.notes[id].tags || []).includes(t)).length;
+    return {
+      swatch: `<span class="swl" style="background:var(--tag-${c}-bg);color:var(--tag-${c}-fg)"></span>`,
+      label: t,
+      sub: `${k} ${k === 1 ? "notatka" : k % 10 >= 2 && k % 10 <= 4 && (k % 100 < 10 || k % 100 >= 20) ? "notatki" : "notatek"}`,
+      run: () => {
+        S.tagFilter = t;
+        activate("home");
+        renderView();
+      },
+    };
+  });
+}
+function palHeads() {
+  if (!E) return [];
+  return E.r.heads.map((h) => ({ icon: "heading", label: h.text, sub: `wiersz ${h.line + 1}`, indent: h.lvl - 1, run: () => goToLine(h.line, 0, true) }));
+}
+/* A line of text cut around the hit, with the hit marked. */
+function snippet(line, at, len) {
+  const from = Math.max(0, at - 28);
+  const pre = (from ? "…" : "") + line.slice(from, at).replace(/^\s+/, "");
+  return esc(pre) + "<mark>" + esc(line.slice(at, at + len)) + "</mark>" + esc(line.slice(at + len, at + len + 70));
+}
+function palFullText(q) {
   const groups = [];
-  const add = (name, list) => {
+  const fq = fold(q.toLowerCase());
+  let total = 0;
+  for (const id of palNotes()) {
+    const lines = S.notes[id].source.split("\n");
+    const items = [];
+    lines.forEach((ln, i) => {
+      const at = fold(ln.toLowerCase()).indexOf(fq);
+      if (at < 0 || items.length >= 6 || total >= 60) return;
+      total++;
+      items.push({
+        icon: "dot",
+        html: snippet(ln, at, q.length),
+        sub: `wiersz ${i + 1}`,
+        run: () => {
+          openNote(id);
+          setTimeout(() => {
+            if (!E || E.id !== id) return;
+            if (view() === "page") goToLine(i, at, true);
+            else selectRange(i, at, q.length);
+          }, 40);
+        },
+      });
+    });
+    if (items.length) groups.push({ name: S.notes[id].title, icon: noteIcon(id), items });
+  }
+  return groups;
+}
+function paletteItems(mode, raw) {
+  const q = raw.trim();
+  const groups = [];
+  const add = (name, list, max = 40) => {
     const scored = list
       .map((it) => {
         const f = fuzzy(q, it.label);
@@ -287,81 +378,89 @@ function paletteItems(raw) {
       })
       .filter(Boolean);
     if (q) scored.sort((a, b) => b.score - a.score);
-    if (scored.length) groups.push({ name, items: scored.slice(0, 40) });
+    if (scored.length) groups.push({ name, items: scored.slice(0, max) });
   };
   if (mode === ">") {
-    const byGroup = {};
-    for (const a of ACTIONS) (byGroup[a.group] = byGroup[a.group] || []).push({ icon: a.icon, label: a.label, sub: a.group, key: keyOf(a.id), run: () => run(a.id) });
-    if (q) add("Polecenia", Object.values(byGroup).flat());
-    else for (const g in byGroup) add(g, byGroup[g]);
+    if (q) add("Polecenia", palCommands());
+    else {
+      const byGroup = {};
+      for (const c of palCommands()) (byGroup[c.sub] = byGroup[c.sub] || []).push(c);
+      for (const g in byGroup) add(g, byGroup[g]);
+    }
+  } else if (mode === "?") {
+    if (!q) return { groups, empty: "Wpisz słowo, żeby przeszukać treść wszystkich notatek w otwartym folderze." };
+    groups.push(...palFullText(q));
+    return { groups, empty: `Żadna notatka nie zawiera „${q}”.` };
   } else if (mode === "@") {
     if (!E) return { groups, empty: "Otwórz notatkę, żeby przejść do nagłówka." };
-    add(
-      "Nagłówki w tej notatce",
-      E.r.heads.map((h) => ({ icon: "heading", label: h.text, sub: `wiersz ${h.line + 1}`, indent: h.lvl - 1, run: () => goToLine(h.line, 0, true) })),
-    );
     if (!E.r.heads.length) return { groups, empty: "Ta notatka nie ma nagłówków. Dodaj je znakiem = na początku wiersza." };
+    add("Nagłówki w tej notatce", palHeads());
   } else if (mode === "#") {
-    const ids = [...wsNotes(), ...S.loose, ...S.drafts].filter((id) => S.notes[id]);
-    const tags = [...new Set(ids.flatMap((id) => S.notes[id].tags || []))];
-    add(
-      "Tagi",
-      tags.map((t) => ({
-        swatch: `<span class="swl" style="background:var(--tag-${TAGS[t] || "gray"}-bg);color:var(--tag-${TAGS[t] || "gray"}-fg)"></span>`,
-        label: t,
-        sub: `${ids.filter((id) => (S.notes[id].tags || []).includes(t)).length} notatek`,
-        run: () => {
-          S.tagFilter = t;
-          activate("home");
-          renderView();
-        },
-      })),
-    );
+    add("Tagi", palTags());
   } else if (mode === ":") {
     if (!E) return { groups, empty: "Otwórz notatkę, żeby przejść do wiersza." };
     const total = E.ta.value.split("\n").length;
     const m = /^(\d+)(?:[:,](\d+))?$/.exec(q);
     if (!m) return { groups, empty: `Wpisz numer wiersza od 1 do ${total}. Wiersz:kolumna też działa, np. 12:4.` };
     const ln = Math.min(total, Math.max(1, +m[1]));
-    groups.push({ name: "Wiersz", items: [{ icon: "arrowLeft", html: `Przejdź do wiersza <b>${ln}</b>${m[2] ? `, kolumny ${m[2]}` : ""}`, sub: `z ${total}`, run: () => goToLine(ln - 1, m[2] ? +m[2] - 1 : 0, true) }] });
+    groups.push({ name: "Wiersz", items: [{ icon: "lineNum", html: `Przejdź do wiersza <b>${ln}</b>${m[2] ? `, kolumny ${m[2]}` : ""}`, sub: `z ${total}`, run: () => goToLine(ln - 1, m[2] ? +m[2] - 1 : 0, true) }] });
+  } else if (!q) {
+    add("Ostatnio otwierane", palNotes().slice(0, 6).map((id) => ({ icon: noteIcon(id), label: S.notes[id].title, sub: notePath(id).replace(/^.*?(?=[^/]+\/[^/]+$)/, ""), run: () => openNote(id) })));
+    groups.push({
+      name: "Tryby wyszukiwania",
+      items: PAL_SWITCH.filter(([m]) => E || (m !== "@" && m !== ":")).map(([m, label, sub]) => ({ icon: PAL_MODES[m].icon, html: `${esc(label)}`, sub, key: m, mode: m })),
+    });
   } else {
-    const ids = [...new Set([...S.recent, ...wsNotes(), ...S.loose, ...S.drafts])].filter((id) => S.notes[id] && inOpenScope(id));
-    add(
-      q ? "Notatki" : "Ostatnio otwierane",
-      ids.map((id) => ({ icon: noteIcon(id), label: S.notes[id].title, sub: notePath(id).replace(/^.*?(?=[^/]+\/[^/]+$)/, ""), run: () => openNote(id) })),
-    );
-    if (q) {
-      add(
-        "Polecenia",
-        ACTIONS.filter((a) => a.group !== "Prototyp").map((a) => ({ icon: a.icon, label: a.label, sub: a.group, key: keyOf(a.id), run: () => run(a.id) })),
-      );
-      groups.push({ name: "", items: [{ icon: "plus", html: `Utwórz notatkę „<b>${esc(q)}</b>”`, run: () => newNoteDlg({ title: q }) }] });
-    }
+    add("Notatki", palNotes().map((id) => ({ icon: noteIcon(id), label: S.notes[id].title, sub: notePath(id).replace(/^.*?(?=[^/]+\/[^/]+$)/, ""), run: () => openNote(id) })), 6);
+    add("Nagłówki w tej notatce", palHeads(), 5);
+    add("Polecenia", palCommands(), 6);
+    add("Tagi", palTags(), 4);
+    groups.push({
+      name: "",
+      items: [
+        { icon: "search", html: `Szukaj „<b>${esc(q)}</b>” w treści notatek`, key: "?", mode: "?", q },
+        { icon: "plus", html: `Utwórz notatkę „<b>${esc(q)}</b>”`, run: () => newNoteDlg({ title: q }) },
+      ],
+    });
   }
   return { groups, empty: "Nic nie pasuje. Spróbuj innego słowa." };
 }
 function openPalette(prefix = "") {
-  if (STACK.some((s) => $(".wt-palette", s.node))) {
-    const inp = $(".wt-palette input");
-    inp.value = prefix;
-    inp.dispatchEvent(new Event("input"));
-    inp.focus();
+  let mode = PAL_MODES[prefix[0]] && prefix[0] ? prefix[0] : "";
+  let text = mode ? prefix.slice(1) : prefix;
+  const open = STACK.find((s) => $(".wt-palette", s.node));
+  if (open) {
+    $(".wt-palette", open.node).setMode(mode, text);
     return;
   }
   const d = openDialog(
-    `<div class="q">${icon("search")}<input aria-label="Szukaj notatki lub polecenia" autocomplete="off" spellcheck="false"></div>
+    `<div class="q"><span class="pal-ic" aria-hidden="true"></span><span class="pal-chip" hidden></span><input autocomplete="off" spellcheck="false"></div>
     <div class="list" role="listbox"></div>
-    <div class="foot"><span>${kbd("↑")}${kbd("↓")} wybór</span><span>${kbd("Enter")} otwórz</span><span><b>&gt;</b> polecenia</span><span><b>@</b> nagłówki</span><span><b>#</b> tagi</span><span><b>:</b> wiersz</span></div>`,
+    <div class="foot"></div>`,
     { cls: "wt-palette", center: false },
   );
   d.dlg.classList.remove("dlg");
   const inp = $("input", d.dlg);
   const list = $(".list", d.dlg);
-  inp.placeholder = "Szukaj notatki… (> polecenia, @ nagłówki, # tagi, : wiersz)";
+  const ic = $(".pal-ic", d.dlg),
+    chip = $(".pal-chip", d.dlg),
+    foot = $(".foot", d.dlg);
   let flat = [],
     sel = 0;
+  const drawMode = () => {
+    const m = PAL_MODES[mode];
+    ic.innerHTML = icon(m.icon);
+    ic.dataset.mode = mode || "all";
+    chip.hidden = !mode;
+    chip.textContent = m.name;
+    inp.placeholder = m.ph;
+    inp.setAttribute("aria-label", m.label);
+    foot.innerHTML = mode
+      ? `<span>${kbd("↑")}${kbd("↓")} wybór</span><span>${kbd("Enter")} otwórz</span><span>${kbd("Backspace")} wszystko naraz</span>`
+      : `<span>${kbd("↑")}${kbd("↓")} wybór</span><span>${kbd("Enter")} otwórz</span><span class="modes">${PAL_SWITCH.map(([k, l]) => `<span><b>${esc(k)}</b> ${esc(l.toLowerCase())}</span>`).join("")}</span>`;
+  };
   const draw = () => {
-    const { groups, empty } = paletteItems(inp.value);
+    const { groups, empty } = paletteItems(mode, inp.value);
     flat = groups.flatMap((g) => g.items);
     sel = Math.min(sel, Math.max(0, flat.length - 1));
     let k = 0;
@@ -369,11 +468,11 @@ function openPalette(prefix = "") {
       ? groups
           .map(
             (g) =>
-              (g.name ? `<div class="grp">${esc(g.name)}</div>` : "") +
+              (g.name ? `<div class="grp">${g.icon ? icon(g.icon, "sm") : ""}${esc(g.name)}</div>` : '<div class="grp-sep"></div>') +
               g.items
                 .map((it) => {
                   const i = k++;
-                  return `<div class="wt-opt" role="option" data-i="${i}" aria-selected="${i === sel}" ${it.indent ? `style="padding-left:${10 + it.indent * 16}px"` : ""}>
+                  return `<div class="wt-opt${it.mode !== undefined ? " mode-sw" : ""}" role="option" data-i="${i}" aria-selected="${i === sel}" ${it.indent ? `style="padding-left:${10 + it.indent * 16}px"` : ""}>
                   <span class="ic">${it.swatch || icon(it.icon || "file", "sm")}</span><span class="t">${it.html}</span>${it.sub ? `<span class="s">${esc(it.sub)}</span>` : ""}${it.key ? kbd(it.key) : ""}</div>`;
                 })
                 .join(""),
@@ -381,6 +480,16 @@ function openPalette(prefix = "") {
           .join("")
       : `<div class="none">${esc(empty)}</div>`;
   };
+  const setMode = (m, t = "") => {
+    mode = m;
+    inp.value = t;
+    sel = 0;
+    drawMode();
+    draw();
+    inp.focus();
+    inp.setSelectionRange(inp.value.length, inp.value.length);
+  };
+  d.dlg.setMode = setMode;
   const mark = () => {
     $$(".wt-opt", list).forEach((o) => o.setAttribute("aria-selected", +o.dataset.i === sel));
     const o = $(`.wt-opt[data-i="${sel}"]`, list);
@@ -389,11 +498,12 @@ function openPalette(prefix = "") {
   const pick = (i) => {
     const it = flat[i];
     if (!it) return;
+    if (it.mode !== undefined) return setMode(it.mode, it.q || "");
     d.close();
     setTimeout(() => it.run(), 0);
   };
-  inp.value = prefix;
   inp.addEventListener("input", () => {
+    if (!mode && PAL_MODES[inp.value[0]] && inp.value[0]) return setMode(inp.value[0], inp.value.slice(1));
     sel = 0;
     draw();
   });
@@ -401,27 +511,27 @@ function openPalette(prefix = "") {
     if (e.key === "ArrowDown") (e.preventDefault(), (sel = Math.min(flat.length - 1, sel + 1)), mark());
     else if (e.key === "ArrowUp") (e.preventDefault(), (sel = Math.max(0, sel - 1)), mark());
     else if (e.key === "Enter") (e.preventDefault(), pick(sel));
+    else if (e.key === "Backspace" && mode && inp.selectionStart === 0 && inp.selectionEnd === 0) (e.preventDefault(), setMode("", inp.value));
   });
+  chip.addEventListener("click", () => setMode("", inp.value));
   list.addEventListener("mousemove", (e) => {
     const o = e.target.closest(".wt-opt");
     if (o && +o.dataset.i !== sel) ((sel = +o.dataset.i), mark());
   });
+  list.addEventListener("mousedown", (e) => e.target.closest(".wt-opt") && e.preventDefault());
   list.addEventListener("click", (e) => {
     const o = e.target.closest(".wt-opt");
     if (o) pick(+o.dataset.i);
   });
-  draw();
-  setTimeout(() => {
-    inp.focus();
-    inp.setSelectionRange(inp.value.length, inp.value.length);
-  }, 0);
+  setMode(mode, text);
+  setTimeout(() => inp.focus(), 0);
 }
 
 /* ---------- Keyboard shortcuts sheet ---------- */
 function openShortcuts() {
   const d = openDialog(
-    `<div class="kh"><h2>Skróty klawiszowe</h2><div class="inbox">${icon("search", "sm")}<input placeholder="Filtruj skróty" aria-label="Filtruj skróty"></div>
-      <button class="wt-ibtn sm" data-close title="Zamknij">${icon("close")}</button></div>
+    `${dlgHead("keyboard", "Skróty klawiszowe", "Skróty i odpowiadająca im składnia Typst")}
+    <div class="kh"><div class="inbox">${icon("search", "sm")}<input placeholder="Filtruj skróty" aria-label="Filtruj skróty"></div></div>
     <div class="kc"></div>
     <div class="kf"><span>${kbd("Ctrl+Tab")} następna karta</span><span>${kbd("Ctrl+1")}…${kbd("9")} karta o numerze</span><span>${kbd("Esc")} zamknij okno</span><a data-k="edit">Zmień skróty w Ustawieniach</a></div>`,
     { cls: "kp" },
@@ -504,7 +614,7 @@ function newNoteDlg({ tpl = "lecture", where = null, title = "" } = {}) {
     where = !S.ws ? "drafts" : loc && loc.folder && loc.ws === S.ws ? loc.folder.id : "root";
   }
   const d = openDialog(
-    `<div class="dlg-h"><h2>Nowa notatka</h2><button class="wt-ibtn sm" data-close title="Zamknij">${icon("close")}</button></div>
+    `${dlgHead("file", "Nowa notatka", "Zwykły plik .typ w wybranym folderze")}
     <div class="dlg-b">
       <div class="wt-field"><label for="nnT">Tytuł</label><input id="nnT" class="wt-input" autocomplete="off" placeholder="np. Wykład 8 – Szeregi potęgowe" value="${esc(title)}" autofocus><span class="wt-msg"></span></div>
       <div class="tpl-grp">Szablon</div>
@@ -516,7 +626,7 @@ function newNoteDlg({ tpl = "lecture", where = null, title = "" } = {}) {
         </select>
         <span class="grow"></span><code class="fn" style="font:12px var(--font-mono);color:var(--color-text-faint)"></code></div>
     </div>
-    <div class="dlg-f"><span class="hint">Enter zatwierdza. Escape anuluje.</span><button class="wt-btn secondary" data-close>Anuluj</button><button class="wt-btn primary" data-ok>Utwórz notatkę</button></div>`,
+    ${dlgFoot("Enter zatwierdza. Escape anuluje.", BTN_CANCEL + '<button class="wt-btn primary" data-ok>Utwórz notatkę</button>')}`,
     { cls: "nn" },
   );
   const inp = $("#nnT", d.dlg),
@@ -572,13 +682,12 @@ const FAKE_FILES = [
 function openFileDlg() {
   let sel = 0;
   const d = openDialog(
-    `<div class="dlg-h">${icon("folderOpen")}<h2>Otwórz notatkę</h2><button class="wt-ibtn sm" data-close title="Zamknij">${icon("close")}</button></div>
+    `${dlgHead("folderOpen", "Otwórz notatkę", "Okno systemowe Windows. Plik spoza folderu trafi do „Luźnych plików”.")}
     <div class="dlg-b">
-      <p class="muted" style="font-size:12px">Okno systemowe Windows. Pliki spoza otwartego folderu trafią do sekcji „Luźne pliki”, a aplikacja zapamięta tylko te, które tu wybierzesz.</p>
       <div class="fs-path">${icon("folder", "sm")}Ten komputer<span>›</span>Użytkownik<span>›</span><b style="color:var(--color-text);font-weight:500">Pobrane</b><span class="grow"></span><span>Pliki Typst (*.typ)</span></div>
       <div class="fs-list" role="listbox">${FAKE_FILES.map((f, i) => `<button class="fs-row" data-i="${i}" aria-selected="${i === sel}" ${f.pdf || f.folder ? 'disabled style="opacity:.45;cursor:default"' : ""}>${icon(f.folder ? "folder" : f.pdf ? "pdf" : "file", "sm")}<span>${esc(f.name)}</span><span class="m">${f.folder ? "folder" : `${f.size} · ${f.date}`}</span></button>`).join("")}</div>
     </div>
-    <div class="dlg-f"><span class="hint">Podwójne kliknięcie otwiera plik.</span><button class="wt-btn secondary" data-close>Anuluj</button><button class="wt-btn primary" data-ok>Otwórz</button></div>`,
+    ${dlgFoot("Podwójne kliknięcie otwiera plik.", BTN_CANCEL + '<button class="wt-btn primary" data-ok>Otwórz</button>')}`,
     { cls: "fs" },
   );
   const open = () => {
@@ -617,14 +726,13 @@ function openFolderDlg() {
   const ids = Object.keys(WORKSPACES);
   let sel = ids.find((w) => w !== S.ws) || ids[0];
   const d = openDialog(
-    `<div class="dlg-h">${icon("folderOpen")}<h2>Otwórz folder</h2><button class="wt-ibtn sm" data-close title="Zamknij">${icon("close")}</button></div>
+    `${dlgHead("folder", "Otwórz folder", "Aplikacja czyta i zapisuje tylko pliki w wybranym folderze.")}
     <div class="dlg-b">
       <div class="fs-path">${icon("folder", "sm")}Ten komputer<span>›</span>Dokumenty<span>›</span><b style="color:var(--color-text);font-weight:500">WYSITyp</b></div>
       <div class="fs-list">${ids.map((w) => `<button class="fs-row" data-w="${w}" aria-selected="${w === sel}">${icon("folder", "sm")}<span>${esc(WORKSPACES[w].path.split("/").pop())}</span><span class="m">${wsNotes(w).length} notatek${w === S.ws ? " · otwarty" : ""}</span></button>`).join("")}
         <button class="fs-row" disabled style="opacity:.45;cursor:default">${icon("folder", "sm")}<span>Archiwum</span><span class="m">pusty</span></button></div>
-      <p class="muted" style="font-size:12px">Aplikacja czyta i zapisuje tylko pliki w wybranym folderze. Nic nie wysyłamy do sieci.</p>
     </div>
-    <div class="dlg-f"><button class="wt-btn secondary" data-close>Anuluj</button><button class="wt-btn primary" data-ok>Wybierz folder</button></div>`,
+    ${dlgFoot("Nic nie wysyłamy do sieci.", BTN_CANCEL + '<button class="wt-btn primary" data-ok>Wybierz folder</button>')}`,
     { cls: "fs" },
   );
   const go = () => {
@@ -657,7 +765,7 @@ function aboutDlg() {
     ["Libertinus", "OFL-1.1"],
   ];
   openDialog(
-    `<div class="dlg-h"><h2>O programie</h2><button class="wt-ibtn sm" data-close title="Zamknij">${icon("close")}</button></div>
+    `${dlgHead("info", "O programie")}
     <div class="dlg-b">
       <div class="brand"><span class="mark">W</span><div><b style="font-size:16px">WYSITyp</b><div class="muted">Wersja 0.4.0 (prototyp HTML) · Typst 0.13.1</div></div></div>
       <p>What You See Is Typst. Notatki z wykładów, które renderują się na bieżąco i zostają zwykłymi plikami <code>.typ</code> na Twoim dysku.</p>
@@ -665,48 +773,143 @@ function aboutDlg() {
       <div class="tpl-grp">Biblioteki i fonty</div>
       <div class="lic">${libs.map(([a, b]) => `<div><span>${esc(a)}</span><span>${esc(b)}</span></div>`).join("")}</div>
     </div>
-    <div class="dlg-f"><button class="wt-btn primary" data-close>Zamknij</button></div>`,
+    ${dlgFoot("", '<button class="wt-btn primary" data-close>Zamknij</button>')}`,
     { cls: "about" },
   );
 }
 
 /* ---------- Tags ---------- */
-function tagMenu(anchor) {
+const TAG_COLORS = [
+  ["gray", "Szary"],
+  ["blue", "Niebieski"],
+  ["green", "Zielony"],
+  ["amber", "Bursztynowy"],
+  ["red", "Czerwony"],
+  ["violet", "Fioletowy"],
+  ["teal", "Morski"],
+];
+function syncTagsBar(n) {
+  if (E && E.id === S.active && S.notes[S.active] === n) $(".top-end", E.root).innerHTML = tagsBar(n) + `<button class="wt-btn ghost sm" data-act="exportPdf" title="${esc(tip("exportPdf"))}">${icon("pdf", "sm")}PDF</button>`;
+  persist();
+}
+/* Centred dialog: the note's tags on top, then one box that filters the list or creates a new tag with a colour. */
+function tagDlg() {
   const n = S.notes[S.active];
   if (!n) return;
-  const all = [...new Set([...Object.keys(TAGS), ...Object.values(S.notes).flatMap((x) => x.tags || [])])];
-  const node = el(`<div class="cmenu"><input class="wt-input" placeholder="Nowy tag i Enter" aria-label="Nowy tag" style="height:30px;font-size:13px"><div class="lab">Tagi</div><div class="row tl"></div><p class="note">Tagi zapisujemy w komentarzu na początku pliku, więc zostają w źródle Typst.</p></div>`);
+  const all = () => [...new Set([...Object.keys(S.tagDefs || {}), ...Object.values(S.notes).flatMap((x) => x.tags || [])])].sort((a, b) => a.localeCompare(b, "pl"));
+  const count = (t) => Object.values(S.notes).filter((x) => (x.tags || []).includes(t)).length;
+  const used = new Set(Object.values(S.tagDefs || {}));
+  let newColor = (TAG_COLORS.find(([c]) => c !== "gray" && !used.has(c)) || TAG_COLORS[1])[0];
+  let q = "",
+    sel = 0,
+    editing = null,
+    flat = [];
+  const dot = (c) => `style="--fg:var(--tag-${c}-fg);--bg:var(--tag-${c}-bg)"`;
+  const swatches = (cur, attr) => `<div class="tg-sws" role="radiogroup" aria-label="Kolor tagu">${TAG_COLORS.map(([c, l]) => `<button class="tg-sw" role="radio" aria-checked="${c === cur}" ${attr}="${c}" title="${l}" ${dot(c)}></button>`).join("")}</div>`;
+  const d = openDialog(
+    `${dlgHead("tag", "Tagi notatki", esc(n.title))}
+    <div class="dlg-b">
+      <div class="tg-cur" aria-label="Tagi tej notatki"></div>
+      <div class="inbox tg-q">${icon("search", "sm")}<input placeholder="Szukaj lub utwórz tag" aria-label="Szukaj lub utwórz tag" autocomplete="off" spellcheck="false" autofocus></div>
+      <div class="tg-list" role="listbox" aria-multiselectable="true" aria-label="Wszystkie tagi"></div>
+    </div>
+    ${dlgFoot("Tagi zapisujemy w komentarzu na początku pliku, więc zostają w źródle Typst.", '<button class="wt-btn primary" data-close>Gotowe</button>')}`,
+    { cls: "tagd" },
+  );
+  const inp = $("input", d.dlg),
+    list = $(".tg-list", d.dlg),
+    cur = $(".tg-cur", d.dlg);
+  const has = (t) => (n.tags || []).includes(t);
+  const drawCur = () => {
+    cur.innerHTML = (n.tags || []).length
+      ? n.tags.map((t) => `<span class="wt-tag sel" ${dot(tagColor(t))}>${esc(t)}<button class="x" data-rm="${esc(t)}" title="Usuń z notatki" aria-label="Usuń tag ${esc(t)}">${icon("close", "sm")}</button></span>`).join("")
+      : '<span class="muted">Ta notatka nie ma jeszcze tagów.</span>';
+  };
   const draw = () => {
-    $(".tl", node).innerHTML = all.map((t) => tagHtml(t, (n.tags || []).includes(t) ? "sel" : "").replace("<span", `<span data-t="${esc(t)}" role="button"`)).join("");
+    const fq = fold(q.toLowerCase());
+    const tags = all().filter((t) => !q || fold(t.toLowerCase()).includes(fq));
+    const exact = all().some((t) => t.toLowerCase() === q.toLowerCase());
+    flat = [...(q && !exact ? [{ create: q }] : []), ...tags.map((t) => ({ t }))];
+    sel = Math.min(sel, Math.max(0, flat.length - 1));
+    list.innerHTML =
+      flat
+        .map((it, i) =>
+          it.create
+            ? `<div class="tg-new${i === sel ? " cur" : ""}" data-i="${i}" role="option"><button class="tg-mk" data-create>${icon("plus", "sm")}Utwórz tag „<b>${esc(it.create)}</b>”</button>${swatches(newColor, "data-nc")}</div>`
+            : `<div class="tg-row${i === sel ? " cur" : ""}" data-i="${i}" role="option" aria-selected="${has(it.t)}">
+                <span class="chk">${has(it.t) ? icon("check", "sm") : ""}</span>
+                <button class="tg-dot" data-dot="${esc(it.t)}" title="Zmień kolor" aria-label="Zmień kolor tagu ${esc(it.t)}" aria-expanded="${editing === it.t}" ${dot(tagColor(it.t))}></button>
+                <span class="nm">${esc(it.t)}</span><span class="ct">${count(it.t)}</span></div>
+              ${editing === it.t ? `<div class="tg-edit">${swatches(tagColor(it.t), "data-setc")}</div>` : ""}`,
+        )
+        .join("") || `<div class="tg-none">Nie ma jeszcze żadnych tagów. Wpisz nazwę, żeby utworzyć pierwszy.</div>`;
   };
-  const sync = () => {
-    if (E && E.id === S.active) $(".top-end", E.root).innerHTML = tagsBar(n) + `<button class="wt-btn ghost sm" data-act="exportPdf" title="${esc(tip("exportPdf"))}">${icon("pdf", "sm")}PDF</button>`;
-    persist();
-  };
-  node.addEventListener("click", (e) => {
-    const t = e.target.closest("[data-t]");
-    if (!t) return;
-    const name = t.dataset.t;
-    n.tags = (n.tags || []).includes(name) ? n.tags.filter((x) => x !== name) : [...(n.tags || []), name];
+  const changed = () => {
+    drawCur();
     draw();
-    sync();
+    syncTagsBar(n);
+  };
+  const toggle = (t) => {
+    n.tags = has(t) ? n.tags.filter((x) => x !== t) : [...(n.tags || []), t];
+    changed();
+  };
+  const create = () => {
+    const name = q.trim();
+    if (!name) return;
+    S.tagDefs = { ...(S.tagDefs || {}), [name]: newColor };
+    if (!has(name)) n.tags = [...(n.tags || []), name];
+    q = inp.value = "";
+    sel = 0;
+    used.add(newColor);
+    newColor = (TAG_COLORS.find(([c]) => c !== "gray" && !used.has(c)) || TAG_COLORS[1])[0];
+    changed();
+    inp.focus();
+  };
+  d.dlg.addEventListener("click", (e) => {
+    const rm = e.target.closest("[data-rm]");
+    if (rm) return toggle(rm.dataset.rm);
+    const nc = e.target.closest("[data-nc]");
+    if (nc) return ((newColor = nc.dataset.nc), draw(), inp.focus());
+    if (e.target.closest("[data-create]")) return create();
+    const dt = e.target.closest("[data-dot]");
+    if (dt) return ((editing = editing === dt.dataset.dot ? null : dt.dataset.dot), draw());
+    const sc = e.target.closest("[data-setc]");
+    if (sc && editing) {
+      S.tagDefs = { ...(S.tagDefs || {}), [editing]: sc.dataset.setc };
+      editing = null;
+      changed();
+      refreshChrome();
+      return;
+    }
+    const row = e.target.closest(".tg-row");
+    if (row) {
+      sel = +row.dataset.i;
+      toggle(flat[sel].t);
+    }
   });
-  const inp = $("input", node);
+  inp.addEventListener("input", () => {
+    q = inp.value.trim();
+    sel = 0;
+    editing = null;
+    draw();
+  });
   inp.addEventListener("keydown", (e) => {
-    e.stopPropagation();
-    if (e.key === "Escape") return closeMenu();
-    if (e.key !== "Enter") return;
-    const v = inp.value.trim().toLowerCase();
-    if (!v) return;
-    if (!all.includes(v)) all.push(v);
-    if (!(n.tags || []).includes(v)) n.tags = [...(n.tags || []), v];
-    inp.value = "";
-    draw();
-    sync();
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      sel = Math.max(0, Math.min(flat.length - 1, sel + (e.key === "ArrowDown" ? 1 : -1)));
+      draw();
+      const c = $(".cur", list);
+      if (c) c.scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const it = flat[sel];
+      if (!it) return;
+      if (it.create) create();
+      else toggle(it.t);
+    } else if (e.key === "Backspace" && !inp.value && (n.tags || []).length) toggle(n.tags[n.tags.length - 1]);
   });
+  drawCur();
   draw();
-  openMenu(anchor, [], { node });
-  setTimeout(() => inp.focus(), 0);
 }
 
 /* ---------- Toolbar menus ---------- */
@@ -764,19 +967,29 @@ function blocksMenu(a) {
   );
 }
 function moreMenu(a) {
-  const ids = ["strike", "super", "sub", "clear", "term", "quote", "outdent", "indent", "image", "link", "footnote", "codeBlock", "reference", "date", "pagebreak", "outline"];
-  const narrow = window.innerWidth < 1100;
-  openMenu(a, [
-    { head: "Formatowanie" },
-    ...ids.slice(0, 4).map((id) => ({ icon: ACT[id].icon, label: ACT[id].label, key: keyOf(id), run: () => run(id) })),
-    { head: "Akapity" },
-    ...ids.slice(4, 8).map((id) => ({ icon: ACT[id].icon, label: ACT[id].label, key: keyOf(id), run: () => run(id) })),
-    ...(narrow ? [{ icon: "align", label: "Wyrównanie…", run: () => alignMenu(a) }] : []),
-    { head: "Wstaw" },
-    ...ids.slice(8).map((id) => ({ icon: ACT[id].icon, label: ACT[id].label, key: keyOf(id), run: () => run(id) })),
-    { sep: true },
-    { icon: "settings", label: "Pełny pasek narzędzi", check: S.settings.toolbar === "full", run: () => ((S.settings.toolbar = S.settings.toolbar === "full" ? "compact" : "full"), persist(), renderView()) },
-  ]);
+  const hidden = (E && E.tbHidden) || [];
+  const full = S.settings.toolbar === "full";
+  const mi = (id) => ({ icon: ACT[id].icon, label: ACT[id].label, key: keyOf(id), run: () => run(id) });
+  const special = {
+    tbPara: { icon: "pilcrow", label: "Styl akapitu…", run: () => setTimeout(() => paraMenu(a), 0) },
+    tbAlign: { icon: "align", label: "Wyrównanie…", run: () => setTimeout(() => alignMenu(a), 0) },
+    tbBlocks: { icon: "blocks", label: "Bloki…", run: () => setTimeout(() => blocksMenu(a), 0) },
+    color: { icon: "textColor", label: "Kolor tekstu…", run: () => setTimeout(() => colorMenu(a), 0) },
+  };
+  const items = [];
+  const shown = new Set();
+  for (const sec of TB_SECS) {
+    if (!hidden.includes(sec.id)) continue;
+    items.push({ head: sec.label });
+    for (const id of sec.items) {
+      shown.add(id);
+      items.push(special[id] || mi(id));
+    }
+  }
+  const extra = [...(full ? [] : [...TB_FULL].filter((id) => !shown.has(id))), "codeBlock", "reference", "date"];
+  items.push({ head: hidden.length ? "Pozostałe" : "Więcej narzędzi" }, ...extra.map(mi));
+  items.push({ sep: true }, { icon: "settings", label: "Pełny pasek narzędzi", check: full, run: () => ((S.settings.toolbar = full ? "compact" : "full"), persist(), renderView()) });
+  openMenu(a, items, { cls: "more-menu" });
 }
 function colorMenu(a) {
   const node = el(`<div class="cmenu">
@@ -815,14 +1028,14 @@ function linkDlg() {
   const sel = selectedText();
   const isUrl = /^https?:\/\//.test(sel);
   const d = openDialog(
-    `<div class="dlg-h">${icon("link")}<h2>Wstaw odnośnik</h2></div>
+    `${dlgHead("link", "Wstaw odnośnik", "Adres w sieci albo do pliku")}
     <div class="dlg-b">
       <div class="wt-field"><label>Adres</label><input class="wt-input" id="lU" placeholder="https://" value="${isUrl ? esc(sel) : ""}" autofocus></div>
       <div class="wt-field"><label>Tekst (opcjonalnie)</label><input class="wt-input" id="lT" value="${isUrl ? "" : esc(sel)}" placeholder="Bez tekstu pokażemy sam adres"></div>
       <pre class="codebox"></pre>
     </div>
-    <div class="dlg-f"><span class="hint">Linki otwierają się w przeglądarce systemowej.</span><button class="wt-btn secondary" data-close>Anuluj</button><button class="wt-btn primary" data-ok>Wstaw</button></div>`,
-    { cls: "confirm" },
+    ${dlgFoot("Linki otwierają się w przeglądarce systemowej.", BTN_CANCEL + '<button class="wt-btn primary" data-ok>Wstaw odnośnik</button>')}`,
+    { cls: "ins-link" },
   );
   const u = $("#lU", d.dlg),
     t = $("#lT", d.dlg),
@@ -851,16 +1064,15 @@ function imageDlg() {
   ];
   let sel = 0;
   const d = openDialog(
-    `<div class="dlg-h">${icon("image")}<h2>Wstaw obraz</h2><button class="wt-ibtn sm" data-close title="Zamknij">${icon("close")}</button></div>
+    `${dlgHead("image", "Wstaw obraz", "Obraz musi leżeć w otwartym folderze. Plik spoza niego skopiujemy do <code>img/</code>.")}
     <div class="dlg-b">
-      <p class="muted" style="font-size:12px">Obraz musi leżeć w otwartym folderze. Plik spoza folderu skopiujemy do <code>img/</code>.</p>
       <div class="fs-list">${files.map(([f, m], i) => `<button class="fs-row" data-i="${i}" aria-selected="${i === sel}">${icon("image", "sm")}<span>${esc(f)}</span><span class="m">${esc(m)}</span></button>`).join("")}
         <button class="fs-row" data-pick>${icon("folderOpen", "sm")}<span>Wybierz z dysku…</span></button></div>
       <div class="row2"><div class="wt-field" style="width:110px"><label>Szerokość</label><select class="wt-input" id="iW"><option>100%</option><option selected>70%</option><option>50%</option><option>8cm</option></select></div>
         <div class="wt-field grow"><label>Podpis</label><input class="wt-input" id="iC" placeholder="np. Wykres zbieżności szeregu"></div></div>
       <pre class="codebox"></pre>
     </div>
-    <div class="dlg-f"><button class="wt-btn secondary" data-close>Anuluj</button><button class="wt-btn primary" data-ok>Wstaw obraz</button></div>`,
+    ${dlgFoot("", BTN_CANCEL + '<button class="wt-btn primary" data-ok>Wstaw obraz</button>')}`,
     { cls: "fs" },
   );
   const cb = $(".codebox", d.dlg);
@@ -890,22 +1102,22 @@ function imageDlg() {
 }
 
 /* ---------- Symbols ---------- */
-function symbolsPop(anchor) {
+function symbolsDlg() {
   if (!E) return;
   let sec = "recent",
     q = "",
     cur = null;
-  const p = openPop(
-    anchor,
-    `<div class="sym-top"><div class="inbox grow">${icon("search", "sm")}<input placeholder="Szukaj: alpha, strzałka, całka…" aria-label="Szukaj symbolu" autofocus></div></div>
+  const p = openDialog(
+    `${dlgHead("omega", "Wstaw symbol", "W trybie matematycznym wstawiamy nazwę Typst, w tekście sam znak.")}
+    <div class="sym-top"><div class="inbox grow">${icon("search", "sm")}<input placeholder="Szukaj: alpha, strzałka, całka…" aria-label="Szukaj symbolu" autofocus></div></div>
     <div class="sym-tabs" role="tablist">${SYMBOL_SECTIONS.map(([id, l]) => `<button role="tab" data-sec="${id}" aria-selected="${id === sec}">${esc(l)}</button>`).join("")}</div>
     <div class="sym-body"><div class="sym-grid" role="listbox"></div><div class="sym-det"></div></div>
-    <div class="pop-f"><span>${kbd("Enter")} wstaw</span><span>${kbd("←")}${kbd("→")} wybór</span><span class="grow"></span><span>W trybie matematycznym wstawiamy nazwę Typst, w tekście znak.</span></div>`,
+    ${dlgFoot(`${kbd("Enter")} wstaw · ${kbd("←")}${kbd("→")}${kbd("↑")}${kbd("↓")} wybór · podwójne kliknięcie wstawia`, BTN_CANCEL + '<button class="wt-btn primary" data-ins>Wstaw</button>')}`,
     { cls: "sym" },
   );
-  const grid = $(".sym-grid", p.pop),
-    det = $(".sym-det", p.pop),
-    inp = $("input", p.pop);
+  const grid = $(".sym-grid", p.dlg),
+    det = $(".sym-det", p.dlg),
+    inp = $("input", p.dlg);
   const SYN = { całka: "integral", suma: "sum", strzałka: "arrow", nieskończoność: "infinity", pierwiastek: "sqrt", należy: "in", mniejsze: "lt", większe: "gt", rzeczywiste: "RR", naturalne: "NN", pochodna: "diff", "dla każdego": "forall", istnieje: "exists" };
   const list = () => {
     if (q) {
@@ -926,8 +1138,7 @@ function symbolsPop(anchor) {
     }
     const [g, n] = cur;
     det.innerHTML = `<div class="big">${esc(g)}</div><div class="nm">${esc(n)}</div>
-      <dl><dt>Matematyka</dt><dd>$${esc(n)}$</dd><dt>Tekst</dt><dd>${esc(g)}</dd><dt>Unicode</dt><dd>U+${g.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}</dd></dl>
-      <button class="wt-btn primary sm" data-ins>Wstaw</button>`;
+      <dl><dt>Matematyka</dt><dd>$${esc(n)}$</dd><dt>Tekst</dt><dd>${esc(g)}</dd><dt>Unicode</dt><dd>U+${g.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}</dd></dl>`;
   };
   const draw = () => {
     items = list();
@@ -940,12 +1151,12 @@ function symbolsPop(anchor) {
     p.close();
     setTimeout(() => insertSymbol(s[1], s[0]), 0);
   };
-  p.pop.addEventListener("click", (e) => {
+  p.dlg.addEventListener("click", (e) => {
     const t = e.target.closest("[data-sec]");
     if (t) {
       sec = t.dataset.sec;
       q = inp.value = "";
-      $$("[data-sec]", p.pop).forEach((b) => b.setAttribute("aria-selected", b === t));
+      $$("[data-sec]", p.dlg).forEach((b) => b.setAttribute("aria-selected", b === t));
       draw();
     }
     const c = e.target.closest(".cell");
@@ -972,7 +1183,7 @@ function symbolsPop(anchor) {
     q = inp.value.trim();
     draw();
   });
-  p.pop.addEventListener("keydown", (e) => {
+  p.dlg.addEventListener("keydown", (e) => {
     const i = items.indexOf(cur);
     const mv = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 7, ArrowUp: -7 }[e.key];
     if (mv && items.length && !(e.target === inp && (e.key === "ArrowLeft" || e.key === "ArrowRight") && inp.value)) {
@@ -989,15 +1200,15 @@ function symbolsPop(anchor) {
 }
 
 /* ---------- Table ---------- */
-function tablePop(anchor) {
+function tableDlg() {
   if (!E) return;
   let rows = 3,
     cols = 3,
     header = true,
     style = "grid";
-  const p = openPop(
-    anchor,
-    `<div class="tbl-body">
+  const p = openDialog(
+    `${dlgHead("table", "Wstaw tabelę", "Najedź na siatkę, żeby wybrać rozmiar, i kliknij.")}
+    <div class="tbl-body">
       <div><div class="tgrid" role="grid" aria-label="Rozmiar tabeli">${Array.from({ length: 80 }, (_, i) => `<button class="tc" data-r="${Math.floor(i / 10) + 1}" data-c="${(i % 10) + 1}" tabindex="-1"></button>`).join("")}</div>
         <p class="size"></p>
         <div class="opts">
@@ -1007,10 +1218,9 @@ function tablePop(anchor) {
           <label><input type="radio" name="tS" value="h"> Tylko linie poziome</label>
           <label><input type="radio" name="tS" value="none"> Bez linii</label>
         </div></div>
-      <div class="tbl-prev"><div class="sheet pv"></div><pre class="codebox"></pre>
-        <div class="btns"><button class="wt-btn secondary sm" data-x>Anuluj</button><button class="wt-btn primary sm" data-ok>Wstaw tabelę</button></div></div>
+      <div class="tbl-prev"><div class="sheet pv"></div><pre class="codebox"></pre></div>
     </div>
-    <div class="pop-f"><span>Najedź na siatkę, żeby wybrać rozmiar, i kliknij.</span><span class="grow"></span><span>Tabela to zwykły <code>#table(…)</code> w źródle.</span></div>`,
+    ${dlgFoot("Tabela to zwykły <code>#table(…)</code> w źródle.", BTN_CANCEL + '<button class="wt-btn primary" data-ok>Wstaw tabelę</button>')}`,
     { cls: "tbl" },
   );
   const code = () => {
@@ -1025,17 +1235,17 @@ function tablePop(anchor) {
   const upd = (hr, hc) => {
     const R = hr || rows,
       C = hc || cols;
-    $$(".tc", p.pop).forEach((c) => c.classList.toggle("on", +c.dataset.r <= R && +c.dataset.c <= C));
-    $(".size", p.pop).innerHTML = `<b>${C} × ${R}</b> (kolumny × wiersze)`;
+    $$(".tc", p.dlg).forEach((c) => c.classList.toggle("on", +c.dataset.r <= R && +c.dataset.c <= C));
+    $(".size", p.dlg).innerHTML = `<b>${C} × ${R}</b> (kolumny × wiersze)`;
     if (!hr) {
-      $("#tR", p.pop).value = rows;
-      $("#tC", p.pop).value = cols;
+      $("#tR", p.dlg).value = rows;
+      $("#tC", p.dlg).value = cols;
       const c = code();
-      $(".codebox", p.pop).textContent = c;
-      $(".pv", p.pop).innerHTML = TY.render(c.replace(/\[ \]/g, "[–]")).html.join("");
+      $(".codebox", p.dlg).textContent = c;
+      $(".pv", p.dlg).innerHTML = TY.render(c.replace(/\[ \]/g, "[–]")).html.join("");
     }
   };
-  const grid = $(".tgrid", p.pop);
+  const grid = $(".tgrid", p.dlg);
   grid.addEventListener("mouseover", (e) => {
     const c = e.target.closest(".tc");
     if (c) upd(+c.dataset.r, +c.dataset.c);
@@ -1048,15 +1258,14 @@ function tablePop(anchor) {
     cols = +c.dataset.c;
     upd();
   });
-  p.pop.addEventListener("input", (e) => {
+  p.dlg.addEventListener("input", (e) => {
     if (e.target.id === "tR") rows = Math.max(1, Math.min(40, +e.target.value || 1));
     if (e.target.id === "tC") cols = Math.max(1, Math.min(12, +e.target.value || 1));
     if (e.target.id === "tH") header = e.target.checked;
     if (e.target.name === "tS") style = e.target.value;
     upd();
   });
-  p.pop.addEventListener("click", (e) => {
-    if (e.target.closest("[data-x]")) p.close();
+  p.dlg.addEventListener("click", (e) => {
     if (e.target.closest("[data-ok]")) {
       const c = code();
       p.close();
@@ -1089,7 +1298,7 @@ function shapesDlg() {
   const st = { id: "tri", stroke: 0, fill: 1, w: 1, dash: "solid", width: 5, height: 3, caption: "" };
   const groups = [...new Set(SHAPES.map((s) => s.group))];
   const d = openDialog(
-    `<div class="dlg-h">${icon("shape")}<h2>Wstaw kształt</h2><span class="muted" style="font-size:12px">Kształty to kod Typst (wbudowane funkcje albo pakiet cetz).</span><button class="wt-ibtn sm" data-close title="Zamknij">${icon("close")}</button></div>
+    `${dlgHead("shape", "Wstaw kształt", "Kształty to kod Typst: wbudowane funkcje albo pakiet cetz.")}
     <div class="shapes-body">
       <nav class="lib">${groups.map((g) => `<h4>${esc(g)}</h4>${SHAPES.filter((s) => s.group === g).map((s) => `<button data-sh="${s.id}" aria-selected="${s.id === st.id}"><svg class="wt-ico" viewBox="0 0 24 24">${s.icon}</svg>${esc(s.name)}</button>`).join("")}`).join("")}</nav>
       <div class="stage"><div class="stage-page" style="background-color:var(--pg-bg)"><figure style="margin:0"><div class="sel-box"><span class="sv"></span><i style="left:-5px;top:-5px"></i><i style="right:-5px;top:-5px"></i><i style="left:-5px;bottom:-5px"></i><i style="right:-5px;bottom:-5px"></i></div><figcaption></figcaption></figure></div>
@@ -1116,7 +1325,7 @@ function shapesDlg() {
         <div class="pl"><span>Kod Typst</span><pre class="codebox"></pre></div>
       </div>
     </div>
-    <div class="dlg-f"><span class="hint">Po wstawieniu zmienisz kształt w źródle albo klikając go na stronie.</span><button class="wt-btn secondary" data-close>Anuluj</button><button class="wt-btn primary" data-ok>Wstaw kształt</button></div>`,
+    ${dlgFoot("Po wstawieniu zmienisz kształt w źródle albo klikając go na stronie.", BTN_CANCEL + '<button class="wt-btn primary" data-ok>Wstaw kształt</button>')}`,
     { cls: "shapes" },
   );
   const code = () => {

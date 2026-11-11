@@ -45,9 +45,7 @@ body { margin: 0; background: var(--color-bg); color: var(--color-text); font-fa
 .wt-field.invalid .wt-msg { color: var(--color-danger); }
 
 /* Toolbar */
-.wt-toolbar { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1-5) var(--space-3); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
-.wt-toolbar .items, .wt-toolbar .end { display: flex; align-items: center; gap: 2px; }
-.wt-toolbar .items { flex: 1; min-width: 0; overflow: hidden; }
+.wt-toolbar { background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
 .wt-sep { flex: none; width: 1px; height: 18px; margin: 0 6px; background: var(--color-border); }
 
 /* SegmentedControl */
