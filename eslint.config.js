@@ -12,6 +12,7 @@ export default ts.config(
       "node_modules/**",
       "src-tauri/**",
       "project.inlang/cache/**",
+      "design/**",
     ],
   },
   js.configs.recommended,
