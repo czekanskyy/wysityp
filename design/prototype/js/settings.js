@@ -29,6 +29,10 @@ const PC_SWATCH = {
   graphite: ["#2a2c30", "#e6e2da"],
   oled: ["#000000", "#d8d4cc"],
 };
+const UI_STYLES = [
+  ["fixed", "Stały", "Paski przy krawędziach okna, pełne tła. Spokojne, krótkie animacje."],
+  ["float", "Pływający", "Szklane paski i okna nad treścią. Same się chowają i wysuwają."],
+];
 const ACCENTS = [
   ["blue", "#2f62d0", "Niebieski"],
   ["teal", "#0e7c86", "Morski"],
@@ -117,6 +121,21 @@ const ST_SECTIONS = {
       }).join("")}</div>
       ${stCard([["Dopasuj do motywu", "Jasny motyw dostaje białą kartkę, ciemny grafitową.", stSw("page_follow")]])}
       <p class="muted" style="margin:0;font-size:12px">Pole <code>page_color</code>. Eksport PDF zawsze ma białą kartkę.</p>
+    </section>
+    <section class="st-sec"><h3>Styl interfejsu</h3>
+      <div class="uis" role="radiogroup" aria-label="Styl interfejsu">${UI_STYLES.map(
+        ([id, n, sub]) => `<button class="ui-opt" role="radio" data-uistyle="${id}" aria-checked="${st.ui_style === id}">
+          <span class="ui-pv ${id}" aria-hidden="true"><i class="t"></i><i class="sb"></i><i class="pg"></i><i class="vb"></i><i class="st"></i></span>
+          <span class="nm">${n}</span><small>${sub}</small></button>`,
+      ).join("")}</div>
+      ${
+        st.ui_style === "float"
+          ? stCard([
+              ["Ukrywaj dolny pasek", "Pasek wysuwa się, gdy zbliżysz kursor do dolnej krawędzi. Przypinasz go też przyciskiem na samym pasku.", stSw("status_autohide")],
+              ["Ukrywaj pasek widoku strony", "Zoom i dopasowanie strony wysuwają się przy prawej krawędzi podglądu.", stSw("vtb_autohide")],
+            ])
+          : ""
+      }
     </section>
     <section class="st-sec"><h3>Układ</h3>
       ${stRow("Pasek narzędzi", stSeg("toolbar", [["compact", "Zwarty"], ["full", "Pełny"]]), "Zwarty chowa rzadziej używane narzędzia pod przyciskiem ⋯.")}
@@ -264,7 +283,7 @@ function settingsView() {
     if (k === "status_bar") renderStatus();
   };
   node.addEventListener("click", async (e) => {
-    const t = e.target.closest("[data-sec],[data-seg],[data-sw],[data-step],[data-sel],[data-pc],[data-accent],[data-st],[data-rec]");
+    const t = e.target.closest("[data-sec],[data-seg],[data-sw],[data-step],[data-sel],[data-pc],[data-accent],[data-uistyle],[data-st],[data-rec]");
     if (!t) return;
     const d = t.dataset;
     if (d.sec) {
@@ -301,6 +320,10 @@ function settingsView() {
       return set("page_color", d.pc);
     }
     if (d.accent) return set("accent", d.accent);
+    if (d.uistyle) {
+      set("ui_style", d.uistyle);
+      return renderStatus();
+    }
     if (d.rec) return recordKey(t, d.rec, draw);
     switch (d.st) {
       case "back": {

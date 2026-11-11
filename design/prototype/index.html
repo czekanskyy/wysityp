@@ -17,8 +17,11 @@
         <main class="main">
           <div class="tabs" id="tabs"></div>
           <div id="view" style="flex: 1; min-height: 0; display: flex; flex-direction: column"></div>
-          <section class="problems" id="problems" aria-label="Problemy" hidden></section>
-          <footer class="status" id="status"></footer>
+          <div class="dock" id="dock">
+            <section class="problems" id="problems" aria-label="Problemy" inert></section>
+            <footer class="status" id="status"></footer>
+          </div>
+          <div class="dock-hint" aria-hidden="true"></div>
         </main>
       </div>
     </div>

@@ -91,6 +91,9 @@ const DEFAULTS = {
   spellcheck: false,
   toolbar: "compact",
   status_bar: true,
+  ui_style: "fixed",
+  status_autohide: false,
+  vtb_autohide: true,
   autosave: true,
   autosave_delay: 1,
   restore_tabs: true,
@@ -133,6 +136,10 @@ function applySettings() {
   r.dataset.theme = resolvedTheme();
   r.dataset.pg = resolvedPage();
   r.dataset.accent = st.accent;
+  // Two looks: "fixed" keeps bars on the window edges, "float" puts glass bars and dialogs over the content.
+  r.dataset.ui = st.ui_style === "float" ? "float" : "fixed";
+  r.toggleAttribute("data-status-auto", !!st.status_autohide);
+  r.toggleAttribute("data-vtb-auto", !!st.vtb_autohide);
   r.lang = st.locale;
   const z = UI_ZOOM[st.ui_size] || 1;
   r.style.setProperty("--ui-zoom", z);
@@ -146,6 +153,7 @@ function applySettings() {
   r.style.setProperty("--pg-lh", st.line_height);
   r.style.setProperty("--pg-align", st.align);
   $("#status") && ($("#status").hidden = !st.status_bar);
+  if (E) requestAnimationFrame(() => applyPageView());
 }
 darkMq.addEventListener("change", () => {
   applySettings();
@@ -166,6 +174,7 @@ function freshState() {
     lastTab: "n-w7",
     tagDefs: clone(TAGS),
     pv: { split: { fit: "width", zoom: 1 }, page: { fit: null, zoom: 1 }, outside: "theme", round: true },
+    split: 0.5,
     problems: { open: false, h: 200 },
     preview: null,
     closed: [],
@@ -927,43 +936,77 @@ const PAGE_W = 794,
   PAGE_H = 1123;
 const ZOOMS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 function vtbHtml() {
-  return `<div class="vtb" role="toolbar" aria-label="Widok strony" data-keep>
-    <button class="wt-ibtn sm" data-act="pvFitWidth" title="Strona na pełną szerokość" aria-label="Strona na pełną szerokość">${icon("fitWidth")}</button>
-    <button class="wt-ibtn sm" data-act="pvFitPage" title="Pokaż całą stronę" aria-label="Pokaż całą stronę">${icon("fitPage")}</button>
+  const b = (act, ic, label, cls = "") => `<button class="wt-ibtn sm ${cls}" data-act="${act}" title="${label}" aria-label="${label}">${icon(ic)}</button>`;
+  return `<div class="vtb" role="toolbar" aria-orientation="vertical" aria-label="Widok strony" data-keep>
+    <span class="vtb-pg" title="Strona 1 z 1">1/1</span>
+    ${b("pvFitWidth", "fitWidth", "Strona na pełną szerokość")}
+    ${b("pvFitPage", "fitPage", "Pokaż całą stronę")}
     <span class="wt-sep"></span>
-    <button class="wt-ibtn sm" data-act="pvZoomOut" title="Pomniejsz (Ctrl+kółko)" aria-label="Pomniejsz">${icon("minus")}</button>
+    ${b("pvZoomIn", "plus", "Powiększ (Ctrl+kółko)")}
     <button class="vtb-pct" data-act="pvZoomMenu" title="Powiększenie" aria-haspopup="menu">100%</button>
-    <button class="wt-ibtn sm" data-act="pvZoomIn" title="Powiększ (Ctrl+kółko)" aria-label="Powiększ">${icon("plus")}</button>
+    ${b("pvZoomOut", "minus", "Pomniejsz (Ctrl+kółko)")}
     <span class="wt-sep"></span>
-    <button class="wt-ibtn sm" data-act="pvOutside" title="Tło wokół strony w kolorze strony" aria-label="Tło wokół strony w kolorze strony">${icon("surround")}</button>
-    <button class="wt-ibtn sm" data-act="pvRound" title="Zaokrąglone rogi strony" aria-label="Zaokrąglone rogi strony">${icon("corner")}</button>
+    ${b("pvOutside", "surround", "Tło wokół strony w kolorze strony")}
+    ${b("pvRound", "corner", "Zaokrąglone rogi strony")}
+    <span class="wt-sep float-only"></span>
+    ${b("pvPin", "pin", "Przypnij pasek widoku", "float-only")}
   </div>`;
 }
 function pvState() {
   return S.pv[view() === "page" ? "page" : "split"];
 }
+/* Space around the pages; "fit page" keeps a thin margin so the whole sheet shows without a scrollbar. */
+const PG_PAD = 20,
+  FIT_PAD = 14;
+const floatUi = () => S.settings.ui_style === "float";
+/* A pinned floating bar covers the content under it, so the page leaves room for it. */
+function dockReserve() {
+  if (!floatUi() || S.settings.status_autohide || !S.settings.status_bar) return 0;
+  const s = $("#status");
+  return s && !s.hidden ? s.offsetHeight + 20 : 0;
+}
+function vtbReserve() {
+  return floatUi() && !S.settings.vtb_autohide ? 58 : 0;
+}
 function pageZoom() {
   const st = pvState();
   const sc = E.panePage;
-  const w = sc.clientWidth - 48,
-    h = sc.clientHeight - 72;
+  const pad = st.fit === "page" ? FIT_PAD : PG_PAD;
+  const w = sc.clientWidth - 2 * pad - vtbReserve(),
+    h = sc.clientHeight - 2 * FIT_PAD - dockReserve();
   let z = st.zoom || 1;
   if (st.fit === "width") z = w / PAGE_W;
   else if (st.fit === "page") z = Math.min(w / PAGE_W, h / PAGE_H);
-  return Math.max(0.25, Math.min(3, z));
+  /* "Fit page" must always fit, so it skips the 25% floor that manual zoom keeps. */
+  return Math.max(st.fit === "page" ? 0.05 : 0.25, Math.min(3, z));
 }
-/* Zoom, outside colour and corners; `onlyFit` skips work when nothing depends on the pane size. */
+/* Zoom, spacing, outside colour and corners; `onlyFit` skips work when nothing depends on the pane size.
+   "Fit page" turns the pane into slides: one page fills it exactly, and more pages snap one at a time. */
 function applyPageView(onlyFit = false) {
   if (!E || !E.pagePane) return;
   const st = pvState();
-  if (onlyFit && !st.fit) return;
-  if (!E.panePage.clientWidth) return;
-  const z = pageZoom();
   const sc = E.panePage;
+  if (!sc.clientWidth) return;
+  if (!E.paginated && !E.editing) renderPage();
+  if (onlyFit && !st.fit) return;
+  const z = pageZoom();
   const old = E.zoom || z;
   const rel = sc.scrollHeight > sc.clientHeight ? sc.scrollTop / sc.scrollHeight : 0;
   E.zoom = z;
   E.pagePane.style.setProperty("--pz", z.toFixed(4));
+  const slide = st.fit === "page";
+  const res = dockReserve(),
+    vr = vtbReserve();
+  E.ed.dataset.slide = slide ? "1" : "0";
+  if (slide) {
+    const gap = Math.max(2 * FIT_PAD, sc.clientHeight - res - PAGE_H * z);
+    E.page.style.gap = gap + "px";
+    sc.style.padding = `${gap / 2}px ${FIT_PAD + vr}px ${gap / 2 + res}px ${FIT_PAD}px`;
+  } else {
+    E.page.style.gap = "";
+    sc.style.padding = `${PG_PAD}px ${PG_PAD + vr}px ${PG_PAD + res + 8}px ${PG_PAD}px`;
+  }
+  sc.style.scrollPaddingBottom = res + "px";
   if (Math.abs(old - z) > 0.001 && rel) sc.scrollTop = rel * sc.scrollHeight;
   E.ed.dataset.out = S.pv.outside;
   E.ed.dataset.round = S.pv.round ? "1" : "0";
@@ -974,6 +1017,29 @@ function applyPageView(onlyFit = false) {
   $('[data-act="pvFitPage"]', vtb).setAttribute("aria-pressed", st.fit === "page");
   $('[data-act="pvOutside"]', vtb).setAttribute("aria-pressed", S.pv.outside === "page");
   $('[data-act="pvRound"]', vtb).setAttribute("aria-pressed", S.pv.round);
+  const pin = $('[data-act="pvPin"]', vtb);
+  pin.setAttribute("aria-pressed", !S.settings.vtb_autohide);
+  pin.title = S.settings.vtb_autohide ? "Przypnij pasek widoku" : "Ukrywaj pasek widoku automatycznie";
+  pin.innerHTML = icon(S.settings.vtb_autohide ? "pin" : "pinOff");
+  updatePageNo();
+}
+/* Which page sits in the middle of the pane, shown at the top of the view bar. */
+function updatePageNo() {
+  if (!E || !E.pagePane) return;
+  const lab = $(".vtb-pg", E.pagePane);
+  if (!lab) return;
+  const sheets = [...E.page.children];
+  const r = E.panePage.getBoundingClientRect();
+  const cy = r.top + r.height / 2;
+  let cur = 1,
+    best = Infinity;
+  sheets.forEach((s, i) => {
+    const b = s.getBoundingClientRect();
+    const d = cy < b.top ? b.top - cy : cy > b.bottom ? cy - b.bottom : 0;
+    if (d < best) (best = d), (cur = i + 1);
+  });
+  lab.textContent = `${cur}/${sheets.length}`;
+  lab.title = `Strona ${cur} z ${sheets.length}`;
 }
 function setPageFit(fit) {
   const st = pvState();
@@ -994,6 +1060,7 @@ function zoomStep(d) {
   const z = E.zoom || 1;
   const next = d > 0 ? ZOOMS.find((x) => x > z + 0.005) : [...ZOOMS].reverse().find((x) => x < z - 0.005);
   if (next) setPageZoom(next);
+  if (E.peekVtb) E.peekVtb();
 }
 function zoomMenu(a) {
   const z = E ? Math.round((E.zoom || 1) * 100) : 100;
@@ -1014,9 +1081,10 @@ function editorView(id) {
       <button class="wt-btn ghost sm" data-act="exportPdf" title="${esc(tip("exportPdf"))}">${icon("pdf", "sm")}PDF</button></div></div>
     ${toolbarHtml()}
     <div class="banners"></div>
-    <div class="editor" data-view="${view()}">
+    <div class="editor" data-view="${view()}" style="--split:${(S.split || 0.5) * 100}%">
       <div class="pane pane-src"><div class="code${st.wrap ? " wrap" : ""}${st.line_numbers ? "" : " no-ln"}"><pre aria-hidden="true"></pre><textarea spellcheck="${st.spellcheck}" autocomplete="off" autocapitalize="off" wrap="${st.wrap ? "soft" : "off"}" aria-label="Źródło Typst"></textarea></div></div>
-      <div class="pane pane-page">${vtbHtml()}<div class="pg-scroll"><div class="pg-sheet paper-scope"><article class="wt-note" lang="pl"></article></div></div></div>
+      <div class="ed-gutter" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Proporcje kodu i podglądu" title="Przeciągnij, aby zmienić proporcje. Podwójne kliknięcie przywraca pół na pół."></div>
+      <div class="pane pane-page"><div class="pg-scroll"><div class="pg-pages"></div></div>${vtbHtml()}</div>
       <div class="diag-box" hidden></div>
     </div></div>`);
   E = {
@@ -1024,7 +1092,9 @@ function editorView(id) {
     root,
     ta: $("textarea", root),
     pre: $("pre", root),
-    page: $(".wt-note", root),
+    page: $(".pg-pages", root),
+    paginated: false,
+    pages: 1,
     paneSrc: $(".pane-src", root),
     panePage: $(".pg-scroll", root),
     pagePane: $(".pane-page", root),
@@ -1043,8 +1113,19 @@ function editorView(id) {
     E.paneSrc.scrollTop = sc[0];
     E.panePage.scrollTop = sc[1];
   };
-  E.paneSrc.addEventListener("scroll", () => (n.scroll = [E.paneSrc.scrollTop, E.panePage.scrollTop]), { passive: true });
-  E.panePage.addEventListener("scroll", () => (n.scroll = [E.paneSrc.scrollTop, E.panePage.scrollTop]), { passive: true });
+  /* `E` is cleared when the editor closes, and a late scroll event can still arrive, so keep this editor's panes. */
+  const { paneSrc, panePage } = E;
+  paneSrc.addEventListener("scroll", () => (n.scroll = [paneSrc.scrollTop, panePage.scrollTop]), { passive: true });
+  let pgRaf = 0;
+  panePage.addEventListener(
+    "scroll",
+    () => {
+      n.scroll = [paneSrc.scrollTop, panePage.scrollTop];
+      cancelAnimationFrame(pgRaf);
+      pgRaf = requestAnimationFrame(updatePageNo);
+    },
+    { passive: true },
+  );
   E.ta.value = n.source;
   const ro = new ResizeObserver(() => {
     fitToolbar();
@@ -1052,6 +1133,9 @@ function editorView(id) {
   });
   ro.observe(E.tb);
   ro.observe(E.pagePane);
+  ro.observe(E.panePage);
+  bindVtbReveal(E);
+  bindSplitGutter(E);
   E.panePage.addEventListener(
     "wheel",
     (e) => {
@@ -1069,6 +1153,67 @@ function editorView(id) {
   renderDiag();
   renderBanners();
   return root;
+}
+/* The floating view bar hides at the right edge and slides in when the pointer comes near it. */
+function bindVtbReveal(ed) {
+  const pane = ed.pagePane;
+  let t = 0;
+  const show = (on, ms = 450) => {
+    clearTimeout(t);
+    if (on) pane.classList.add("vtb-show");
+    else t = setTimeout(() => pane.classList.remove("vtb-show"), ms);
+  };
+  pane.addEventListener("mousemove", (e) => {
+    if (!floatUi() || !S.settings.vtb_autohide) return;
+    const r = pane.getBoundingClientRect();
+    show(r.right - e.clientX < 96 || !!e.target.closest(".vtb"));
+  });
+  pane.addEventListener("mouseleave", () => show(false));
+  ed.peekVtb = () => {
+    show(true);
+    show(false, 1200);
+  };
+}
+/* Drag the line between source and page to change the split; double-click returns to half and half. */
+function bindSplitGutter(ed) {
+  const g = $(".ed-gutter", ed.root);
+  const set = (f) => {
+    const w = ed.ed.getBoundingClientRect().width || 1;
+    const min = Math.min(0.45, 240 / w);
+    f = Math.max(min, Math.min(1 - min, f));
+    S.split = Math.round(f * 1000) / 1000;
+    ed.ed.style.setProperty("--split", S.split * 100 + "%");
+    g.setAttribute("aria-valuenow", Math.round(S.split * 100));
+  };
+  g.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const r = ed.ed.getBoundingClientRect();
+    g.classList.add("drag");
+    ed.ed.classList.add("resizing");
+    document.body.style.cursor = "col-resize";
+    const move = (ev) => set((ev.clientX - r.left) / r.width);
+    const up = () => {
+      g.classList.remove("drag");
+      ed.ed.classList.remove("resizing");
+      document.body.style.cursor = "";
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", up);
+      persist();
+    };
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", up);
+  });
+  g.addEventListener("dblclick", () => {
+    set(0.5);
+    persist();
+  });
+  g.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    set((S.split || 0.5) + (e.key === "ArrowLeft" ? -0.05 : 0.05));
+    persist();
+  });
 }
 function recompute() {
   const n = S.notes[E.id];
@@ -1092,7 +1237,62 @@ function renderPage() {
   if (!r.blocks.length) html = '<p class="muted" style="font-style:italic">Pusta notatka. Kliknij tutaj i zacznij pisać.</p>';
   if (r.footnotes.length) html += `<section class="footnotes"><ol>${r.footnotes.map((f) => `<li>${f}</li>`).join("")}</ol></section>`;
   html += '<button class="add-end" aria-label="Pisz dalej na końcu notatki" title="Kliknij, aby pisać dalej"></button>';
-  E.page.innerHTML = html;
+  E.page.innerHTML = sheetHtml(html);
+  paginate();
+}
+function sheetHtml(inner = "") {
+  return `<div class="pg-sheet paper-scope"><article class="wt-note" lang="pl">${inner}</article></div>`;
+}
+/* Break the flow into A4 sheets. The blocks are laid out on one long sheet first, then whole blocks move
+   to the next sheet when they would cross the bottom margin. Rects are read before anything moves, and
+   the sheet's width gives the zoom, so this works at any zoom. A hidden pane waits for applyPageView. */
+const PAD_T = 72,
+  PAD_B = 56;
+function paginate() {
+  const box = E.page;
+  const first = box.firstElementChild;
+  const sr = first.getBoundingClientRect();
+  E.paginated = !!sr.width;
+  if (!sr.width) return;
+  const k = sr.width / PAGE_W;
+  const kids = [...first.firstElementChild.children];
+  const add = kids.length && kids[kids.length - 1].classList.contains("add-end") ? kids.pop() : null;
+  const avail = (PAGE_H - PAD_T - PAD_B) * k;
+  const groups = [[]];
+  let top = null;
+  for (const c of kids) {
+    const r = c.getBoundingClientRect();
+    if (top === null) top = r.top;
+    if (r.bottom - top > avail && groups[groups.length - 1].length) {
+      groups.push([]);
+      top = r.top;
+    }
+    groups[groups.length - 1].push(c);
+  }
+  for (let i = 1; i < groups.length; i++) {
+    const s = el(sheetHtml());
+    s.firstElementChild.append(...groups[i]);
+    box.appendChild(s);
+  }
+  const last = box.lastElementChild;
+  if (add) {
+    // The rest of the last sheet is one big "write on" target.
+    last.firstElementChild.appendChild(add);
+    const lr = last.getBoundingClientRect(),
+      ar = add.getBoundingClientRect();
+    // It also covers the bottom margin, so the sheet keeps its A4 height.
+    add.style.height = Math.max(0, (lr.top + (PAGE_H - PAD_B) * k - ar.top) / k) + PAD_B + "px";
+    add.style.marginBottom = -PAD_B + "px";
+  }
+  E.pages = groups.length;
+  if (S.settings.pdf_numbers && E.pages > 1) [...box.children].forEach((s, i) => s.appendChild(el(`<span class="pg-num" aria-hidden="true">${i + 1}</span>`)));
+  E.ed.dataset.pages = E.pages > 1 ? "many" : "one";
+  updatePageNo();
+}
+/* New blocks go before the "write on" target, which lives on the last sheet. */
+function insertBlk(blk, ref) {
+  const r = ref || $(".add-end", E.page);
+  r.parentNode.insertBefore(blk, r);
 }
 function renderDiag() {
   const d = E.r.diags[0];
@@ -1361,7 +1561,7 @@ function editAtEnd() {
   recompute();
   renderSourceHl();
   const blk = el(`<div class="blk" data-s="${line}" data-e="${line}"></div>`);
-  E.page.insertBefore(blk, $(".add-end", E.page));
+  insertBlk(blk);
   const ph = $(".wt-note > p.muted", E.page);
   if (ph) ph.remove();
   startEdit(blk);
@@ -1463,7 +1663,7 @@ function newParagraphAfter() {
   const line = e + 2;
   const blk = el(`<div class="blk" data-s="${line}" data-e="${line}"></div>`);
   const next = $$(".blk", E.page).find((b) => +b.dataset.s > e);
-  E.page.insertBefore(blk, next || $(".add-end", E.page));
+  insertBlk(blk, next);
   startEdit(blk);
 }
 
@@ -1705,7 +1905,7 @@ function renderStatus() {
     s.dataset.save = sum.cls ? "unsaved" : "saved";
     s.innerHTML = `<span class="si save"><span class="save-dot"></span>${sum.cls ? sum.text : "Wszystko zapisane"}</span>
       <span class="si path">${esc(WS() ? WS().path : "Brak otwartego folderu")}</span><span class="gap"></span>${proto}
-      <span class="si">Typst 0.13.1</span><span class="si">${S.settings.locale === "pl" ? "Polski" : "English"}</span>${problemsBtn()}`;
+      <span class="si">Typst 0.13.1</span><span class="si">${S.settings.locale === "pl" ? "Polski" : "English"}</span>${problemsBtn()}${pinBtn()}`;
     renderProblems();
     return;
   }
@@ -1717,7 +1917,7 @@ function renderStatus() {
     <button class="caret" data-act="gotoLine" title="Przejdź do wiersza">Wr ${E && E.caret ? E.caret.ln + 1 : 1}, kol ${E && E.caret ? E.caret.col : 1}</button>
     <span class="si">${words} ${words === 1 ? "słowo" : words % 10 >= 2 && words % 10 <= 4 && (words % 100 < 10 || words % 100 >= 20) ? "słowa" : "słów"}</span>
     ${proto}
-    <span class="si">Typst 0.13.1</span>${problemsBtn()}`;
+    <span class="si">Typst 0.13.1</span>${problemsBtn()}${pinBtn()}`;
   renderProblems();
 }
 
@@ -1744,6 +1944,28 @@ function problemsBtn() {
   const label = total ? `${icon("error", "sm")}${total} ${plErr(total)}` : `${icon("check", "sm")}Bez błędów`;
   return `<button class="pb-btn ${total ? "err-cnt" : "ok-cnt"}" data-act="problems" aria-expanded="${open}" title="${open ? "Zwiń" : "Rozwiń"} panel problemów (${esc(keyOf("problems"))})">${label}${icon(open ? "chevronDown" : "chevronUp", "sm")}</button>`;
 }
+function pinBtn() {
+  const on = !S.settings.status_autohide;
+  return `<button class="st-pin float-only" data-act="statusPin" aria-pressed="${on}" title="${on ? "Ukrywaj pasek automatycznie" : "Przypnij pasek, żeby był zawsze widoczny"}" aria-label="Przypnij dolny pasek">${icon(on ? "pin" : "pinOff", "sm")}</button>`;
+}
+/* A floating bar set to hide comes back when the pointer nears the bottom edge. */
+function bindDock() {
+  const main = $(".main"),
+    dock = $("#dock");
+  let t = 0;
+  const show = (on) => {
+    clearTimeout(t);
+    if (on) main.classList.add("dock-show");
+    else t = setTimeout(() => main.classList.remove("dock-show"), 500);
+  };
+  main.addEventListener("mousemove", (e) => {
+    if (!floatUi() || !S.settings.status_autohide) return;
+    const r = main.getBoundingClientRect();
+    const reach = main.classList.contains("dock-show") ? dock.offsetHeight + 28 : 36;
+    show(r.bottom - e.clientY < reach);
+  });
+  main.addEventListener("mouseleave", () => show(false));
+}
 function renderStatusProblems() {
   const b = $("#status .pb-btn");
   if (b) b.outerHTML = problemsBtn();
@@ -1752,9 +1974,12 @@ function renderStatusProblems() {
 function renderProblems() {
   const p = $("#problems");
   if (!p) return;
-  p.hidden = !S.problems.open;
-  if (p.hidden) return;
-  p.style.height = S.problems.h + "px";
+  const open = S.problems.open;
+  $("#dock").classList.toggle("pb-open", open);
+  p.inert = !open;
+  p.style.setProperty("--pb-h", S.problems.h + "px");
+  // A closed panel keeps its last content, so it can shrink away instead of going blank.
+  if (!open) return;
   const list = problemsList();
   const withErr = list.filter((g) => g.diags.length);
   const total = withErr.reduce((a, g) => a + g.diags.length, 0);
@@ -1804,13 +2029,15 @@ function bindProblems() {
       h0 = p.offsetHeight;
     const max = () => Math.max(120, $(".main").clientHeight - 160);
     h.classList.add("drag");
+    $("#dock").classList.add("dragging");
     document.body.style.cursor = "row-resize";
     const move = (ev) => {
       S.problems.h = Math.round(Math.max(90, Math.min(max(), h0 + (y0 - ev.clientY) / z)));
-      p.style.height = S.problems.h + "px";
+      p.style.setProperty("--pb-h", S.problems.h + "px");
     };
     const up = () => {
       h.classList.remove("drag");
+      $("#dock").classList.remove("dragging");
       document.body.style.cursor = "";
       document.removeEventListener("mousemove", move);
       document.removeEventListener("mouseup", up);
@@ -1822,7 +2049,7 @@ function bindProblems() {
   p.addEventListener("dblclick", (e) => {
     if (!e.target.closest(".pb-resize")) return;
     S.problems.h = 200;
-    p.style.height = "200px";
+    p.style.setProperty("--pb-h", "200px");
     persist();
   });
 }
@@ -2197,6 +2424,26 @@ function run(id, ctx = {}) {
       return zoomStep(-1);
     case "pvZoomMenu":
       return zoomMenu(a);
+    case "pvPin":
+      S.settings.vtb_autohide = !S.settings.vtb_autohide;
+      applySettings();
+      persist();
+      if (E && E.pagePane) E.pagePane.classList.toggle("vtb-show", !S.settings.vtb_autohide);
+      return;
+    case "statusPin":
+      S.settings.status_autohide = !S.settings.status_autohide;
+      applySettings();
+      persist();
+      renderStatus();
+      $(".main").classList.toggle("dock-show", S.settings.status_autohide);
+      return;
+    case "uiStyle":
+      S.settings.ui_style = floatUi() ? "fixed" : "float";
+      applySettings();
+      persist();
+      renderStatus();
+      if (S.active === "settings") renderView();
+      return toast(floatUi() ? "Styl pływający: szklane paski i okna nad treścią." : "Styl stały: paski przy krawędziach okna.", { type: "info", ms: 2600 });
     case "pvOutside":
       S.pv.outside = S.pv.outside === "page" ? "theme" : "page";
       persist();
@@ -2592,6 +2839,7 @@ function boot() {
   buildSidebar();
   bindSearch();
   bindProblems();
+  bindDock();
   renderAll();
   window.addEventListener("beforeunload", persist);
 }

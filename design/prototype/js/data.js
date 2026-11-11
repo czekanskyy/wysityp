@@ -447,6 +447,7 @@ const ACTIONS = [
   { id: "viewSplit", label: "Widok: podział", group: "Widok", icon: "split", key: "Ctrl+Alt+D" },
   { id: "viewPage", label: "Widok: strona", group: "Widok", icon: "eye", key: "Ctrl+Alt+R" },
   { id: "problems", label: "Pokaż lub zwiń panel problemów", group: "Widok", icon: "warning", key: "Ctrl+J" },
+  { id: "uiStyle", label: "Przełącz styl interfejsu: stały lub pływający", group: "Widok", icon: "palette" },
   // Formatting
   { id: "bold", label: "Pogrubienie", group: "Formatowanie znaków", icon: "bold", key: "Ctrl+B", typst: "*tekst*" },
   { id: "italic", label: "Kursywa", group: "Formatowanie znaków", icon: "italic", key: "Ctrl+I", typst: "_tekst_" },
