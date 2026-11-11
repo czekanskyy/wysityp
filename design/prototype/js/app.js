@@ -963,16 +963,13 @@ const floatUi = () => S.settings.ui_style === "float";
 function dockReserve() {
   if (!floatUi() || S.settings.status_autohide || !S.settings.status_bar) return 0;
   const s = $("#status");
-  return s && !s.hidden ? s.offsetHeight + 20 : 0;
-}
-function vtbReserve() {
-  return floatUi() && !S.settings.vtb_autohide ? 58 : 0;
+  return s && !s.hidden ? s.offsetHeight + 16 : 0;
 }
 function pageZoom() {
   const st = pvState();
   const sc = E.panePage;
   const pad = st.fit === "page" ? FIT_PAD : PG_PAD;
-  const w = sc.clientWidth - 2 * pad - vtbReserve(),
+  const w = sc.clientWidth - 2 * pad,
     h = sc.clientHeight - 2 * FIT_PAD - dockReserve();
   let z = st.zoom || 1;
   if (st.fit === "width") z = w / PAGE_W;
@@ -995,16 +992,15 @@ function applyPageView(onlyFit = false) {
   E.zoom = z;
   E.pagePane.style.setProperty("--pz", z.toFixed(4));
   const slide = st.fit === "page";
-  const res = dockReserve(),
-    vr = vtbReserve();
+  const res = dockReserve();
   E.ed.dataset.slide = slide ? "1" : "0";
   if (slide) {
     const gap = Math.max(2 * FIT_PAD, sc.clientHeight - res - PAGE_H * z);
     E.page.style.gap = gap + "px";
-    sc.style.padding = `${gap / 2}px ${FIT_PAD + vr}px ${gap / 2 + res}px ${FIT_PAD}px`;
+    sc.style.padding = `${gap / 2}px ${FIT_PAD}px ${gap / 2 + res}px`;
   } else {
     E.page.style.gap = "";
-    sc.style.padding = `${PG_PAD}px ${PG_PAD + vr}px ${PG_PAD + res + 8}px ${PG_PAD}px`;
+    sc.style.padding = `${PG_PAD}px ${PG_PAD}px ${PG_PAD + res + 8}px`;
   }
   sc.style.scrollPaddingBottom = res + "px";
   if (Math.abs(old - z) > 0.001 && rel) sc.scrollTop = rel * sc.scrollHeight;
@@ -1987,8 +1983,7 @@ function renderProblems() {
   const keep = $(".pb-list", p) ? $(".pb-list", p).scrollTop : 0;
   p.innerHTML = `<div class="pb-resize" title="Przeciągnij, aby zmienić wysokość"></div>
     <div class="pb-h"><span class="t">Problemy</span><span class="cnt${total ? " on" : ""}">${total}</span>
-      <span class="sc">w otwartych notatkach (${list.length})</span><span class="grow"></span>
-      <button class="wt-ibtn xs" data-act="problems" title="Zwiń panel (${esc(keyOf("problems"))})" aria-label="Zwiń panel">${icon("chevronDown", "sm")}</button></div>
+      <span class="sc">w otwartych notatkach (${list.length})</span></div>
     <div class="pb-list" role="tree">${
       withErr.length
         ? withErr
