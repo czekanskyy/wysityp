@@ -930,24 +930,25 @@ html[data-ui="float"][data-theme="dark"] {
 }
 html[data-ui="float"] :is(.top, .shell > .sb, .vtb, .dock, .float-tb, .tab-peek, .wt-menu, .pop, .dlg, .toast, .diag-box) { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
 
-/* Window: four glass panels around the note, over a Mica-like backdrop.
-   Pinned, a panel docks and takes room: top and bottom span the whole width, left and right fill the height between them.
-   Unpinned, it floats over the note and slides in from its edge. The floating left panel keeps room for the top and bottom panels. */
+/* Window: the sidebar and the note with its three bars, as glass panels over a Mica-like backdrop.
+   Pinned, a panel docks and takes room. The pinned sidebar is a section of its own and always runs the full height;
+   the top and bottom bars span the rest of the width, and the right bar fills the height between them.
+   Unpinned, a panel floats over the note and slides in from its edge. The floating left panel keeps room for the top and bottom bars. */
 html[data-ui="float"] .shell { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr) auto; padding: 8px; background: var(--mica); }
 html[data-ui="float"] :is(.main, .mid) { display: contents; }
 html[data-ui="float"] :is(.top, .shell > .sb, .dock, .vtb) { border: 0; border-radius: var(--glass-r); background: var(--glass-noise), var(--glass-bg); box-shadow: var(--card-shadow); }
-html[data-ui="float"] .top { grid-area: 1 / 1 / 2 / -1; z-index: 32; margin-bottom: 8px; transition: transform .36s var(--spring-soft), opacity .2s ease; }
+html[data-ui="float"] .top { grid-area: 1 / 2 / 2 / -1; z-index: 32; margin-bottom: 8px; transition: transform .36s var(--spring-soft), opacity .2s ease; }
 html[data-ui="float"] .tabs { border: 0; background: transparent; }
 html[data-ui="float"] .top-head:not(:empty) { border-top: 1px solid var(--glass-line); }
 html[data-ui="float"] .tab.active { border-color: transparent; box-shadow: var(--card-shadow); }
-html[data-ui="float"] .shell > .sb { grid-area: 2 / 1; z-index: 31; width: var(--sb-w); height: auto; margin-right: 8px; transition: transform .36s var(--spring-soft), opacity .2s ease; }
+html[data-ui="float"] .shell > .sb { grid-area: 1 / 1 / -1 / 2; z-index: 31; width: var(--sb-w); height: auto; margin-right: 8px; transition: transform .36s var(--spring-soft), opacity .2s ease; }
 html[data-ui="float"] .sb .foot { border-top-color: var(--glass-line); }
-html[data-ui="float"] .sb-resize { grid-area: 2 / 1; justify-self: end; width: 8px; margin: 0; }
+html[data-ui="float"] .sb-resize { grid-area: 1 / 1 / -1 / 2; justify-self: end; width: 8px; margin: 0; }
 html[data-ui="float"] .shell.no-sb .sb-resize { display: block; }
 html[data-ui="float"] .sb-edge { display: none; }
 html[data-ui="float"] #view { grid-area: 2 / 2; border-radius: var(--glass-r); overflow: hidden; background: var(--color-surface); box-shadow: var(--card-shadow); }
 html[data-ui="float"] .rail { grid-area: 2 / 3; position: relative; z-index: 25; }
-html[data-ui="float"] .dock { grid-area: 3 / 1 / 4 / -1; position: relative; margin-top: 8px; overflow: hidden; transition: transform .4s var(--spring), opacity .22s ease; }
+html[data-ui="float"] .dock { grid-area: 3 / 2 / 4 / -1; position: relative; margin-top: 8px; overflow: hidden; transition: transform .4s var(--spring), opacity .22s ease; }
 html[data-ui="float"] .wt-ibtn.pin[aria-pressed="true"], html[data-ui="float"] .status .st-pin[aria-pressed="true"] { color: var(--color-accent-text); }
 
 /* Unpinned: the panel leaves the grid and floats over the note with a deeper shadow.
@@ -1030,11 +1031,11 @@ html[data-ui="float"] .diag-box { background: var(--glass-noise), color-mix(in s
 .ui-pv.fixed .st { left: 0; right: 0; bottom: 0; height: 11px; background: var(--color-bg); border-top: 1px solid var(--color-border); }
 .ui-pv.float { background: radial-gradient(110% 80% at 0% 0%, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 62%), var(--color-surface-sunken); }
 .ui-pv.float :is(.t, .sd, .vb, .st) { border: 0; border-radius: 3px; background: color-mix(in srgb, var(--color-surface-raised) 82%, transparent); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-text) 12%, transparent), 0 2px 5px rgb(0 0 0 / .14); }
-.ui-pv.float .t { left: 4px; right: 4px; top: 4px; height: 12px; }
-.ui-pv.float .sd { left: 4px; top: 19px; bottom: 18px; width: calc(22% - 2px); }
+.ui-pv.float .t { left: calc(22% + 6px); right: 4px; top: 4px; height: 12px; }
+.ui-pv.float .sd { left: 4px; top: 4px; bottom: 4px; width: calc(22% - 2px); }
 .ui-pv.float .pg { top: 24px; }
 .ui-pv.float .vb { right: 8px; top: 34px; width: 7px; height: 26px; }
-.ui-pv.float .st { left: 4px; right: 4px; bottom: 4px; height: 9px; }
+.ui-pv.float .st { left: calc(22% + 6px); right: 4px; bottom: 4px; height: 9px; }
 
 /* Responsive shell */
 @media (max-width: 760px) {
