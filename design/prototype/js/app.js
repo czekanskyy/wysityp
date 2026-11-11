@@ -1995,10 +1995,15 @@ function bindEdges() {
       shell.classList.remove(cls);
     }, 450);
   };
+  /* Floating top and bottom panels cover only the note, between the pinned side panels, so they answer only there. */
+  const overNote = (e) => {
+    const v = $("#view").getBoundingClientRect();
+    return e.clientX >= v.left && e.clientX <= v.right;
+  };
   const parts = [
-    ["top_autohide", "top-show", top, (e, r, out) => e.clientY - r.top < (out ? top.offsetHeight + 24 : 28)],
+    ["top_autohide", "top-show", top, (e, r, out) => overNote(e) && e.clientY - r.top < (out ? top.offsetHeight + 24 : 28)],
     ["sb_autohide", "sb-show", sb, (e, r, out) => e.clientX - r.left < (out ? sb.offsetWidth + 24 : 24) && e.clientY > r.top + off(top) && e.clientY < r.bottom - off(dock)],
-    ["status_autohide", "dock-show", dock, (e, r, out) => r.bottom - e.clientY < (out ? dock.offsetHeight + 28 : 36)],
+    ["status_autohide", "dock-show", dock, (e, r, out) => overNote(e) && r.bottom - e.clientY < (out ? dock.offsetHeight + 28 : 36)],
   ];
   shell.addEventListener("mousemove", (e) => {
     if (!floatUi()) return;

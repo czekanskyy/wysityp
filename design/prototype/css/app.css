@@ -950,11 +950,12 @@ html[data-ui="float"] .rail { grid-area: 2 / 3; position: relative; z-index: 25;
 html[data-ui="float"] .dock { grid-area: 3 / 1 / 4 / -1; position: relative; margin-top: 8px; overflow: hidden; transition: transform .4s var(--spring), opacity .22s ease; }
 html[data-ui="float"] .wt-ibtn.pin[aria-pressed="true"], html[data-ui="float"] .status .st-pin[aria-pressed="true"] { color: var(--color-accent-text); }
 
-/* Unpinned: the panel leaves the grid and floats over the note with a deeper shadow. Without a grid area it is placed against the window, not its old cell. */
-html[data-ui="float"][data-top-auto] .top { grid-area: auto; position: absolute; top: 8px; left: 8px; right: 8px; margin: 0; box-shadow: var(--glass-shadow); }
+/* Unpinned: the panel leaves the grid and floats over the note with a deeper shadow.
+   Floating top and bottom panels sit in the note column, so pinned side panels stay uncovered. The floating left panel is placed against the window. */
+html[data-ui="float"][data-top-auto] .top { grid-area: 1 / 2 / -1 / 3; position: absolute; top: 0; left: 0; right: 0; margin: 0; box-shadow: var(--glass-shadow); }
 html[data-ui="float"][data-sb-auto] .shell > .sb { grid-area: auto; position: absolute; left: 8px; top: calc(8px + var(--top-off, 0px)); bottom: calc(8px + var(--dock-off, 0px)); margin: 0; box-shadow: var(--glass-shadow); }
 html[data-ui="float"][data-sb-auto] .shell .sb-resize { display: none; }
-html[data-ui="float"][data-status-auto] .dock { grid-area: auto; position: absolute; left: 8px; right: 8px; bottom: 8px; margin: 0; box-shadow: var(--glass-shadow); }
+html[data-ui="float"][data-status-auto] .dock { grid-area: 1 / 2 / -1 / 3; position: absolute; left: 0; right: 0; bottom: 0; margin: 0; box-shadow: var(--glass-shadow); }
 html[data-ui="float"][data-vtb-auto] .vtb { position: absolute; right: 10px; top: 50%; max-height: calc(100% - 20px); padding: 5px 3px; box-shadow: var(--glass-shadow); transform: translateY(-50%); transition: transform .36s var(--spring-soft), opacity .2s ease; }
 html[data-ui="float"]:not([data-vtb-auto]) .rail { display: flex; }
 html[data-ui="float"]:not([data-vtb-auto]) .vtb { width: 44px; margin-left: 8px; padding: 6px 0; }
@@ -967,9 +968,9 @@ html[data-ui="float"][data-vtb-auto] .rail:not(.vtb-show) .vtb:not(:has([aria-ex
 
 /* Small handles in the window margin show where a hidden panel waits. */
 html[data-ui="float"] :is(.edge-hint, .dock-hint) { position: absolute; z-index: 19; border-radius: 2px; background: color-mix(in srgb, var(--color-text) 24%, transparent); pointer-events: none; transition: opacity .2s; }
-html[data-ui="float"][data-top-auto] .eh-top { display: block; top: 2px; left: 50%; width: 48px; height: 4px; margin-left: -24px; }
+html[data-ui="float"][data-top-auto] .eh-top { display: block; grid-area: 1 / 2 / -1 / 3; top: -6px; left: 50%; width: 48px; height: 4px; margin-left: -24px; }
 html[data-ui="float"][data-sb-auto] .eh-left { display: block; left: 2px; top: calc(50% + (var(--top-off, 0px) - var(--dock-off, 0px)) / 2); width: 4px; height: 48px; margin-top: -24px; }
-html[data-ui="float"][data-status-auto] .dock-hint { display: block; bottom: 2px; left: 50%; width: 48px; height: 4px; margin-left: -24px; }
+html[data-ui="float"][data-status-auto] .dock-hint { display: block; grid-area: 1 / 2 / -1 / 3; bottom: -6px; left: 50%; width: 48px; height: 4px; margin-left: -24px; }
 html[data-ui="float"][data-vtb-auto] .rail:has(.vtb)::after { content: ""; position: absolute; right: 4px; top: 50%; width: 4px; height: 44px; margin-top: -22px; border-radius: 2px; background: color-mix(in srgb, var(--color-text) 24%, transparent); pointer-events: none; transition: opacity .2s; }
 html[data-ui="float"] .shell.top-show .eh-top, html[data-ui="float"] .shell.sb-show .eh-left, html[data-ui="float"] .shell.dock-show .dock-hint, html[data-ui="float"] .shell:has(.dock.pb-open) .dock-hint { opacity: 0; }
 html[data-ui="float"][data-vtb-auto] .rail.vtb-show::after, html[data-ui="float"][data-vtb-auto] .rail:has(.vtb [aria-expanded="true"])::after { opacity: 0; }
