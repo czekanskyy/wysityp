@@ -1,4 +1,5 @@
 import type { EditorState } from "@codemirror/state";
+import { untrack } from "svelte";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type {
   RenderDiagnostic,
@@ -183,8 +184,15 @@ export class Session {
   private readonly scheduleRender: () => void;
   private readonly scheduleSearch: () => void;
   editor: EditorHandle | undefined;
-  readonly attachEditor = (node: HTMLDivElement): (() => void) =>
-    this.editorAttachment(node);
+  readonly attachEditor = (node: HTMLDivElement): (() => void) => {
+    // Rebuild the editor when the active tab changes, and for no other reason.
+    // Setup and teardown both read and write the tab list (they snapshot the
+    // text), so tracking it here would re-run this attachment forever
+    // (Svelte: effect_update_depth_exceeded). Fonts, page colour, and view
+    // are applied to the live editor by their own setters.
+    void this.activeId;
+    return untrack(() => this.editorAttachment(node));
+  };
 
   constructor(startup: StartupAppearance) {
     this.theme = startup.theme;
@@ -1118,9 +1126,15 @@ export class Session {
       void getCurrentWindow()
         .onCloseRequested(async (event) => {
           event.preventDefault();
+          // Rust closes the window by itself after a short wait, so a hang
+          // or a failure here can never keep the window open for good.
           const ok = await this.run(() => this.settleAll());
-          if (!ok) return;
-          await this.writeSession();
+          if (!ok) {
+            // A save failed: keep the window open until the student decides.
+            await api.holdClose().catch(() => undefined);
+            return;
+          }
+          await this.writeSession().catch(() => undefined);
           await getCurrentWindow().destroy();
         })
         .then((fn) => {

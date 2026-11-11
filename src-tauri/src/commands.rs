@@ -794,6 +794,14 @@ pub fn adopt_open_paths(
     map_open_paths(&state, paths, false)
 }
 
+/// The page keeps the window open on purpose (a save failed): stop the
+/// close timer. The next close request starts a new one.
+#[tauri::command]
+#[specta::specta]
+pub fn hold_close(state: State<'_, AppState>) {
+    state.close_guard.hold();
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_settings(state: State<'_, AppState>) -> Result<Settings, String> {

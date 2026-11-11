@@ -1,4 +1,5 @@
 mod access;
+mod close_guard;
 mod commands;
 mod error;
 mod files;
@@ -25,6 +26,8 @@ pub struct AppState {
     pub template_baselines: Mutex<templates::TemplateBaselines>,
     /// Open folder, drafts folder, and files the student picked.
     pub access: Mutex<access::AccessGate>,
+    /// Makes sure a close request always ends in a closed window.
+    pub close_guard: close_guard::CloseGuard,
 }
 
 impl AppState {
@@ -36,6 +39,7 @@ impl AppState {
             note_baselines: Mutex::new(files::NoteBaselines::default()),
             template_baselines: Mutex::new(templates::TemplateBaselines::default()),
             access: Mutex::new(access::AccessGate::new(PathBuf::new())),
+            close_guard: close_guard::CloseGuard::default(),
         }
     }
 }
@@ -82,7 +86,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::restore_session,
         commands::save_session,
         commands::release_workspace_paths,
-        commands::adopt_open_paths
+        commands::adopt_open_paths,
+        commands::hold_close
     ])
 }
 
@@ -139,9 +144,34 @@ pub fn run() {
             }
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                arm_close_fallback(window);
+            }
+        })
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// The page flushes saves before it closes the window. If it does not do so
+/// in time (broken page, hung flush, missing permission), close it from here.
+fn arm_close_fallback(window: &tauri::Window) {
+    if window.label() != "main" {
+        return;
+    }
+    let ticket = window.state::<AppState>().close_guard.arm();
+    let window = window.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(close_guard::CLOSE_TIMEOUT);
+        if window
+            .state::<AppState>()
+            .close_guard
+            .may_force_close(ticket)
+        {
+            let _ = window.destroy();
+        }
+    });
 }
 
 /// WebView2 prints on Ctrl+P and F1 before the page can handle them.

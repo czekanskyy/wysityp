@@ -67,6 +67,11 @@ export const commands = {
 	releaseWorkspacePaths: (paths: string[]) => typedError<string[], string>(__TAURI_INVOKE("release_workspace_paths", { paths })),
 	/**  Turn absolute keys that sit in the open folder back into relative paths. */
 	adoptOpenPaths: (paths: string[]) => typedError<string[], string>(__TAURI_INVOKE("adopt_open_paths", { paths })),
+	/**
+	 *  The page keeps the window open on purpose (a save failed): stop the
+	 *  close timer. The next close request starts a new one.
+	 */
+	holdClose: () => __TAURI_INVOKE<void>("hold_close"),
 };
 
 /* Types */
