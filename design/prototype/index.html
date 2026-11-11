@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pl" data-theme="light" data-pg="white">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WYSITyp – prototyp</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body>
+    <div class="app-root">
+      <div class="shell" id="shell">
+        <aside class="sb wt-sidebar" id="sb" aria-label="Notatki"></aside>
+        <div class="sb-resize" id="sbResize" title="Przeciągnij, aby zmienić szerokość. Podwójne kliknięcie przywraca domyślną."></div>
+        <button class="sb-edge" id="sbEdge" data-act="toggleSidebar" aria-controls="sb"></button>
+        <main class="main">
+          <div class="tabs" id="tabs"></div>
+          <div id="view" style="flex: 1; min-height: 0; display: flex; flex-direction: column"></div>
+          <footer class="status" id="status"></footer>
+        </main>
+      </div>
+    </div>
+    <div id="layer"></div>
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+
+    <script src="js/icons.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/typst.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/popups.js"></script>
+    <script src="js/settings.js"></script>
+    <script>
+      boot();
+    </script>
+  </body>
+</html>
